@@ -128,26 +128,182 @@
                     else if (ActiveTab == "Paint")
                     {
                         <!-- 油漆涂料价格与参数库 -->
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span class="text-xs text-primary fw-bold">🎨 工业重防腐涂料与防火涂料标准参考报价 (支持在线调整)</span>
-                            <span class="text-xs @(IsDarkMode ? "text-white-50" : "text-muted")">
-                                数据库容量: <strong>@PaintProducts.Count</strong> 款标准工程涂料
-                            </span>
+                        <div class="d-flex flex-wrap justify-content-between align-items-center mb-2 gap-2">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="text-xs text-primary fw-bold">🎨 工业重防腐涂料与防火涂料标准参考报价 (支持在线调整与持久化)</span>
+                                <span class="badge @(IsDarkMode ? "bg-secondary" : "bg-primary-subtle text-primary") text-xs">
+                                    共 @PaintProducts.Count 款
+                                </span>
+                            </div>
+                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                <button class="btn btn-xs @(ShowAddPaintForm ? "btn-warning" : "btn-outline-warning") d-flex align-items-center gap-1"
+                                        @onclick="ToggleAddPaintForm">
+                                    <span>➕ 新增涂料/防火品牌</span>
+                                </button>
+                                <button class="btn btn-xs btn-success d-flex align-items-center gap-1"
+                                        @onclick="SavePaintProducts" title="保存所有调整与新增至工程数据库">
+                                    <span>💾 存储变更</span>
+                                </button>
+                                <button class="btn btn-xs btn-outline-info d-flex align-items-center gap-1"
+                                        @onclick="OpenImportModal" title="预留 JSON / 外部数据批量导入接口">
+                                    <span>📥 数据导入</span>
+                                </button>
+                                <button class="btn btn-xs btn-outline-secondary d-flex align-items-center gap-1"
+                                        @onclick="ExportDatabaseJson" title="导出当前数据库备份 (JSON)">
+                                    <span>📤 导出备份</span>
+                                </button>
+                                <button class="btn btn-xs btn-outline-danger"
+                                        @onclick="ResetPaintDatabase" title="恢复出厂内置参考产品与价格">
+                                    <span>🔄 恢复默认</span>
+                                </button>
+                            </div>
                         </div>
+
+                        @if (!string.IsNullOrEmpty(SaveStatusMessage))
+                        {
+                            <div class="alert alert-success py-1 px-2 text-xs mb-2 d-flex justify-content-between align-items-center">
+                                <span>@SaveStatusMessage</span>
+                                <button type="button" class="btn-close py-0" @onclick="() => SaveStatusMessage = null"></button>
+                            </div>
+                        }
+
+                        <!-- 新增涂料品牌产品表单卡片 -->
+                        @if (ShowAddPaintForm)
+                        {
+                            <div class="p-3 mb-3 rounded border @(IsDarkMode ? "bg-dark border-warning border-opacity-50" : "bg-warning bg-opacity-10 border-warning-subtle")">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="fw-bold text-xs text-warning">➕ 添加新涂料 / 防火品牌规格</span>
+                                    <button class="btn btn-link btn-sm p-0 text-muted text-xs" @onclick="() => ShowAddPaintForm = false">✕ 关闭</button>
+                                </div>
+                                <div class="row g-2 text-xs mb-2">
+                                    <div class="col-md-2">
+                                        <label class="@(IsDarkMode ? "text-white-50" : "text-muted")">涂层类别</label>
+                                        <select class="form-select form-select-sm @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                                @bind="NewPaintItem.LayerType">
+                                            @foreach (var lt in Enum.GetValues<CoatingLayerType>())
+                                            {
+                                                <option value="@lt">@lt</option>
+                                            }
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="@(IsDarkMode ? "text-white-50" : "text-muted")">产品规格型号名称</label>
+                                        <input type="text" class="form-control form-control-sm @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                               placeholder="如: 高固体分环氧底漆" @bind="NewPaintItem.Name" />
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="@(IsDarkMode ? "text-white-50" : "text-muted")">代表品牌/厂家</label>
+                                        <input type="text" class="form-control form-control-sm @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                               placeholder="如: 佐敦 / 兰陵 / 自定义" @bind="NewPaintItem.Brand" />
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="@(IsDarkMode ? "text-white-50" : "text-muted")">设计膜厚 (@(NewPaintItem.LayerType == CoatingLayerType.Fireproof ? "mm" : "μm"))</label>
+                                        <input type="number" class="form-control form-control-sm text-end @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                               @bind="NewPaintItem.DefaultDft" step="@(NewPaintItem.LayerType == CoatingLayerType.Fireproof ? 0.2 : 5)" />
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="@(IsDarkMode ? "text-white-50" : "text-muted")">固含 (VS%)</label>
+                                        <input type="number" class="form-control form-control-sm text-end @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                               @bind="NewPaintItem.VolumeSolidsPercent" step="1" />
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="@(IsDarkMode ? "text-white-50" : "text-muted")">比重 (kg/L)</label>
+                                        <input type="number" class="form-control form-control-sm text-end @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                               @bind="NewPaintItem.DensityKgL" step="0.05" />
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="@(IsDarkMode ? "text-white-50" : "text-muted")">损耗率 (%)</label>
+                                        <input type="number" class="form-control form-control-sm text-end @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                               @bind="NewPaintItem.LossRatePercent" step="5" />
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="@(IsDarkMode ? "text-white-50" : "text-muted")">材料单价 (元/kg)</label>
+                                        <input type="number" class="form-control form-control-sm text-end fw-bold text-success @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                               @bind="NewPaintItem.MaterialUnitPricePerKg" step="1" />
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="@(IsDarkMode ? "text-white-50" : "text-muted")">施工工费 (元/m²)</label>
+                                        <input type="number" class="form-control form-control-sm text-end fw-bold text-primary @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                               @bind="NewPaintItem.LaborUnitPricePerM2" step="1" />
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="@(IsDarkMode ? "text-white-50" : "text-muted")">技术特性说明</label>
+                                        <input type="text" class="form-control form-control-sm @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                               placeholder="防腐年限、环境分类等说明" @bind="NewPaintItem.Description" />
+                                    </div>
+                                </div>
+                                <div class="d-flex justify-content-end gap-2">
+                                    <button class="btn btn-xs btn-outline-secondary" @onclick="() => ShowAddPaintForm = false">取消</button>
+                                    <button class="btn btn-xs btn-warning fw-bold" @onclick="ConfirmAddNewPaintProduct">
+                                        ✔ 确认添加至数据库
+                                    </button>
+                                </div>
+                            </div>
+                        }
+
+                        <!-- 预留数据导入/导出模态面板 -->
+                        @if (ShowImportModal)
+                        {
+                            <div class="p-3 mb-3 rounded border @(IsDarkMode ? "bg-dark border-info" : "bg-info bg-opacity-10 border-info-subtle")">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="fw-bold text-xs text-info">📥 涂料数据库批量导入接口 (JSON 格式)</span>
+                                    <button class="btn btn-link btn-sm p-0 text-muted text-xs" @onclick="() => ShowImportModal = false">✕ 关闭</button>
+                                </div>
+                                <div class="text-xs @(IsDarkMode ? "text-white-50" : "text-muted") mb-1">
+                                    支持粘贴外部 ERP / 造价定额系统导出的标准 JSON 数据格式，可选择追加导入或全量覆盖：
+                                </div>
+                                <textarea class="form-control form-control-sm font-monospace text-xs mb-2 @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                          rows="5" placeholder="请在此粘贴 JSON 涂料数组数据..." @bind="ImportJsonContent"></textarea>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div class="form-check form-check-inline text-xs m-0">
+                                        <input class="form-check-input" type="checkbox" id="chkOverwrite" @bind="ImportOverwrite">
+                                        <label class="form-check-label @(IsDarkMode ? "text-white-50" : "text-muted")" for="chkOverwrite">
+                                            全量覆盖现有数据 (默认追加)
+                                        </label>
+                                    </div>
+                                    <div class="d-flex gap-2">
+                                        <button class="btn btn-xs btn-outline-secondary" @onclick="() => ShowImportModal = false">取消</button>
+                                        <button class="btn btn-xs btn-info" @onclick="ExecuteImportData">
+                                            🚀 解析并执行导入
+                                        </button>
+                                    </div>
+                                </div>
+                                @if (!string.IsNullOrEmpty(ImportErrorMessage))
+                                {
+                                    <div class="text-danger text-xs mt-1">@ImportErrorMessage</div>
+                                }
+                            </div>
+                        }
+
+                        @if (ShowExportModal)
+                        {
+                            <div class="p-3 mb-3 rounded border @(IsDarkMode ? "bg-dark border-secondary" : "bg-light border-secondary")">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="fw-bold text-xs text-info">📤 涂料数据库导出成果 (JSON)</span>
+                                    <button class="btn btn-link btn-sm p-0 text-muted text-xs" @onclick="() => ShowExportModal = false">✕ 关闭</button>
+                                </div>
+                                <textarea class="form-control form-control-sm font-monospace text-xs mb-2 @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                          rows="6" readonly value="@ExportJsonContent"></textarea>
+                                <div class="text-end">
+                                    <button class="btn btn-xs btn-secondary" @onclick="() => ShowExportModal = false">完成关闭</button>
+                                </div>
+                            </div>
+                        }
 
                         <div class="table-responsive rounded border @(IsDarkMode ? "border-secondary" : "border-light-subtle")" style="max-height: 440px;">
                             <table class="table table-sm @(IsDarkMode ? "table-dark table-hover" : "table-hover") align-middle mb-0 text-xs">
                                 <thead class="@(IsDarkMode ? "table-secondary table-opacity-25" : "table-light") sticky-top">
                                     <tr>
-                                        <th>类别</th>
+                                        <th style="width: 70px;">类别</th>
                                         <th>涂料规格名称</th>
                                         <th>代表品牌</th>
-                                        <th class="text-end" style="width: 100px;">固含(VS%)</th>
-                                        <th class="text-end" style="width: 100px;">比重(kg/L)</th>
-                                        <th class="text-end" style="width: 100px;">推荐膜厚</th>
-                                        <th class="text-end" style="width: 120px;">材料单价(元/kg)</th>
-                                        <th class="text-end" style="width: 120px;">工费单价(元/m²)</th>
+                                        <th class="text-end" style="width: 90px;">固含(VS%)</th>
+                                        <th class="text-end" style="width: 90px;">比重(kg/L)</th>
+                                        <th class="text-end" style="width: 90px;">推荐膜厚</th>
+                                        <th class="text-end" style="width: 110px;">材料单价(元/kg)</th>
+                                        <th class="text-end" style="width: 110px;">工费单价(元/m²)</th>
                                         <th>技术描述</th>
+                                        <th class="text-center" style="width: 60px;">操作</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -157,18 +313,26 @@
                                             <td>
                                                 <span class="badge @GetPaintBadgeClass(p.LayerType)">@p.LayerType</span>
                                             </td>
-                                            <td class="fw-bold">@p.Name</td>
-                                            <td>@p.Brand</td>
+                                            <td class="fw-bold">
+                                                <input type="text" class="form-control form-control-sm p-0 border-0 fw-bold @(IsDarkMode ? "bg-dark text-white" : "bg-white")"
+                                                       @bind="p.Name" />
+                                            </td>
+                                            <td>
+                                                <input type="text" class="form-control form-control-sm p-0 border-0 @(IsDarkMode ? "bg-dark text-white" : "bg-white")"
+                                                       @bind="p.Brand" />
+                                            </td>
                                             <td class="text-end">
                                                 <input type="number" class="form-control form-control-sm text-end p-0 border-0 @(IsDarkMode ? "bg-dark text-white" : "bg-white")"
                                                        @bind="p.VolumeSolidsPercent" step="1" />
                                             </td>
                                             <td class="text-end">
-                                                <input type="number" class="form-control form-control-sm text-end p-0 border-0 @(IsDarkMode ? "bg-dark text-white" : "bg-white")"
+                                                <input type="number" class="form-control form-control-sm text-end p-0 border-0 @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
                                                        @bind="p.DensityKgL" step="0.05" />
                                             </td>
                                             <td class="text-end">
-                                                <span>@p.DefaultDft @(p.LayerType == CoatingLayerType.Fireproof ? "mm" : "μm")</span>
+                                                <input type="number" class="form-control form-control-sm text-end p-0 border-0 @(IsDarkMode ? "bg-dark text-white" : "bg-white")"
+                                                       @bind="p.DefaultDft" step="@(p.LayerType == CoatingLayerType.Fireproof ? 0.2 : 5)" />
+                                                <span class="text-muted" style="font-size: 10px;">@(p.LayerType == CoatingLayerType.Fireproof ? "mm" : "μm")</span>
                                             </td>
                                             <td class="text-end">
                                                 <input type="number" class="form-control form-control-sm text-end p-0 border-0 fw-bold text-success @(IsDarkMode ? "bg-dark" : "bg-white")"
@@ -178,8 +342,14 @@
                                                 <input type="number" class="form-control form-control-sm text-end p-0 border-0 fw-bold text-primary @(IsDarkMode ? "bg-dark" : "bg-white")"
                                                        @bind="p.LaborUnitPricePerM2" step="1" />
                                             </td>
-                                            <td class="text-truncate @(IsDarkMode ? "text-white-50" : "text-muted")" style="max-width: 240px;" title="@p.Description">
-                                                @p.Description
+                                            <td class="text-truncate @(IsDarkMode ? "text-white-50" : "text-muted")" style="max-width: 200px;" title="@p.Description">
+                                                <input type="text" class="form-control form-control-sm p-0 border-0 text-truncate @(IsDarkMode ? "bg-dark text-white" : "bg-white")"
+                                                       @bind="p.Description" />
+                                            </td>
+                                            <td class="text-center">
+                                                <button class="btn btn-link text-danger p-0 text-xs" @onclick="() => DeletePaintProduct(p.Id)" title="删除此产品">
+                                                    🗑️
+                                                </button>
                                             </td>
                                         </tr>
                                     }
@@ -277,4 +447,120 @@
         CoatingLayerType.Fireproof => "bg-danger",
         _ => "bg-secondary"
     };
+
+    // ================= 油漆与防火涂料数据库操作逻辑 =================
+    private bool ShowAddPaintForm { get; set; }
+    private bool ShowImportModal { get; set; }
+    private bool ShowExportModal { get; set; }
+    private string? SaveStatusMessage { get; set; }
+    private string? ImportErrorMessage { get; set; }
+    private string ImportJsonContent { get; set; } = "";
+    private string ExportJsonContent { get; set; } = "";
+    private bool ImportOverwrite { get; set; }
+
+    private PaintProductItem NewPaintItem { get; set; } = new()
+    {
+        LayerType = CoatingLayerType.Primer,
+        Name = "",
+        Brand = "自选品牌",
+        DefaultDft = 70,
+        VolumeSolidsPercent = 60,
+        DensityKgL = 1.40,
+        LossRatePercent = 25,
+        MaterialUnitPricePerKg = 35,
+        LaborUnitPricePerM2 = 12,
+        Description = "通用防腐涂装产品"
+    };
+
+    private void ToggleAddPaintForm()
+    {
+        ShowAddPaintForm = !ShowAddPaintForm;
+        if (ShowAddPaintForm)
+        {
+            NewPaintItem = new PaintProductItem
+            {
+                LayerType = CoatingLayerType.Primer,
+                Name = "",
+                Brand = "自选品牌",
+                DefaultDft = 70,
+                VolumeSolidsPercent = 60,
+                DensityKgL = 1.40,
+                LossRatePercent = 25,
+                MaterialUnitPricePerKg = 35,
+                LaborUnitPricePerM2 = 12,
+                Description = "通用防腐涂装产品"
+            };
+        }
+    }
+
+    private void ConfirmAddNewPaintProduct()
+    {
+        if (string.IsNullOrWhiteSpace(NewPaintItem.Name))
+        {
+            SaveStatusMessage = "⚠️ 请输入涂料规格型号名称！";
+            return;
+        }
+
+        PaintProductDatabase.AddProduct(NewPaintItem);
+        PaintProducts = PaintProductDatabase.AllProducts.ToList();
+        ShowAddPaintForm = false;
+        SaveStatusMessage = $"✅ 成功添加新涂料规格：{NewPaintItem.Name}（{NewPaintItem.Brand}），已存入数据库！";
+    }
+
+    private void DeletePaintProduct(int id)
+    {
+        var target = PaintProducts.FirstOrDefault(p => p.Id == id);
+        if (target != null && PaintProductDatabase.RemoveProduct(id))
+        {
+            PaintProducts = PaintProductDatabase.AllProducts.ToList();
+            SaveStatusMessage = $"🗑️ 已从数据库中删除涂料规格：{target.Name}";
+        }
+    }
+
+    private void SavePaintProducts()
+    {
+        PaintProductDatabase.UpdateProducts(PaintProducts);
+        SaveStatusMessage = $"💾 存储成功！已将 {PaintProducts.Count} 款涂料与防火单价及技术参数持久化至工程数据库！";
+    }
+
+    private void OpenImportModal()
+    {
+        ShowImportModal = true;
+        ImportErrorMessage = null;
+        ImportJsonContent = "";
+    }
+
+    private void ExecuteImportData()
+    {
+        if (string.IsNullOrWhiteSpace(ImportJsonContent))
+        {
+            ImportErrorMessage = "请粘贴有效 JSON 格式数据！";
+            return;
+        }
+
+        bool success = PaintProductDatabase.ImportFromJson(ImportJsonContent, ImportOverwrite);
+        if (success)
+        {
+            PaintProducts = PaintProductDatabase.AllProducts.ToList();
+            ShowImportModal = false;
+            SaveStatusMessage = $"🎉 数据导入成功！当前数据库已载入 {PaintProducts.Count} 款工程涂料与防火数据。";
+        }
+        else
+        {
+            ImportErrorMessage = "导入失败：JSON 格式不合规或缺少必要字段，请检查输入！";
+        }
+    }
+
+    private void ExportDatabaseJson()
+    {
+        ExportJsonContent = PaintProductDatabase.ExportToJson();
+        ShowExportModal = true;
+    }
+
+    private void ResetPaintDatabase()
+    {
+        PaintProductDatabase.ResetToDefaults();
+        PaintProducts = PaintProductDatabase.AllProducts.ToList();
+        SaveStatusMessage = "🔄 已恢复为国家与行业标准出厂默认涂料参考报价与工艺参数。";
+    }
 }

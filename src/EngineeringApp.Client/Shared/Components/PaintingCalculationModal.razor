@@ -87,14 +87,27 @@
                                             <span class="badge @GetLayerBadgeClass(layer.LayerType)">@layer.GetDisplayName()</span>
                                         </td>
                                         <td>
-                                            <div class="input-group input-group-sm">
-                                                <input type="text" class="form-control form-control-sm @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
-                                                       @bind="layer.ProductName" @bind:after="Recalculate" />
-                                                <button class="btn @(IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary") dropdown-toggle py-0"
-                                                        type="button" data-bs-toggle="dropdown" aria-expanded="false" title="从产品库选择标准涂料"
-                                                        @onclick="() => SelectProductFromDb(layer)">
-                                                    库
-                                                </button>
+                                            <div class="d-flex flex-column gap-1">
+                                                <select class="form-select form-select-sm py-0 @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark")"
+                                                        style="font-size: 11px; height: 26px;"
+                                                        @onchange="(e) => OnSelectProductFromDatabase(layer, e)">
+                                                    <option value="">-- 选择标准产品库 / 品牌报价 --</option>
+                                                    @foreach (var prod in PaintProductDatabase.GetByType(layer.LayerType))
+                                                    {
+                                                        <option value="@prod.Name" selected="@(prod.Name == layer.ProductName)">
+                                                            @prod.Name (@prod.Brand) - ¥@prod.MaterialUnitPricePerKg/kg
+                                                        </option>
+                                                    }
+                                                </select>
+                                                <div class="input-group input-group-sm">
+                                                    <input type="text" class="form-control form-control-sm py-0 @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                                           style="font-size: 11px; height: 24px;"
+                                                           placeholder="自定义规格名称 / 品牌"
+                                                           @bind="layer.ProductName" @bind:after="Recalculate" />
+                                                    <span class="input-group-text py-0 px-1 text-xs @(IsDarkMode ? "bg-secondary bg-opacity-25 text-white-50 border-secondary" : "bg-light")" title="当前规格型号">
+                                                        🏷️
+                                                    </span>
+                                                </div>
                                             </div>
                                         </td>
                                         <td>
@@ -288,9 +301,14 @@
         Recalculate();
     }
 
-    private void SelectProductFromDb(CoatingLayerConfig layer)
+    private void OnSelectProductFromDatabase(CoatingLayerConfig layer, ChangeEventArgs e)
     {
-        var product = PaintProductDatabase.GetByType(layer.LayerType).FirstOrDefault();
+        string? prodName = e.Value?.ToString();
+        if (string.IsNullOrWhiteSpace(prodName)) return;
+
+        var product = PaintProductDatabase.GetByType(layer.LayerType).FirstOrDefault(p => p.Name == prodName)
+                   ?? PaintProductDatabase.AllProducts.FirstOrDefault(p => p.Name == prodName);
+
         if (product != null)
         {
             layer.ProductName = product.Name;

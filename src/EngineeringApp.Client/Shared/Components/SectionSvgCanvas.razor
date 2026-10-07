@@ -101,7 +101,16 @@
                     var na2 = Result.StressResult.NeutralAxisPoint2;
                     <line x1="@ToSvgX(na1.Y)" y1="@ToSvgY(na1.Z)" x2="@ToSvgX(na2.Y)" y2="@ToSvgY(na2.Z)"
                           stroke="@NeutralAxisColor" stroke-width="@(StrokeWidth * 2)" stroke-dasharray="6,4" />
-                    @((MarkupString)$"<text x=\"{ToSvgX(na2.Y + 10):F1}\" y=\"{ToSvgY(na2.Z):F1}\" fill=\"{NeutralAxisColor}\" font-size=\"{FontSize:F1}\" font-weight=\"bold\">中和轴 (N.A.)</text>")
+                    
+                    // 选取中和轴靠左上方的端点进行标注，彻底避免与右侧高度标注及底部宽度标注冲突
+                    var naLabelPt = na1.Z >= na2.Z ? na1 : na2;
+                    double naTx = ToSvgX(naLabelPt.Y - 12);
+                    double naTy = ToSvgY(naLabelPt.Z + 8);
+                    string naText = "中和轴 (N.A.)";
+                    double naW = GetTextWidthApprox(naText, FontSize * 0.9);
+                    <rect x="@(naTx - naW - 4)" y="@(naTy - FontSize * 0.7)" width="@(naW + 8)" height="@(FontSize * 1.3)"
+                          fill="@CanvasBgColor" fill-opacity="0.9" stroke="@NeutralAxisColor" stroke-width="1" rx="3" />
+                    @((MarkupString)$"<text x=\"{(naTx - 4):F1}\" y=\"{naTy:F1}\" fill=\"{NeutralAxisColor}\" font-size=\"{(FontSize * 0.9):F1}\" font-weight=\"bold\" text-anchor=\"end\" dominant-baseline=\"middle\">{naText}</text>")
                 }
 
                 <!-- 形心标记与主轴 -->
@@ -121,48 +130,82 @@
                     var p1End = RotateOffset(Result.Yc, Result.Zc, AxisLength, Result.PrincipalAngleDeg);
                     <line x1="@ToSvgX(p1Start.Y)" y1="@ToSvgY(p1Start.Z)" x2="@ToSvgX(p1End.Y)" y2="@ToSvgY(p1End.Z)"
                           stroke="@Axis1Color" stroke-width="@(StrokeWidth * 1.4)" stroke-dasharray="8,4" />
-                    @((MarkupString)$"<text x=\"{ToSvgX(p1End.Y):F1}\" y=\"{ToSvgY(p1End.Z - 5):F1}\" fill=\"{Axis1Color}\" font-size=\"{FontSize:F1}\" font-weight=\"bold\">1-1 (α={Result.PrincipalAngleDeg:F1}°)</text>")
+                    
+                    string axis1Text = $"1-1 (α={Result.PrincipalAngleDeg:F1}°)";
+                    double a1W = GetTextWidthApprox(axis1Text, FontSize * 0.85);
+                    double a1Tx = ToSvgX(p1End.Y + 4);
+                    double a1Ty = ToSvgY(p1End.Z);
+                    <rect x="@a1Tx" y="@(a1Ty - FontSize * 0.65)" width="@(a1W + 8)" height="@(FontSize * 1.3)"
+                          fill="@CanvasBgColor" fill-opacity="0.9" stroke="@Axis1Color" stroke-width="1" rx="3" />
+                    @((MarkupString)$"<text x=\"{(a1Tx + 4):F1}\" y=\"{a1Ty:F1}\" fill=\"{Axis1Color}\" font-size=\"{(FontSize * 0.85):F1}\" font-weight=\"bold\" dominant-baseline=\"middle\">{axis1Text}</text>")
 
                     <!-- 第二主惯性轴 2-2 -->
                     var p2Start = RotateOffset(Result.Yc, Result.Zc, -AxisLength, Result.PrincipalAngleDeg + 90);
                     var p2End = RotateOffset(Result.Yc, Result.Zc, AxisLength, Result.PrincipalAngleDeg + 90);
                     <line x1="@ToSvgX(p2Start.Y)" y1="@ToSvgY(p2Start.Z)" x2="@ToSvgX(p2End.Y)" y2="@ToSvgY(p2End.Z)"
                           stroke="@Axis2Color" stroke-width="@(StrokeWidth * 1.4)" stroke-dasharray="8,4" />
-                    @((MarkupString)$"<text x=\"{ToSvgX(p2End.Y):F1}\" y=\"{ToSvgY(p2End.Z - 5):F1}\" fill=\"{Axis2Color}\" font-size=\"{FontSize:F1}\" font-weight=\"bold\">2-2</text>")
+                    
+                    string axis2Text = "2-2";
+                    double a2W = GetTextWidthApprox(axis2Text, FontSize * 0.85);
+                    double a2Tx = ToSvgX(p2End.Y);
+                    double a2Ty = ToSvgY(p2End.Z + 8);
+                    <rect x="@(a2Tx - a2W / 2 - 4)" y="@(a2Ty - FontSize * 0.65)" width="@(a2W + 8)" height="@(FontSize * 1.3)"
+                          fill="@CanvasBgColor" fill-opacity="0.9" stroke="@Axis2Color" stroke-width="1" rx="3" />
+                    @((MarkupString)$"<text x=\"{a2Tx:F1}\" y=\"{a2Ty:F1}\" fill=\"{Axis2Color}\" font-size=\"{(FontSize * 0.85):F1}\" font-weight=\"bold\" text-anchor=\"middle\" dominant-baseline=\"middle\">{axis2Text}</text>")
 
-                    <!-- 形心十字标 -->
+                    <!-- 形心十字标与坐标 -->
                     <circle cx="@cx" cy="@cy" r="@(StrokeWidth * 2.5)" fill="@CentroidColor" stroke="#ffffff" stroke-width="@(StrokeWidth * 0.8)" />
                     <line x1="@(cx - 15)" y1="@cy" x2="@(cx + 15)" y2="@cy" stroke="@CentroidColor" stroke-width="@(StrokeWidth * 1.2)" />
                     <line x1="@cx" y1="@(cy - 15)" x2="@cx" y2="@(cy + 15)" stroke="@CentroidColor" stroke-width="@(StrokeWidth * 1.2)" />
-                    @((MarkupString)$"<text x=\"{(cx + 8):F1}\" y=\"{(cy - 8):F1}\" fill=\"{CentroidColor}\" font-size=\"{FontSize:F1}\" font-weight=\"bold\">C ({Result.Yc:F1}, {Result.Zc:F1})</text>")
+                    
+                    string cText = $"C ({Result.Yc:F1}, {Result.Zc:F1})";
+                    double cW = GetTextWidthApprox(cText, FontSize * 0.85);
+                    <rect x="@(cx + 6)" y="@(cy - FontSize * 1.3)" width="@(cW + 6)" height="@(FontSize * 1.2)"
+                          fill="@CanvasBgColor" fill-opacity="0.85" rx="2" />
+                    @((MarkupString)$"<text x=\"{(cx + 9):F1}\" y=\"{(cy - FontSize * 0.7):F1}\" fill=\"{CentroidColor}\" font-size=\"{(FontSize * 0.85):F1}\" font-weight=\"bold\" dominant-baseline=\"middle\">{cText}</text>")
                 }
 
-                <!-- 尺寸标注线 -->
+                <!-- 尺寸标注线 (防碰撞 CAD 规范布局) -->
                 @if (ShowDimensions)
                 {
                     double w = Result.TotalWidth;
                     double h = Result.TotalHeight;
-                    double dimOffset = Math.Max(25.0, Math.Max(w, h) * 0.12);
+                    double dimOffset = Math.Max(28.0, Math.Max(w, h) * 0.14);
 
-                    <!-- 宽度标注 (底部) -->
+                    <!-- 宽度标注 (底部，带底色胶囊保护) -->
                     double dimZBottom = Result.Zmin - dimOffset;
                     <line x1="@ToSvgX(Result.Ymin)" y1="@ToSvgY(dimZBottom)" x2="@ToSvgX(Result.Ymax)" y2="@ToSvgY(dimZBottom)"
                           stroke="@DimensionColor" stroke-width="@StrokeWidth" marker-start="url(#arrow-start)" marker-end="url(#arrow-end)" />
                     <line x1="@ToSvgX(Result.Ymin)" y1="@ToSvgY(Result.Zmin)" x2="@ToSvgX(Result.Ymin)" y2="@ToSvgY(dimZBottom - 5)"
-                          stroke="@DimensionColor" stroke-opacity="0.5" stroke-width="@(StrokeWidth * 0.6)" stroke-dasharray="2,2" />
+                          stroke="@DimensionColor" stroke-opacity="0.4" stroke-width="@(StrokeWidth * 0.6)" stroke-dasharray="2,2" />
                     <line x1="@ToSvgX(Result.Ymax)" y1="@ToSvgY(Result.Zmin)" x2="@ToSvgX(Result.Ymax)" y2="@ToSvgY(dimZBottom - 5)"
-                          stroke="@DimensionColor" stroke-opacity="0.5" stroke-width="@(StrokeWidth * 0.6)" stroke-dasharray="2,2" />
-                    @((MarkupString)$"<text x=\"{ToSvgX(Result.Ymin + w / 2.0):F1}\" y=\"{ToSvgY(dimZBottom - 8):F1}\" fill=\"{DimensionTextColor}\" font-size=\"{FontSize:F1}\" font-weight=\"bold\" text-anchor=\"middle\">B = {w:F1} mm</text>")
+                          stroke="@DimensionColor" stroke-opacity="0.4" stroke-width="@(StrokeWidth * 0.6)" stroke-dasharray="2,2" />
+                    
+                    string bText = $"B = {w:F1} mm";
+                    double bW = GetTextWidthApprox(bText, FontSize);
+                    double bTx = ToSvgX(Result.Ymin + w / 2.0);
+                    double bTy = ToSvgY(dimZBottom - 10);
+                    <rect x="@(bTx - bW / 2 - 4)" y="@(bTy - FontSize * 0.65)" width="@(bW + 8)" height="@(FontSize * 1.3)"
+                          fill="@CanvasBgColor" fill-opacity="0.9" rx="3" />
+                    @((MarkupString)$"<text x=\"{bTx:F1}\" y=\"{bTy:F1}\" fill=\"{DimensionTextColor}\" font-size=\"{FontSize:F1}\" font-weight=\"bold\" text-anchor=\"middle\" dominant-baseline=\"middle\">{bText}</text>")
 
-                    <!-- 高度标注 (右侧) -->
+                    <!-- 高度标注 (右侧)：避开水平形心主轴，文字往上移至截面上部 75% 处，彻底消除重叠 -->
                     double dimYRight = Result.Ymax + dimOffset;
                     <line x1="@ToSvgX(dimYRight)" y1="@ToSvgY(Result.Zmin)" x2="@ToSvgX(dimYRight)" y2="@ToSvgY(Result.Zmax)"
                           stroke="@DimensionColor" stroke-width="@StrokeWidth" marker-start="url(#arrow-start)" marker-end="url(#arrow-end)" />
                     <line x1="@ToSvgX(Result.Ymax)" y1="@ToSvgY(Result.Zmin)" x2="@ToSvgX(dimYRight + 5)" y2="@ToSvgY(Result.Zmin)"
-                          stroke="@DimensionColor" stroke-opacity="0.5" stroke-width="@(StrokeWidth * 0.6)" stroke-dasharray="2,2" />
+                          stroke="@DimensionColor" stroke-opacity="0.4" stroke-width="@(StrokeWidth * 0.6)" stroke-dasharray="2,2" />
                     <line x1="@ToSvgX(Result.Ymax)" y1="@ToSvgY(Result.Zmax)" x2="@ToSvgX(dimYRight + 5)" y2="@ToSvgY(Result.Zmax)"
-                          stroke="@DimensionColor" stroke-opacity="0.5" stroke-width="@(StrokeWidth * 0.6)" stroke-dasharray="2,2" />
-                    @((MarkupString)$"<text x=\"{ToSvgX(dimYRight + 12):F1}\" y=\"{ToSvgY(Result.Zmin + h / 2.0):F1}\" fill=\"{DimensionTextColor}\" font-size=\"{FontSize:F1}\" font-weight=\"bold\" dominant-baseline=\"middle\">H = {h:F1} mm</text>")
+                          stroke="@DimensionColor" stroke-opacity="0.4" stroke-width="@(StrokeWidth * 0.6)" stroke-dasharray="2,2" />
+                    
+                    string hText = $"H = {h:F1} mm";
+                    double hW = GetTextWidthApprox(hText, FontSize);
+                    double hTx = ToSvgX(dimYRight + 12);
+                    // 往上移动至截面上方 75% 处，远离位于 50% 处的第一主轴 1-1
+                    double hTy = ToSvgY(Result.Zmin + h * 0.75);
+                    <rect x="@(hTx - 2)" y="@(hTy - FontSize * 0.65)" width="@(hW + 6)" height="@(FontSize * 1.3)"
+                          fill="@CanvasBgColor" fill-opacity="0.9" rx="3" />
+                    @((MarkupString)$"<text x=\"{hTx:F1}\" y=\"{hTy:F1}\" fill=\"{DimensionTextColor}\" font-size=\"{FontSize:F1}\" font-weight=\"bold\" dominant-baseline=\"middle\">{hText}</text>")
                 }
             </svg>
         }
@@ -417,5 +460,20 @@
             if (stress < -70) return "#06b6d4";
             return "#38bdf8";
         }
+    }
+
+    private double GetTextWidthApprox(string text, double fontSize)
+    {
+        if (string.IsNullOrEmpty(text)) return 10.0;
+        // 粗略估算等宽与英数中文字符宽度
+        double w = 0;
+        foreach (char c in text)
+        {
+            if (c >= 0x4e00 && c <= 0x9fa5)
+                w += fontSize * 1.05; // 中文字符宽度
+            else
+                w += fontSize * 0.62; // 西文字符宽度
+        }
+        return Math.Max(12.0, w);
     }
 }
