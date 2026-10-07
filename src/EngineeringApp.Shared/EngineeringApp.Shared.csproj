@@ -1,9 +1,19 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+
+    <!-- NuGet Package & Class Library Metadata -->
+    <PackageId>EngineeringApp.SectionCore</PackageId>
+    <Version>1.1.0</Version>
+    <Authors>Civil &amp; Commercial Engineering Team</Authors>
+    <Company>Engineering Solutions</Company>
+    <Product>Structural Section &amp; Commercial Quoting Engine</Product>
+    <Description>通用土木与钢结构截面几何特性、力学分析、线重量及展开涂装表面积计算类库。专为商务算量系统设计，支持按楼板密贴扣除上表面涂装面积、闭口内腔浸锌选择及新截面插件式扩展。</Description>
+    <PackageTags>CivilEngineering;StructuralSteel;SectionProperties;Quoting;PaintingArea;LinearMass</PackageTags>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
   </PropertyGroup>
 
 </Project>

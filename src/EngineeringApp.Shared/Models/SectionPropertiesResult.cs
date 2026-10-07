@@ -11,14 +11,69 @@ public class SectionPropertiesResult
     /// <summary>截面面积 A (cm²)</summary>
     public double AreaCm2 => Area / 100.0;
 
-    /// <summary>截面周长 P (mm)</summary>
-    public double Perimeter { get; set; }
+    /// <summary>截面外表面轮廓周长 P_outer (mm)</summary>
+    public double OuterPerimeter { get; set; }
 
-    /// <summary>延米理论涂装表面积 (m²/m)</summary>
-    public double PaintingAreaPerMeter => Perimeter / 1000.0;
+    /// <summary>截面内孔洞/内部空腔周长 P_inner (mm)</summary>
+    public double InnerPerimeter { get; set; }
+
+    /// <summary>截面全周长 P (mm，默认等于外表面周长与内表面周长之和)</summary>
+    public double Perimeter
+    {
+        get => OuterPerimeter > 0 ? (OuterPerimeter + InnerPerimeter) : _perimeter;
+        set => _perimeter = value;
+    }
+    private double _perimeter;
+
+    /// <summary>截面上表面暴露宽度 (mm，例如 H型钢上翼缘宽 b，箱型梁顶宽 b，用于扣除楼板贴合免涂装面积)</summary>
+    public double TopSurfaceWidth { get; set; }
+
+    /// <summary>截面下表面暴露宽度 (mm，例如底翼缘或底板宽度)</summary>
+    public double BottomSurfaceWidth { get; set; }
+
+    /// <summary>外表面延米全涂装表面积 (m²/m)</summary>
+    public double GrossPaintingAreaPerMeter => (OuterPerimeter > 0 ? OuterPerimeter : Perimeter) / 1000.0;
+
+    /// <summary>扣除上表面（例如与混凝土楼板/压型钢板贴合）后的延米净涂装表面积 (m²/m)</summary>
+    public double PaintingAreaExcludingTop => Math.Max(0, ((OuterPerimeter > 0 ? OuterPerimeter : Perimeter) - TopSurfaceWidth) / 1000.0);
+
+    /// <summary>延米理论涂装表面积 (m²/m，默认按外表面计算)</summary>
+    public double PaintingAreaPerMeter => GrossPaintingAreaPerMeter;
 
     /// <summary>延米理论线密度 / 米重 (kg/m)</summary>
     public double LinearMass { get; set; }
+
+    /// <summary>吨钢比表面积 / 展开度 (m²/t，延米外表面积 / 延米吨重，商务防腐/防火涂料报价核心指标)</summary>
+    public double AreaPerTon => LinearMass > 1e-4 ? (GrossPaintingAreaPerMeter / (LinearMass / 1000.0)) : 0;
+
+    /// <summary>
+    /// 根据涂装计算选项（如扣除楼板、扣除底面、包含内孔等）计算延米净涂装面积 (m²/m)
+    /// </summary>
+    public double CalculatePaintingArea(PaintingCalculationOptions? options = null)
+    {
+        if (options == null) return GrossPaintingAreaPerMeter;
+
+        double basePerimeter = OuterPerimeter > 0 ? OuterPerimeter : Perimeter;
+        if (options.IncludeInnerSurface)
+        {
+            basePerimeter += InnerPerimeter;
+        }
+
+        if (options.ExcludeTopSurface)
+        {
+            double deduct = options.TopSurfaceDeductionWidth ?? TopSurfaceWidth;
+            basePerimeter -= deduct;
+        }
+
+        if (options.ExcludeBottomSurface)
+        {
+            double deduct = options.BottomSurfaceDeductionWidth ?? BottomSurfaceWidth;
+            basePerimeter -= deduct;
+        }
+
+        double netArea = Math.Max(0, basePerimeter) / 1000.0;
+        return netArea * options.LossRatio;
+    }
 
     /// <summary>形心横坐标 Yc (mm, 相对外轮廓包络矩形左下角)</summary>
     public double Yc { get; set; }

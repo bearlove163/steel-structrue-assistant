@@ -61,7 +61,11 @@ public class ParametricSectionCalculator : ISectionCalculator
         double h = Math.Max(1.0, p.Height);
 
         res.Area = b * h;
-        res.Perimeter = 2.0 * (b + h);
+        res.OuterPerimeter = 2.0 * (b + h);
+        res.InnerPerimeter = 0;
+        res.Perimeter = res.OuterPerimeter;
+        res.TopSurfaceWidth = b;
+        res.BottomSurfaceWidth = b;
         res.Ymin = 0; res.Ymax = b;
         res.Zmin = 0; res.Zmax = h;
         res.Yc = b / 2.0;
@@ -105,7 +109,11 @@ public class ParametricSectionCalculator : ISectionCalculator
         double r = d / 2.0;
 
         res.Area = Math.PI * r * r;
-        res.Perimeter = Math.PI * d;
+        res.OuterPerimeter = Math.PI * d;
+        res.InnerPerimeter = 0;
+        res.Perimeter = res.OuterPerimeter;
+        res.TopSurfaceWidth = 0;
+        res.BottomSurfaceWidth = 0;
         res.Ymin = 0; res.Ymax = d;
         res.Zmin = 0; res.Zmax = d;
         res.Yc = r;
@@ -151,7 +159,11 @@ public class ParametricSectionCalculator : ISectionCalculator
         double ri = dInner / 2.0;
 
         res.Area = Math.PI * (ro * ro - ri * ri);
-        res.Perimeter = Math.PI * (d + dInner);
+        res.OuterPerimeter = Math.PI * d;
+        res.InnerPerimeter = Math.PI * dInner;
+        res.Perimeter = res.OuterPerimeter + res.InnerPerimeter;
+        res.TopSurfaceWidth = 0;
+        res.BottomSurfaceWidth = 0;
         res.Ymin = 0; res.Ymax = d;
         res.Zmin = 0; res.Zmax = d;
         res.Yc = ro;
@@ -198,7 +210,11 @@ public class ParametricSectionCalculator : ISectionCalculator
         double hi = Math.Max(0.1, h - 2.0 * t);
 
         res.Area = b * h - bi * hi;
-        res.Perimeter = 2.0 * (b + h + bi + hi);
+        res.OuterPerimeter = 2.0 * (b + h);
+        res.InnerPerimeter = 2.0 * (bi + hi);
+        res.Perimeter = res.OuterPerimeter + res.InnerPerimeter;
+        res.TopSurfaceWidth = b;
+        res.BottomSurfaceWidth = b;
         res.Ymin = 0; res.Ymax = b;
         res.Zmin = 0; res.Zmax = h;
         res.Yc = b / 2.0;
@@ -258,7 +274,11 @@ public class ParametricSectionCalculator : ISectionCalculator
         double aWeb = hw * tw;
 
         res.Area = aFlanges + aWeb;
-        res.Perimeter = 2.0 * (2.0 * b + h - tw);
+        res.OuterPerimeter = 2.0 * (2.0 * b + h - tw);
+        res.InnerPerimeter = 0;
+        res.Perimeter = res.OuterPerimeter;
+        res.TopSurfaceWidth = b;
+        res.BottomSurfaceWidth = b;
         res.Ymin = 0; res.Ymax = b;
         res.Zmin = 0; res.Zmax = h;
         res.Yc = b / 2.0;
@@ -333,7 +353,11 @@ public class ParametricSectionCalculator : ISectionCalculator
 
         var polyRes = GreenTheoremPolygonEngine.CalculateProperties(pts);
         res.Area = polyRes.Area;
-        res.Perimeter = polyRes.Perimeter;
+        res.OuterPerimeter = polyRes.Perimeter;
+        res.InnerPerimeter = 0;
+        res.Perimeter = res.OuterPerimeter;
+        res.TopSurfaceWidth = b;
+        res.BottomSurfaceWidth = b;
         res.Ymin = 0; res.Ymax = b;
         res.Zmin = 0; res.Zmax = h;
         res.Yc = polyRes.Yc;
@@ -385,7 +409,11 @@ public class ParametricSectionCalculator : ISectionCalculator
 
         var polyRes = GreenTheoremPolygonEngine.CalculateProperties(pts);
         res.Area = polyRes.Area;
-        res.Perimeter = polyRes.Perimeter;
+        res.OuterPerimeter = polyRes.Perimeter;
+        res.InnerPerimeter = 0;
+        res.Perimeter = res.OuterPerimeter;
+        res.TopSurfaceWidth = t;
+        res.BottomSurfaceWidth = b2;
         res.Ymin = 0; res.Ymax = b2;
         res.Zmin = 0; res.Zmax = b1;
         res.Yc = polyRes.Yc;
@@ -442,7 +470,11 @@ public class ParametricSectionCalculator : ISectionCalculator
 
         var polyRes = GreenTheoremPolygonEngine.CalculateProperties(pts);
         res.Area = polyRes.Area;
-        res.Perimeter = polyRes.Perimeter;
+        res.OuterPerimeter = polyRes.Perimeter;
+        res.InnerPerimeter = 0;
+        res.Perimeter = res.OuterPerimeter;
+        res.TopSurfaceWidth = b;
+        res.BottomSurfaceWidth = tw;
         res.Ymin = 0; res.Ymax = b;
         res.Zmin = 0; res.Zmax = h;
         res.Yc = polyRes.Yc;
@@ -505,7 +537,11 @@ public class ParametricSectionCalculator : ISectionCalculator
 
         var polyRes = GreenTheoremPolygonEngine.CalculateProperties(pts);
         res.Area = polyRes.Area;
-        res.Perimeter = polyRes.Perimeter;
+        res.OuterPerimeter = polyRes.Perimeter;
+        res.InnerPerimeter = 0;
+        res.Perimeter = res.OuterPerimeter;
+        res.TopSurfaceWidth = tw;
+        res.BottomSurfaceWidth = tw;
         res.Ymin = 0; res.Ymax = b;
         res.Zmin = 0; res.Zmax = h;
         res.Yc = polyRes.Yc;
@@ -550,11 +586,15 @@ public class ParametricSectionCalculator : ISectionCalculator
         var polyRes = GreenTheoremPolygonEngine.CalculateProperties(outer, holes);
 
         res.Area = polyRes.Area;
-        res.Perimeter = polyRes.Perimeter;
+        res.OuterPerimeter = polyRes.Perimeter;
+        res.InnerPerimeter = 0;
+        res.Perimeter = res.OuterPerimeter;
         res.Ymin = outer.Min(pt => pt.Y);
         res.Ymax = outer.Max(pt => pt.Y);
         res.Zmin = outer.Min(pt => pt.Z);
         res.Zmax = outer.Max(pt => pt.Z);
+        res.TopSurfaceWidth = res.TotalWidth;
+        res.BottomSurfaceWidth = res.TotalWidth;
         res.Yc = polyRes.Yc;
         res.Zc = polyRes.Zc;
 

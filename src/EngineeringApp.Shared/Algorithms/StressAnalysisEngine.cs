@@ -184,18 +184,19 @@ public static class StressAnalysisEngine
         double cy,
         double cz)
     {
-        int gridCount = 20;
-        double dy = prop.TotalWidth / gridCount;
-        double dz = prop.TotalHeight / gridCount;
+        int gridCountY = 24;
+        int gridCountZ = 28;
+        double dy = prop.TotalWidth / gridCountY;
+        double dz = prop.TotalHeight / gridCountZ;
 
         if (dy <= 0 || dz <= 0) return;
 
-        for (int i = 0; i <= gridCount; i++)
+        for (int i = 0; i <= gridCountY; i++)
         {
-            double y = prop.Ymin + i * dy;
-            for (int j = 0; j <= gridCount; j++)
+            double y = (i == gridCountY) ? prop.Ymax : (prop.Ymin + i * dy);
+            for (int j = 0; j <= gridCountZ; j++)
             {
-                double z = prop.Zmin + j * dz;
+                double z = (j == gridCountZ) ? prop.Zmax : (prop.Zmin + j * dz);
                 double yPrime = y - prop.Yc;
                 double zPrime = z - prop.Zc;
                 double sigma = c0 + cz * zPrime + cy * yPrime;

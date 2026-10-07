@@ -315,26 +315,90 @@
         if (Result.IsCircular)
         {
             double r = Math.Sqrt(Math.Pow(y - Result.Yc, 2) + Math.Pow(z - Result.Zc, 2));
-            return r <= Result.CircleOuterRadius && r >= Result.CircleInnerRadius;
+            // 考虑微小容差，保证外边界(尤其是顶端最大Z处)能被完整识别
+            return r <= Result.CircleOuterRadius + 0.5 && r >= Math.Max(0.0, Result.CircleInnerRadius - 0.5);
         }
 
-        return IsPointInPolygon(y, z, Result.OuterContour) &&
-               !(Result.InnerContours.Any(h => IsPointInPolygon(y, z, h)));
+        // 截面外形尺度自适应边界容差
+        double tol = Math.Max(0.8, Math.Min(Result.TotalWidth, Result.TotalHeight) * 0.005);
+
+        // 判定外轮廓：包含边界上的点(例如顶缘、底缘、侧缘)
+        bool insideOuter = IsPointInPolygon(y, z, Result.OuterContour, tol, includeBoundary: true);
+        if (!insideOuter) return false;
+
+        // 判定内孔洞：仅剔除严格落在孔洞内部的点，孔洞边界上的点保留
+        if (Result.InnerContours != null && Result.InnerContours.Count > 0)
+        {
+            foreach (var hole in Result.InnerContours)
+            {
+                if (IsPointInPolygon(y, z, hole, tol, includeBoundary: false))
+                    return false;
+            }
+        }
+
+        return true;
     }
 
-    private bool IsPointInPolygon(double y, double z, List<Point2D> pts)
+    private bool IsPointInPolygon(double y, double z, List<Point2D> pts, double tol, bool includeBoundary)
     {
+        if (pts.Count < 3) return false;
+
+        // 1. 线段边界判定 (针对 z = Zmax 或边界边线上的点)
+        for (int i = 0, j = pts.Count - 1; i < pts.Count; j = i++)
+        {
+            if (IsPointOnSegment(y, z, pts[j], pts[i], tol))
+            {
+                return includeBoundary;
+            }
+        }
+
+        // 2. 射线穿透判定法：对水平线重合及顶点重合做微扰消除退化
+        double testZ = z;
+        for (int i = 0; i < pts.Count; i++)
+        {
+            if (Math.Abs(pts[i].Z - testZ) < 1e-5)
+            {
+                testZ += 1e-4;
+                break;
+            }
+        }
+
         bool inside = false;
         int n = pts.Count;
         for (int i = 0, j = n - 1; i < n; j = i++)
         {
-            if (((pts[i].Z > z) != (pts[j].Z > z)) &&
-                (y < (pts[j].Y - pts[i].Y) * (z - pts[i].Z) / (pts[j].Z - pts[i].Z) + pts[i].Y))
+            var p1 = pts[i];
+            var p2 = pts[j];
+
+            if (((p1.Z > testZ) != (p2.Z > testZ)) &&
+                (y < (p2.Y - p1.Y) * (testZ - p1.Z) / (p2.Z - p1.Z) + p1.Y))
             {
                 inside = !inside;
             }
         }
         return inside;
+    }
+
+    private bool IsPointOnSegment(double py, double pz, Point2D a, Point2D b, double tol)
+    {
+        double dy = b.Y - a.Y;
+        double dz = b.Z - a.Z;
+        double l2 = dy * dy + dz * dz;
+        if (l2 < 1e-10)
+        {
+            double dist2 = (py - a.Y) * (py - a.Y) + (pz - a.Z) * (pz - a.Z);
+            return dist2 <= tol * tol;
+        }
+
+        // 投影到线段的比例因子 t
+        double t = ((py - a.Y) * dy + (pz - a.Z) * dz) / l2;
+        if (t < -0.01 || t > 1.01) return false;
+        t = Math.Max(0.0, Math.Min(1.0, t));
+
+        double projY = a.Y + t * dy;
+        double projZ = a.Z + t * dz;
+        double d2 = (py - projY) * (py - projY) + (pz - projZ) * (pz - projZ);
+        return d2 <= tol * tol;
     }
 
     private string GetStressColor(double stress)

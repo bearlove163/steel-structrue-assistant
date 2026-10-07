@@ -83,8 +83,23 @@
                                         <tr>
                                             <td class="text-start ps-3">理论延米展开涂装面积</td>
                                             <td><strong>A_paint</strong></td>
-                                            <td>@Result.PaintingAreaPerMeter.ToString("F3") m²/m</td>
-                                            <td>周长 @Result.Perimeter.ToString("F1") mm</td>
+                                            <td>@Result.GrossPaintingAreaPerMeter.ToString("F3") m²/m</td>
+                                            <td>外周长 @Result.OuterPerimeter.ToString("F1") mm</td>
+                                        </tr>
+                                        @if (Result.TopSurfaceWidth > 0)
+                                        {
+                                            <tr>
+                                                <td class="text-start ps-3 text-success">扣除楼板贴合净涂装面积</td>
+                                                <td><strong>A_net_slab</strong></td>
+                                                <td class="text-success fw-bold">@Result.PaintingAreaExcludingTop.ToString("F3") m²/m</td>
+                                                <td>扣除上表面宽 @Result.TopSurfaceWidth.ToString("F0") mm</td>
+                                            </tr>
+                                        }
+                                        <tr>
+                                            <td class="text-start ps-3">吨钢比表面积 (商务防腐)</td>
+                                            <td><strong>A_per_ton</strong></td>
+                                            <td class="text-primary fw-bold">@Result.AreaPerTon.ToString("F1") m²/t</td>
+                                            <td>防腐与防火涂料吨成本估算依据</td>
                                         </tr>
                                         <tr>
                                             <td class="text-start ps-3">形心坐标 (相对左下角)</td>
@@ -322,7 +337,12 @@
         sb.AppendLine("| :--- | :--- | :--- | :--- |");
         sb.AppendLine($"| 截面面积 | A | {Result.AreaCm2:F2} | cm² |");
         sb.AppendLine($"| 延米理论米重 | m | {Result.LinearMass:F2} | kg/m |");
-        sb.AppendLine($"| 延米涂装表面积 | A_paint | {Result.PaintingAreaPerMeter:F3} | m²/m |");
+        sb.AppendLine($"| 延米外涂装表面积 | A_paint | {Result.GrossPaintingAreaPerMeter:F3} | m²/m |");
+        if (Result.TopSurfaceWidth > 0)
+        {
+            sb.AppendLine($"| 扣除楼板贴合净涂装面积 | A_net_slab | {Result.PaintingAreaExcludingTop:F3} | m²/m |");
+        }
+        sb.AppendLine($"| 吨钢比表面积 | A_ton | {Result.AreaPerTon:F1} | m²/t |");
         sb.AppendLine($"| 形心坐标 | (Yc, Zc) | ({Result.Yc:F1}, {Result.Zc:F1}) | mm |");
         sb.AppendLine($"| 强轴惯性矩 | Iy | {Result.IyCm4:F2} | cm⁴ |");
         sb.AppendLine($"| 弱轴惯性矩 | Iz | {Result.IzCm4:F2} | cm⁴ |");
