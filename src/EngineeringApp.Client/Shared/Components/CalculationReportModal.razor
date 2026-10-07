@@ -157,7 +157,66 @@
                             </div>
                         </div>
 
-                        <!-- 3. 荷载与截面强度验算 -->
+                        <!-- 3. 构件计算长度与面外长细比验算 -->
+                        @if (BucklingParameters != null && BucklingParameters.EnableSlendernessCheck && Result.SlendernessResult != null)
+                        {
+                            var b = BucklingParameters;
+                            var sr = Result.SlendernessResult;
+                            bool isSlenderOk = sr.IsSatisfied;
+
+                            <div class="card mb-3 border-light shadow-sm">
+                                <div class="card-header bg-light fw-bold py-1">三、 构件面内/面外计算长度与长细比复核 (GB 50017)</div>
+                                <div class="card-body py-2">
+                                    <div class="row g-2 small mb-2">
+                                        <div class="col-md-3"><strong>构件几何长度 L：</strong> @b.MemberLength.ToString("F0") mm</div>
+                                        <div class="col-md-3"><strong>面内计算长度 L0x：</strong> @b.L0x.ToString("F0") mm (μx=@b.EffectiveLengthFactorX.ToString("F2"))</div>
+                                        <div class="col-md-3"><strong>面外计算长度 L0y：</strong> @b.L0y.ToString("F0") mm (μy=@b.EffectiveLengthFactorY.ToString("F2"))</div>
+                                        <div class="col-md-3"><strong>受力类型：</strong> @(b.ForceType == MemberForceType.Compression ? "轴压/偏压构件" : "受拉构件")</div>
+                                    </div>
+                                    <table class="table table-bordered table-sm mb-2 small text-center align-middle">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>验算项目</th>
+                                                <th>计算长度 (mm)</th>
+                                                <th>回转半径 (mm)</th>
+                                                <th>计算长细比 λ</th>
+                                                <th>规范限值 [λ]</th>
+                                                <th>判定结论</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td class="text-start ps-3">强轴/面内长细比 λx</td>
+                                                <td>@sr.L0x.ToString("F0")</td>
+                                                <td>@sr.RadiusIx.ToString("F1")</td>
+                                                <td class="fw-bold text-primary">@sr.LambdaX.ToString("F1")</td>
+                                                <td>@sr.AllowableLambda.ToString("F0")</td>
+                                                <td>@(sr.LambdaX <= sr.AllowableLambda ? "✅ 合规" : "❌ 超限")</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-start ps-3">弱轴/面外长细比 λy</td>
+                                                <td>@sr.L0y.ToString("F0")</td>
+                                                <td>@sr.RadiusIy.ToString("F1")</td>
+                                                <td class="fw-bold text-warning">@sr.LambdaY.ToString("F1")</td>
+                                                <td>@sr.AllowableLambda.ToString("F0")</td>
+                                                <td>@(sr.LambdaY <= sr.AllowableLambda ? "✅ 合规" : "❌ 超限")</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                    <div class="alert @(isSlenderOk ? "alert-success" : "alert-warning") py-1 px-3 small mb-0 d-flex justify-content-between align-items-center">
+                                        <span>
+                                            <strong>长细比控制结论：</strong> 最大控制长细比 λmax = @sr.LambdaMax.ToString("F1") @(isSlenderOk ? "≤" : ">") [λ] = @sr.AllowableLambda.ToString("F0")。
+                                            @(isSlenderOk ? "构件刚度与长细比指标满足规范限值要求。" : "构件长细比超限，建议增设面外支撑或增大截面回转半径！")
+                                        </span>
+                                        <span class="badge @(isSlenderOk ? "bg-success" : "bg-warning text-dark") fs-6">
+                                            @(isSlenderOk ? "合规 PASSED" : "预警 WARNING")
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+
+                        <!-- 4. 荷载与截面强度验算 -->
                         @if (LoadCase != null && LoadCase.EnableStressCheck && Result.StressResult != null)
                         {
                             var s = Result.StressResult;
@@ -165,7 +224,7 @@
                             bool isSafe = s.MaxAbsoluteStress <= fy;
 
                             <div class="card mb-3 border-light shadow-sm">
-                                <div class="card-header bg-light fw-bold py-1">三、 荷载工况与截面强度复核</div>
+                                <div class="card-header bg-light fw-bold py-1">四、 荷载工况与截面强度复核</div>
                                 <div class="card-body py-2">
                                     <div class="row g-2 small mb-2">
                                         <div class="col-md-3"><strong>轴向力 N：</strong> @LoadCase.AxialForceN.ToString("F1") kN</div>
@@ -233,6 +292,8 @@
     [Parameter] public SectionParameters? Parameters { get; set; }
     [Parameter] public SectionPropertiesResult? Result { get; set; }
     [Parameter] public LoadCase? LoadCase { get; set; }
+    [Parameter] public MemberBucklingParameters? BucklingParameters { get; set; }
+    [Parameter] public bool IsDarkMode { get; set; } = true;
 
     private async Task Close()
     {
@@ -275,10 +336,20 @@
         sb.AppendLine($"| 自由扭转常数 | J | {Result.TorsionConstantJCm4:F2} | cm⁴ |");
         sb.AppendLine($"| 翘曲常数 | Iw | {Result.WarpingConstantIwCm6:F2} | cm⁶ |");
 
+        if (BucklingParameters != null && BucklingParameters.EnableSlendernessCheck && Result.SlendernessResult != null)
+        {
+            sb.AppendLine();
+            sb.AppendLine("## 二、 构件面内与面外计算长度及长细比验算 (GB 50017)");
+            sb.AppendLine($"- 构件长度 L = {BucklingParameters.MemberLength:F0} mm, 面内 L0x = {Result.SlendernessResult.L0x:F0} mm, 面外 L0y = {Result.SlendernessResult.L0y:F0} mm");
+            sb.AppendLine($"- 强轴/面内长细比 λx = {Result.SlendernessResult.LambdaX:F1}, 弱轴/面外长细比 λy = {Result.SlendernessResult.LambdaY:F1}");
+            sb.AppendLine($"- 最大控制长细比 λmax = {Result.SlendernessResult.LambdaMax:F1}, 规范限值 [λ] = {Result.SlendernessResult.AllowableLambda:F0}");
+            sb.AppendLine($"- 验算判定：{(Result.SlendernessResult.IsSatisfied ? "合格 PASSED" : "超限 WARNING")}");
+        }
+
         if (LoadCase != null && LoadCase.EnableStressCheck && Result.StressResult != null)
         {
             sb.AppendLine();
-            sb.AppendLine("## 二、 荷载工况与正应力验算");
+            sb.AppendLine("## 三、 荷载工况与正应力验算");
             sb.AppendLine($"- 轴力 N = {LoadCase.AxialForceN:F1} kN, 弯矩 My = {LoadCase.BendingMomentMy:F1} kN·m, Mz = {LoadCase.BendingMomentMz:F1} kN·m");
             sb.AppendLine($"- 最大拉应力 σ_max = +{Result.StressResult.MaxTensileStress:F1} MPa");
             sb.AppendLine($"- 最大压应力 σ_min = {Result.StressResult.MinCompressiveStress:F1} MPa");

@@ -144,4 +144,8 @@ public class SectionPropertiesResult
 
     /// <summary>应力极值分析结果 (若已输入荷载)</summary>
     public StressAnalysisResult? StressResult { get; set; }
+
+    /// <summary>构件面外计算长度与长细比计算结果</summary>
+    public MemberSlendernessResult? SlendernessResult { get; set; }
 }
+

@@ -5,13 +5,13 @@
 {
     <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.65); z-index: 1060;">
         <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
-            <div class="modal-content bg-dark text-white border-secondary shadow-lg">
-                <div class="modal-header border-secondary py-3">
+            <div class="modal-content @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-light-subtle") shadow-lg">
+                <div class="modal-header @(IsDarkMode ? "border-secondary" : "border-light-subtle bg-light") py-3">
                     <h5 class="modal-title d-flex align-items-center gap-2">
                         <span class="badge bg-primary">GB/T</span>
                         <span>中国国家标准型钢截面规格库</span>
                     </h5>
-                    <button type="button" class="btn-close btn-close-white" @onclick="Close"></button>
+                    <button type="button" class="btn-close @(IsDarkMode ? "btn-close-white" : "")" @onclick="Close"></button>
                 </div>
 
                 <div class="modal-body p-3">
@@ -19,19 +19,19 @@
                     <div class="row g-2 mb-3">
                         <div class="col-md-5">
                             <div class="input-group">
-                                <span class="input-group-text bg-secondary border-secondary text-white">🔍 搜索型号</span>
-                                <input type="text" class="form-control bg-dark text-white border-secondary"
+                                <span class="input-group-text @(IsDarkMode ? "bg-secondary border-secondary text-white" : "bg-light border-light-subtle text-dark")">🔍 搜索型号</span>
+                                <input type="text" class="form-control @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-light-subtle")"
                                        placeholder="输入型号，如 HW 300, 20a, L 100..."
                                        @bind="SearchText" @bind:event="oninput" />
                             </div>
                         </div>
                         <div class="col-md-7">
                             <div class="d-flex flex-wrap gap-1">
-                                <button class="btn btn-sm @(SelectedCategory == null ? "btn-primary" : "btn-outline-secondary")"
+                                <button class="btn btn-sm @(SelectedCategory == null ? "btn-primary" : (IsDarkMode ? "btn-outline-secondary" : "btn-outline-secondary"))"
                                         @onclick="() => SelectedCategory = null">全部类型</button>
                                 @foreach (var cat in StandardSteelDatabase.Categories)
                                 {
-                                    <button class="btn btn-sm @(SelectedCategory == cat ? "btn-primary" : "btn-outline-secondary")"
+                                    <button class="btn btn-sm @(SelectedCategory == cat ? "btn-primary" : (IsDarkMode ? "btn-outline-secondary" : "btn-outline-secondary"))"
                                             @onclick="() => SelectedCategory = cat">@cat.Replace("GB/T ", "").Replace(" 普通", "")</button>
                                 }
                             </div>
@@ -39,9 +39,9 @@
                     </div>
 
                     <!-- 型号列表表格 -->
-                    <div class="table-responsive rounded border border-secondary" style="max-height: 480px;">
-                        <table class="table table-dark table-hover table-striped table-sm align-middle mb-0 font-monospace text-xs">
-                            <thead class="table-dark sticky-top border-bottom border-secondary">
+                    <div class="table-responsive rounded border @(IsDarkMode ? "border-secondary" : "border-light-subtle")" style="max-height: 480px;">
+                        <table class="table @(IsDarkMode ? "table-dark table-hover table-striped" : "table-hover table-striped") table-sm align-middle mb-0 font-monospace text-xs">
+                            <thead class="@(IsDarkMode ? "table-dark border-secondary" : "table-light border-light-subtle") sticky-top border-bottom">
                                 <tr>
                                     <th>型号代号</th>
                                     <th>类别</th>
@@ -60,8 +60,8 @@
                                 @foreach (var item in FilteredItems)
                                 {
                                     <tr>
-                                        <td class="fw-bold text-info">@item.Designation</td>
-                                        <td class="text-white-50">@item.Category</td>
+                                        <td class="fw-bold @(IsDarkMode ? "text-info" : "text-primary")">@item.Designation</td>
+                                        <td class="@(IsDarkMode ? "text-white-50" : "text-muted")">@item.Category</td>
                                         <td>@item.Height</td>
                                         <td>@item.Width</td>
                                         <td>@item.WebThickness</td>
@@ -81,7 +81,7 @@
                                 @if (!FilteredItems.Any())
                                 {
                                     <tr>
-                                        <td colspan="11" class="text-center py-4 text-white-50">
+                                        <td colspan="11" class="text-center py-4 @(IsDarkMode ? "text-white-50" : "text-muted")">
                                             未找到匹配的型钢型号，请调整搜索关键词。
                                         </td>
                                     </tr>
@@ -91,8 +91,8 @@
                     </div>
                 </div>
 
-                <div class="modal-footer border-secondary py-2 justify-content-between">
-                    <span class="text-white-50 text-xs">共匹配到 @FilteredItems.Count() 种标准型钢规格</span>
+                <div class="modal-footer @(IsDarkMode ? "border-secondary" : "border-light-subtle bg-light") py-2 justify-content-between">
+                    <span class="@(IsDarkMode ? "text-white-50" : "text-muted") text-xs">共匹配到 @FilteredItems.Count() 种标准型钢规格</span>
                     <button type="button" class="btn btn-secondary btn-sm" @onclick="Close">关闭</button>
                 </div>
             </div>
@@ -104,6 +104,7 @@
     [Parameter] public bool IsOpen { get; set; }
     [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
     [Parameter] public EventCallback<StandardSteelItem> OnSelectProfile { get; set; }
+    [Parameter] public bool IsDarkMode { get; set; } = true;
 
     private string SearchText { get; set; } = "";
     private string? SelectedCategory { get; set; }

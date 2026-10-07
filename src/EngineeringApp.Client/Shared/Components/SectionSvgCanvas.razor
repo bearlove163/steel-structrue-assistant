@@ -1,57 +1,60 @@
 @using EngineeringApp.Shared.Models
 @using EngineeringApp.Shared.Algorithms
 
-<div class="cad-viewport-container position-relative w-100 h-100 d-flex flex-column bg-dark rounded border border-secondary shadow-sm overflow-hidden">
+<div class="cad-viewport-container position-relative w-100 h-100 d-flex flex-column rounded border shadow-sm overflow-hidden @(IsDarkMode ? "bg-dark border-secondary text-white" : "bg-white border-light-subtle text-dark")">
     <!-- CAD 视图顶部工具栏 -->
-    <div class="cad-toolbar d-flex align-items-center justify-content-between px-3 py-2 bg-black bg-opacity-50 border-bottom border-secondary text-white text-xs">
+    <div class="cad-toolbar d-flex align-items-center justify-content-between px-3 py-2 border-bottom @(IsDarkMode ? "bg-black bg-opacity-50 border-secondary text-white" : "bg-light border-light-subtle text-dark") text-xs">
         <div class="d-flex align-items-center gap-2">
-            <span class="badge bg-primary text-uppercase font-monospace">CAD 2D 矢量视口</span>
-            <span class="text-white-50">比例: 1:1 (自适应)</span>
+            <span class="badge @(IsDarkMode ? "bg-primary" : "bg-primary") text-uppercase font-monospace">CAD 2D 矢量视口</span>
+            <span class="@(IsDarkMode ? "text-white-50" : "text-muted")">模式: @(IsDarkMode ? "🌙 暗黑工程" : "☀️ 专业亮色")</span>
         </div>
         <div class="d-flex align-items-center gap-2">
             <div class="form-check form-switch m-0 d-flex align-items-center gap-1">
                 <input class="form-check-input" type="checkbox" id="showDims" @bind="ShowDimensions">
-                <label class="form-check-label text-white-50" for="showDims">尺寸标注</label>
+                <label class="form-check-label @(IsDarkMode ? "text-white-50" : "text-muted")" for="showDims">标注</label>
             </div>
             <div class="form-check form-switch m-0 d-flex align-items-center gap-1">
                 <input class="form-check-input" type="checkbox" id="showAxes" @bind="ShowAxes">
-                <label class="form-check-label text-white-50" for="showAxes">形心与主轴</label>
+                <label class="form-check-label @(IsDarkMode ? "text-white-50" : "text-muted")" for="showAxes">形心/主轴</label>
             </div>
             <div class="form-check form-switch m-0 d-flex align-items-center gap-1">
                 <input class="form-check-input" type="checkbox" id="showStress" @bind="ShowStressMap">
-                <label class="form-check-label text-white-50" for="showStress">正应力云图/中和轴</label>
+                <label class="form-check-label @(IsDarkMode ? "text-white-50" : "text-muted")" for="showStress">中和轴/应力</label>
             </div>
             <div class="form-check form-switch m-0 d-flex align-items-center gap-1">
                 <input class="form-check-input" type="checkbox" id="showGrid" @bind="ShowGrid">
-                <label class="form-check-label text-white-50" for="showGrid">网格</label>
+                <label class="form-check-label @(IsDarkMode ? "text-white-50" : "text-muted")" for="showGrid">网格</label>
             </div>
-            <button class="btn btn-outline-light btn-sm py-0 px-2" @onclick="ResetZoom" title="重置视图">
+            <button class="btn @(IsDarkMode ? "btn-outline-light" : "btn-outline-secondary") btn-sm py-0 px-2" @onclick="ResetZoom" title="重置视图">
                 ⟲ 复位
             </button>
         </div>
     </div>
 
     <!-- SVG 画布区域 -->
-    <div class="flex-grow-1 position-relative d-flex align-items-center justify-content-center p-2" style="min-height: 420px;">
+    <div class="flex-grow-1 position-relative d-flex align-items-center justify-content-center p-2" style="min-height: 420px; background-color: @CanvasBgColor;">
         @if (Result != null && (Result.OuterContour.Count > 0 || Result.IsCircular))
         {
             <svg viewBox="@SvgViewBox" class="w-100 h-100" style="max-height: 600px; user-select: none;">
                 <defs>
                     <!-- 尺寸箭头标记 -->
                     <marker id="arrow-start" viewBox="0 0 10 10" refX="2" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                        <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#38bdf8" />
+                        <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="@DimensionColor" />
                     </marker>
                     <marker id="arrow-end" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-                        <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#38bdf8" />
+                        <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="@DimensionColor" />
                     </marker>
                     <!-- 背景工程网格图案 -->
                     @if (ShowGrid)
                     {
                         <pattern id="grid-pattern" width="@GridSpacing" height="@GridSpacing" patternUnits="userSpaceOnUse">
-                            <path d="M @GridSpacing 0 L 0 0 0 @GridSpacing" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="1" />
+                            <path d="M @GridSpacing 0 L 0 0 0 @GridSpacing" fill="none" stroke="@GridLineColor" stroke-width="1" />
                         </pattern>
                     }
                 </defs>
+
+                <!-- 画布底板背景 -->
+                <rect x="@BoxMinX" y="@BoxMinY" width="@BoxWidth" height="@BoxHeight" fill="@CanvasBgColor" />
 
                 <!-- 网格背景 -->
                 @if (ShowGrid)
@@ -64,18 +67,18 @@
                 {
                     <!-- 圆形 / 空心圆管 -->
                     <circle cx="@ToSvgX(Result.Yc)" cy="@ToSvgY(Result.Zc)" r="@Result.CircleOuterRadius"
-                            fill="#1e293b" stroke="#38bdf8" stroke-width="@(StrokeWidth * 1.5)" />
+                            fill="@SectionFillColor" stroke="@SectionStrokeColor" stroke-width="@(StrokeWidth * 1.5)" />
                     @if (Result.CircleInnerRadius > 0)
                     {
                         <circle cx="@ToSvgX(Result.Yc)" cy="@ToSvgY(Result.Zc)" r="@Result.CircleInnerRadius"
-                                fill="#0f172a" stroke="#38bdf8" stroke-width="@StrokeWidth" />
+                                fill="@CanvasBgColor" stroke="@SectionStrokeColor" stroke-width="@StrokeWidth" />
                     }
                 }
                 else
                 {
                     <!-- 任意多边形 / 复合截面 -->
                     <path d="@GetSvgPolygonPath(Result.OuterContour, Result.InnerContours)"
-                          fill="#1e293b" fill-rule="evenodd" stroke="#38bdf8" stroke-width="@(StrokeWidth * 1.5)" />
+                          fill="@SectionFillColor" fill-rule="evenodd" stroke="@SectionStrokeColor" stroke-width="@(StrokeWidth * 1.5)" />
                 }
 
                 <!-- 应力云图点集展示 (当开启且存在应力计算) -->
@@ -86,7 +89,7 @@
                         if (IsPointInsideSection(pt.Y, pt.Z))
                         {
                             <circle cx="@ToSvgX(pt.Y)" cy="@ToSvgY(pt.Z)" r="@(StrokeWidth * 1.6)"
-                                    fill="@GetStressColor(pt.Stress)" opacity="0.75" />
+                                    fill="@GetStressColor(pt.Stress)" opacity="0.8" />
                         }
                     }
                 }
@@ -97,8 +100,8 @@
                     var na1 = Result.StressResult.NeutralAxisPoint1;
                     var na2 = Result.StressResult.NeutralAxisPoint2;
                     <line x1="@ToSvgX(na1.Y)" y1="@ToSvgY(na1.Z)" x2="@ToSvgX(na2.Y)" y2="@ToSvgY(na2.Z)"
-                          stroke="#ec4899" stroke-width="@(StrokeWidth * 2)" stroke-dasharray="6,4" />
-                    @((MarkupString)$"<text x=\"{ToSvgX(na2.Y + 10):F1}\" y=\"{ToSvgY(na2.Z):F1}\" fill=\"#ec4899\" font-size=\"{FontSize:F1}\" font-weight=\"bold\">中和轴 (N.A.)</text>")
+                          stroke="@NeutralAxisColor" stroke-width="@(StrokeWidth * 2)" stroke-dasharray="6,4" />
+                    @((MarkupString)$"<text x=\"{ToSvgX(na2.Y + 10):F1}\" y=\"{ToSvgY(na2.Z):F1}\" fill=\"{NeutralAxisColor}\" font-size=\"{FontSize:F1}\" font-weight=\"bold\">中和轴 (N.A.)</text>")
                 }
 
                 <!-- 形心标记与主轴 -->
@@ -107,34 +110,34 @@
                     double cx = ToSvgX(Result.Yc);
                     double cy = ToSvgY(Result.Zc);
 
-                    <!-- 水平与竖向参考形心轴 (灰色虚线) -->
+                    <!-- 水平与竖向参考形心轴 (参考虚线) -->
                     <line x1="@BoxMinX" y1="@cy" x2="@(BoxMinX + BoxWidth)" y2="@cy"
-                          stroke="rgba(255,255,255,0.25)" stroke-width="@(StrokeWidth * 0.8)" stroke-dasharray="4,4" />
+                          stroke="@RefAxisColor" stroke-width="@(StrokeWidth * 0.8)" stroke-dasharray="4,4" />
                     <line x1="@cx" y1="@BoxMinY" x2="@cx" y2="@(BoxMinY + BoxHeight)"
-                          stroke="rgba(255,255,255,0.25)" stroke-width="@(StrokeWidth * 0.8)" stroke-dasharray="4,4" />
+                          stroke="@RefAxisColor" stroke-width="@(StrokeWidth * 0.8)" stroke-dasharray="4,4" />
 
-                    <!-- 第一主惯性轴 1-1 (绿色) -->
+                    <!-- 第一主惯性轴 1-1 -->
                     var p1Start = RotateOffset(Result.Yc, Result.Zc, -AxisLength, Result.PrincipalAngleDeg);
                     var p1End = RotateOffset(Result.Yc, Result.Zc, AxisLength, Result.PrincipalAngleDeg);
                     <line x1="@ToSvgX(p1Start.Y)" y1="@ToSvgY(p1Start.Z)" x2="@ToSvgX(p1End.Y)" y2="@ToSvgY(p1End.Z)"
-                          stroke="#22c55e" stroke-width="@(StrokeWidth * 1.4)" stroke-dasharray="8,4" />
-                    @((MarkupString)$"<text x=\"{ToSvgX(p1End.Y):F1}\" y=\"{ToSvgY(p1End.Z - 5):F1}\" fill=\"#22c55e\" font-size=\"{FontSize:F1}\" font-weight=\"bold\">1-1 (α={Result.PrincipalAngleDeg:F1}°)</text>")
+                          stroke="@Axis1Color" stroke-width="@(StrokeWidth * 1.4)" stroke-dasharray="8,4" />
+                    @((MarkupString)$"<text x=\"{ToSvgX(p1End.Y):F1}\" y=\"{ToSvgY(p1End.Z - 5):F1}\" fill=\"{Axis1Color}\" font-size=\"{FontSize:F1}\" font-weight=\"bold\">1-1 (α={Result.PrincipalAngleDeg:F1}°)</text>")
 
-                    <!-- 第二主惯性轴 2-2 (橙色) -->
+                    <!-- 第二主惯性轴 2-2 -->
                     var p2Start = RotateOffset(Result.Yc, Result.Zc, -AxisLength, Result.PrincipalAngleDeg + 90);
                     var p2End = RotateOffset(Result.Yc, Result.Zc, AxisLength, Result.PrincipalAngleDeg + 90);
                     <line x1="@ToSvgX(p2Start.Y)" y1="@ToSvgY(p2Start.Z)" x2="@ToSvgX(p2End.Y)" y2="@ToSvgY(p2End.Z)"
-                          stroke="#f97316" stroke-width="@(StrokeWidth * 1.4)" stroke-dasharray="8,4" />
-                    @((MarkupString)$"<text x=\"{ToSvgX(p2End.Y):F1}\" y=\"{ToSvgY(p2End.Z - 5):F1}\" fill=\"#f97316\" font-size=\"{FontSize:F1}\" font-weight=\"bold\">2-2</text>")
+                          stroke="@Axis2Color" stroke-width="@(StrokeWidth * 1.4)" stroke-dasharray="8,4" />
+                    @((MarkupString)$"<text x=\"{ToSvgX(p2End.Y):F1}\" y=\"{ToSvgY(p2End.Z - 5):F1}\" fill=\"{Axis2Color}\" font-size=\"{FontSize:F1}\" font-weight=\"bold\">2-2</text>")
 
-                    <!-- 形心十字标 (红色) -->
-                    <circle cx="@cx" cy="@cy" r="@(StrokeWidth * 2.5)" fill="#ef4444" stroke="#ffffff" stroke-width="@(StrokeWidth * 0.8)" />
-                    <line x1="@(cx - 15)" y1="@cy" x2="@(cx + 15)" y2="@cy" stroke="#ef4444" stroke-width="@(StrokeWidth * 1.2)" />
-                    <line x1="@cx" y1="@(cy - 15)" x2="@cx" y2="@(cy + 15)" stroke="#ef4444" stroke-width="@(StrokeWidth * 1.2)" />
-                    @((MarkupString)$"<text x=\"{(cx + 8):F1}\" y=\"{(cy - 8):F1}\" fill=\"#ef4444\" font-size=\"{FontSize:F1}\" font-weight=\"bold\">C ({Result.Yc:F1}, {Result.Zc:F1})</text>")
+                    <!-- 形心十字标 -->
+                    <circle cx="@cx" cy="@cy" r="@(StrokeWidth * 2.5)" fill="@CentroidColor" stroke="#ffffff" stroke-width="@(StrokeWidth * 0.8)" />
+                    <line x1="@(cx - 15)" y1="@cy" x2="@(cx + 15)" y2="@cy" stroke="@CentroidColor" stroke-width="@(StrokeWidth * 1.2)" />
+                    <line x1="@cx" y1="@(cy - 15)" x2="@cx" y2="@(cy + 15)" stroke="@CentroidColor" stroke-width="@(StrokeWidth * 1.2)" />
+                    @((MarkupString)$"<text x=\"{(cx + 8):F1}\" y=\"{(cy - 8):F1}\" fill=\"{CentroidColor}\" font-size=\"{FontSize:F1}\" font-weight=\"bold\">C ({Result.Yc:F1}, {Result.Zc:F1})</text>")
                 }
 
-                <!-- 尺寸标注线 (蓝色) -->
+                <!-- 尺寸标注线 -->
                 @if (ShowDimensions)
                 {
                     double w = Result.TotalWidth;
@@ -144,43 +147,43 @@
                     <!-- 宽度标注 (底部) -->
                     double dimZBottom = Result.Zmin - dimOffset;
                     <line x1="@ToSvgX(Result.Ymin)" y1="@ToSvgY(dimZBottom)" x2="@ToSvgX(Result.Ymax)" y2="@ToSvgY(dimZBottom)"
-                          stroke="#38bdf8" stroke-width="@StrokeWidth" marker-start="url(#arrow-start)" marker-end="url(#arrow-end)" />
+                          stroke="@DimensionColor" stroke-width="@StrokeWidth" marker-start="url(#arrow-start)" marker-end="url(#arrow-end)" />
                     <line x1="@ToSvgX(Result.Ymin)" y1="@ToSvgY(Result.Zmin)" x2="@ToSvgX(Result.Ymin)" y2="@ToSvgY(dimZBottom - 5)"
-                          stroke="rgba(56,189,248,0.5)" stroke-width="@(StrokeWidth * 0.6)" stroke-dasharray="2,2" />
+                          stroke="@DimensionColor" stroke-opacity="0.5" stroke-width="@(StrokeWidth * 0.6)" stroke-dasharray="2,2" />
                     <line x1="@ToSvgX(Result.Ymax)" y1="@ToSvgY(Result.Zmin)" x2="@ToSvgX(Result.Ymax)" y2="@ToSvgY(dimZBottom - 5)"
-                          stroke="rgba(56,189,248,0.5)" stroke-width="@(StrokeWidth * 0.6)" stroke-dasharray="2,2" />
-                    @((MarkupString)$"<text x=\"{ToSvgX(Result.Ymin + w / 2.0):F1}\" y=\"{ToSvgY(dimZBottom - 8):F1}\" fill=\"#38bdf8\" font-size=\"{FontSize:F1}\" text-anchor=\"middle\">B = {w:F1} mm</text>")
+                          stroke="@DimensionColor" stroke-opacity="0.5" stroke-width="@(StrokeWidth * 0.6)" stroke-dasharray="2,2" />
+                    @((MarkupString)$"<text x=\"{ToSvgX(Result.Ymin + w / 2.0):F1}\" y=\"{ToSvgY(dimZBottom - 8):F1}\" fill=\"{DimensionTextColor}\" font-size=\"{FontSize:F1}\" font-weight=\"bold\" text-anchor=\"middle\">B = {w:F1} mm</text>")
 
                     <!-- 高度标注 (右侧) -->
                     double dimYRight = Result.Ymax + dimOffset;
                     <line x1="@ToSvgX(dimYRight)" y1="@ToSvgY(Result.Zmin)" x2="@ToSvgX(dimYRight)" y2="@ToSvgY(Result.Zmax)"
-                          stroke="#38bdf8" stroke-width="@StrokeWidth" marker-start="url(#arrow-start)" marker-end="url(#arrow-end)" />
+                          stroke="@DimensionColor" stroke-width="@StrokeWidth" marker-start="url(#arrow-start)" marker-end="url(#arrow-end)" />
                     <line x1="@ToSvgX(Result.Ymax)" y1="@ToSvgY(Result.Zmin)" x2="@ToSvgX(dimYRight + 5)" y2="@ToSvgY(Result.Zmin)"
-                          stroke="rgba(56,189,248,0.5)" stroke-width="@(StrokeWidth * 0.6)" stroke-dasharray="2,2" />
+                          stroke="@DimensionColor" stroke-opacity="0.5" stroke-width="@(StrokeWidth * 0.6)" stroke-dasharray="2,2" />
                     <line x1="@ToSvgX(Result.Ymax)" y1="@ToSvgY(Result.Zmax)" x2="@ToSvgX(dimYRight + 5)" y2="@ToSvgY(Result.Zmax)"
-                          stroke="rgba(56,189,248,0.5)" stroke-width="@(StrokeWidth * 0.6)" stroke-dasharray="2,2" />
-                    @((MarkupString)$"<text x=\"{ToSvgX(dimYRight + 12):F1}\" y=\"{ToSvgY(Result.Zmin + h / 2.0):F1}\" fill=\"#38bdf8\" font-size=\"{FontSize:F1}\" dominant-baseline=\"middle\">H = {h:F1} mm</text>")
+                          stroke="@DimensionColor" stroke-opacity="0.5" stroke-width="@(StrokeWidth * 0.6)" stroke-dasharray="2,2" />
+                    @((MarkupString)$"<text x=\"{ToSvgX(dimYRight + 12):F1}\" y=\"{ToSvgY(Result.Zmin + h / 2.0):F1}\" fill=\"{DimensionTextColor}\" font-size=\"{FontSize:F1}\" font-weight=\"bold\" dominant-baseline=\"middle\">H = {h:F1} mm</text>")
                 }
             </svg>
         }
         else
         {
-            <div class="text-secondary text-center">
-                <i class="bi bi-bounding-box-circles display-4 mb-2"></i>
+            <div class="@(IsDarkMode ? "text-secondary" : "text-muted") text-center">
+                <div class="display-4 mb-2">⬡</div>
                 <div>等待输入截面尺寸以渲染图形...</div>
             </div>
         }
     </div>
 
     <!-- 视口底部图例与提示 -->
-    <div class="cad-legend px-3 py-1 bg-black bg-opacity-75 border-top border-secondary d-flex align-items-center justify-content-between text-white-50 text-xs">
+    <div class="cad-legend px-3 py-1 border-top d-flex align-items-center justify-content-between text-xs @(IsDarkMode ? "bg-black bg-opacity-75 border-secondary text-white-50" : "bg-light border-light-subtle text-muted")">
         <div class="d-flex align-items-center gap-3">
             <span class="d-flex align-items-center gap-1"><span class="badge rounded-circle p-1 bg-danger"></span> 形心 C (Yc, Zc)</span>
             <span class="d-flex align-items-center gap-1"><span class="badge rounded-circle p-1 bg-success"></span> 1-1 第一主轴</span>
             <span class="d-flex align-items-center gap-1"><span class="badge rounded-circle p-1 bg-warning"></span> 2-2 第二主轴</span>
             @if (ShowStressMap)
             {
-                <span class="d-flex align-items-center gap-1"><span class="badge rounded-circle p-1" style="background:#ec4899;"></span> 中和轴</span>
+                <span class="d-flex align-items-center gap-1"><span class="badge rounded-circle p-1" style="background:@NeutralAxisColor;"></span> 中和轴</span>
                 <span class="d-flex align-items-center gap-1"><span class="badge rounded-circle p-1 bg-primary"></span> 受压 (-)</span>
                 <span class="d-flex align-items-center gap-1"><span class="badge rounded-circle p-1 bg-danger"></span> 受拉 (+)</span>
             }
@@ -194,6 +197,7 @@
 @code {
     [Parameter] public SectionPropertiesResult? Result { get; set; }
     [Parameter] public SectionParameters? Parameters { get; set; }
+    [Parameter] public bool IsDarkMode { get; set; } = true;
 
     public bool ShowDimensions { get; set; } = true;
     public bool ShowAxes { get; set; } = true;
@@ -206,6 +210,19 @@
     {
         ZoomScale = 1.0;
     }
+
+    // 主题色彩计算属性
+    private string CanvasBgColor => IsDarkMode ? "#020617" : "#f8fafc";
+    private string GridLineColor => IsDarkMode ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)";
+    private string SectionFillColor => IsDarkMode ? "#1e293b" : "#e2e8f0";
+    private string SectionStrokeColor => IsDarkMode ? "#38bdf8" : "#0284c7";
+    private string DimensionColor => IsDarkMode ? "#38bdf8" : "#0284c7";
+    private string DimensionTextColor => IsDarkMode ? "#38bdf8" : "#0f172a";
+    private string RefAxisColor => IsDarkMode ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.2)";
+    private string Axis1Color => IsDarkMode ? "#22c55e" : "#16a34a";
+    private string Axis2Color => IsDarkMode ? "#f97316" : "#ea580c";
+    private string CentroidColor => IsDarkMode ? "#ef4444" : "#dc2626";
+    private string NeutralAxisColor => IsDarkMode ? "#ec4899" : "#db2777";
 
     // 坐标与 ViewBox 计算
     private double BoxMinX { get; set; }
@@ -245,10 +262,8 @@
         SvgViewBox = $"{BoxMinX} {BoxMinY} {BoxWidth} {BoxHeight}";
     }
 
-    // 将几何 Y 坐标映射为 SVG X
     private double ToSvgX(double y) => y;
 
-    // 将几何 Z 坐标 (上正下负) 映射为 SVG Y (SVG向下为正: y_svg = (BoxMinY + BoxHeight) - (z - BoxMinY))
     private double ToSvgY(double z)
     {
         return (BoxMinY + BoxHeight) - (z - BoxMinY);
@@ -303,7 +318,6 @@
             return r <= Result.CircleOuterRadius && r >= Result.CircleInnerRadius;
         }
 
-        // 多边形包含性判断 (射线法)
         return IsPointInPolygon(y, z, Result.OuterContour) &&
                !(Result.InnerContours.Any(h => IsPointInPolygon(y, z, h)));
     }
@@ -325,22 +339,16 @@
 
     private string GetStressColor(double stress)
     {
-        // 应力色标:
-        // 拉应力 (正): 红/橙
-        // 压应力 (负): 蓝/青
-        // 零应力: 绿/灰
-        if (Math.Abs(stress) < 0.5) return "#94a3b8"; // 近零应力
+        if (Math.Abs(stress) < 0.5) return IsDarkMode ? "#94a3b8" : "#64748b";
 
         if (stress > 0)
         {
-            // 受拉
             if (stress > 150) return "#ef4444";
             if (stress > 70) return "#f97316";
             return "#fbbf24";
         }
         else
         {
-            // 受压
             if (stress < -150) return "#3b82f6";
             if (stress < -70) return "#06b6d4";
             return "#38bdf8";

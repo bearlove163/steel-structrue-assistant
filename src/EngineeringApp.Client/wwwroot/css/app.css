@@ -124,20 +124,97 @@ code {
     line-height: 1.2 !important;
 }
 
-/* 深色模式自定义滚动条 */
+/* 深色与亮色模式滚动条 */
 ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
 }
 ::-webkit-scrollbar-track {
-    background: #0f172a;
+    background: var(--app-scrollbar-track, #0f172a);
 }
 ::-webkit-scrollbar-thumb {
-    background: #334155;
+    background: var(--app-scrollbar-thumb, #334155);
     border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
     background: #475569;
+}
+
+/* ================= 双界面主题变量系统 ================= */
+[data-theme="dark"] {
+    --app-bg: #0f172a;
+    --app-header-bg: #0b1120;
+    --app-card-bg: #1e293b;
+    --app-card-header-bg: #131d2e;
+    --app-card-inner-bg: rgba(15, 23, 42, 0.7);
+    --app-border: #334155;
+    --app-text: #f8fafc;
+    --app-text-muted: #94a3b8;
+    --app-input-bg: #0f172a;
+    --app-input-border: #334155;
+    --app-input-text: #f8fafc;
+    --app-table-hover: rgba(255, 255, 255, 0.05);
+    --app-scrollbar-track: #0f172a;
+    --app-scrollbar-thumb: #334155;
+}
+
+[data-theme="light"] {
+    --app-bg: #f8fafc;
+    --app-header-bg: #ffffff;
+    --app-card-bg: #ffffff;
+    --app-card-header-bg: #f1f5f9;
+    --app-card-inner-bg: #f8fafc;
+    --app-border: #e2e8f0;
+    --app-text: #0f172a;
+    --app-text-muted: #64748b;
+    --app-input-bg: #ffffff;
+    --app-input-border: #cbd5e1;
+    --app-input-text: #0f172a;
+    --app-table-hover: rgba(0, 0, 0, 0.03);
+    --app-scrollbar-track: #f1f5f9;
+    --app-scrollbar-thumb: #cbd5e1;
+}
+
+.workstation-root {
+    background-color: var(--app-bg) !important;
+    color: var(--app-text) !important;
+    transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+.theme-card {
+    background-color: var(--app-card-bg) !important;
+    border-color: var(--app-border) !important;
+    color: var(--app-text) !important;
+    transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease;
+}
+
+.theme-card-header {
+    background-color: var(--app-card-header-bg) !important;
+    border-color: var(--app-border) !important;
+    color: var(--app-text) !important;
+    transition: background-color 0.25s ease, border-color 0.25s ease;
+}
+
+.theme-card-inner {
+    background-color: var(--app-card-inner-bg) !important;
+    border-color: var(--app-border) !important;
+    color: var(--app-text) !important;
+    transition: background-color 0.25s ease, border-color 0.25s ease;
+}
+
+.theme-input {
+    background-color: var(--app-input-bg) !important;
+    border-color: var(--app-input-border) !important;
+    color: var(--app-input-text) !important;
+    transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease;
+}
+
+.theme-text-muted {
+    color: var(--app-text-muted) !important;
+}
+
+.theme-border {
+    border-color: var(--app-border) !important;
 }
 
 /* 打印与计算书输出样式优化 */

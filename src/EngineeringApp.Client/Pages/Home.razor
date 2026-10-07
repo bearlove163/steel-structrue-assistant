@@ -6,9 +6,11 @@
 
 <PageTitle>截面特性计算与力学分析工作站</PageTitle>
 
-<div class="container-fluid py-2 px-3 workstation-root d-flex flex-column h-100 min-vh-100 bg-dark text-white">
-    <!-- 顶部工程工作站标题栏 -->
-    <header class="d-flex flex-wrap align-items-center justify-content-between pb-2 mb-2 border-bottom border-secondary">
+<div class="container-fluid py-2 px-3 workstation-root d-flex flex-column h-100 min-vh-100 @(IsDarkMode ? "bg-dark text-white" : "bg-light text-dark")"
+     data-theme="@(IsDarkMode ? "dark" : "light")">
+
+    <!-- ======================= 顶部工程工作站标题栏 ======================= -->
+    <header class="d-flex flex-wrap align-items-center justify-content-between pb-2 mb-2 border-bottom @(IsDarkMode ? "border-secondary" : "border-light-subtle bg-white rounded p-2 shadow-sm")">
         <div class="d-flex align-items-center gap-3">
             <div class="p-2 bg-primary rounded-3 text-white fw-bold d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
                 ⬡
@@ -16,15 +18,21 @@
             <div>
                 <h5 class="mb-0 fw-bold tracking-tight d-flex align-items-center gap-2">
                     <span>截面特性计算与力学分析工作站</span>
-                    <span class="badge bg-secondary text-xs">v2.0 PRO</span>
+                    <span class="badge @(IsDarkMode ? "bg-secondary" : "bg-primary-subtle text-primary") text-xs">v2.1 PRO</span>
                 </h5>
-                <div class="text-white-50 text-xs">
-                    空间结构与钢结构截面几何·惯性主轴·塑性模量·扭转翘曲·应力验算综合系统
+                <div class="@(IsDarkMode ? "text-white-50" : "text-muted") text-xs">
+                    空间结构与钢结构截面几何 · 惯性主轴 · 塑性模量 · 扭转翘曲 · <b>面外长细比 (λx, λy)</b> · 应力验算
                 </div>
             </div>
         </div>
 
         <div class="d-flex align-items-center gap-2 mt-2 mt-md-0">
+            <!-- 暗黑/亮色主题切换按钮 -->
+            <button class="btn btn-sm d-flex align-items-center gap-1 @(IsDarkMode ? "btn-outline-warning" : "btn-outline-dark")"
+                    @onclick="ToggleTheme" title="切换暗黑/亮色主题界面类型">
+                <span>@(IsDarkMode ? "☀️ 亮色模式" : "🌙 暗黑模式")</span>
+            </button>
+
             <button class="btn btn-outline-info btn-sm d-flex align-items-center gap-1" @onclick="OpenStandardDatabase">
                 <span>📖 国标型钢库</span>
                 <span class="badge bg-info text-dark">GB/T</span>
@@ -38,25 +46,26 @@
         </div>
     </header>
 
-    <!-- 工作站三栏式主体架构 -->
+    <!-- ======================= 工作站三栏式主体架构 ======================= -->
     <div class="row g-2 flex-grow-1">
+
         <!-- ======================= 1. 左侧参数控制栏 (3.5 列) ======================= -->
         <div class="col-lg-3 col-xl-3 d-flex flex-column">
-            <div class="card bg-secondary bg-opacity-25 border-secondary h-100 shadow-sm d-flex flex-column">
-                <div class="card-header bg-dark bg-opacity-50 border-secondary py-2 d-flex justify-content-between align-items-center">
-                    <span class="fw-bold text-xs text-uppercase text-info">🛠️ 截面定义与参数输入</span>
+            <div class="card @(IsDarkMode ? "bg-secondary bg-opacity-25 border-secondary text-white" : "bg-white border-light-subtle text-dark shadow-sm") h-100 d-flex flex-column">
+                <div class="card-header @(IsDarkMode ? "bg-dark bg-opacity-50 border-secondary" : "bg-light border-light-subtle") py-2 d-flex justify-content-between align-items-center">
+                    <span class="fw-bold text-xs text-uppercase @(IsDarkMode ? "text-info" : "text-primary")">🛠️ 截面定义与构件参数</span>
                     <span class="badge bg-primary">@CurrentParams.Type</span>
                 </div>
 
                 <div class="card-body p-2 overflow-auto" style="max-height: calc(100vh - 120px);">
-                    <!-- 截面类型选择器 -->
+                    <!-- 截面类型快速选择器 -->
                     <div class="mb-3">
-                        <label class="form-label text-xs text-white-50 mb-1 fw-bold">截面类型快速选择</label>
+                        <label class="form-label text-xs @(IsDarkMode ? "text-white-50" : "text-muted") mb-1 fw-bold">截面类型快速选择</label>
                         <div class="row g-1">
                             @foreach (var type in Enum.GetValues<SectionType>())
                             {
                                 <div class="col-4">
-                                    <button class="btn btn-sm w-100 p-1 text-xs text-truncate @(CurrentParams.Type == type ? "btn-primary fw-bold" : "btn-outline-secondary text-white-50")"
+                                    <button class="btn btn-sm w-100 p-1 text-xs text-truncate @(CurrentParams.Type == type ? "btn-primary fw-bold" : (IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary text-muted"))"
                                             @onclick="() => ChangeSectionType(type)">
                                         @GetSectionTypeDisplayName(type)
                                     </button>
@@ -67,34 +76,34 @@
 
                     @if (!string.IsNullOrEmpty(CurrentParams.StandardProfileName))
                     {
-                        <div class="alert alert-info py-1 px-2 text-xs mb-3 d-flex justify-content-between align-items-center">
+                        <div class="alert @(IsDarkMode ? "alert-info" : "alert-primary") py-1 px-2 text-xs mb-3 d-flex justify-content-between align-items-center">
                             <span>当前型钢：<strong>@CurrentParams.StandardProfileName</strong></span>
-                            <button class="btn btn-link btn-sm text-info p-0 text-xs" @onclick="ClearStandardProfile">解除绑定</button>
+                            <button class="btn btn-link btn-sm p-0 text-xs @(IsDarkMode ? "text-info" : "text-primary")" @onclick="ClearStandardProfile">解除绑定</button>
                         </div>
                     }
 
                     <!-- 几何尺寸动态输入 -->
-                    <div class="p-2 mb-3 bg-dark bg-opacity-50 rounded border border-secondary border-opacity-50">
+                    <div class="p-2 mb-3 rounded border @(IsDarkMode ? "bg-dark bg-opacity-50 border-secondary border-opacity-50" : "bg-light border-light-subtle")">
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <span class="text-xs fw-bold text-warning">几何尺寸 (mm)</span>
-                            <span class="text-xs text-white-50">实时自动重算</span>
+                            <span class="text-xs @(IsDarkMode ? "text-white-50" : "text-muted")">实时自动重算</span>
                         </div>
 
                         @if (CurrentParams.Type == SectionType.Rectangle)
                         {
                             <div class="mb-2">
-                                <label class="form-label text-xs text-white-50 mb-0 d-flex justify-content-between">
+                                <label class="form-label text-xs @(IsDarkMode ? "text-white-50" : "text-muted") mb-0 d-flex justify-content-between">
                                     <span>宽度 B</span><span>@CurrentParams.Width mm</span>
                                 </label>
-                                <input type="number" class="form-control form-control-sm bg-dark text-white border-secondary mb-1"
+                                <input type="number" class="form-control form-control-sm @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-light-subtle") mb-1"
                                        @bind="CurrentParams.Width" @bind:after="OnParameterChanged" min="1" step="5" />
                                 <input type="range" class="form-range" @bind="CurrentParams.Width" @bind:after="OnParameterChanged" min="10" max="1000" step="5" />
                             </div>
                             <div class="mb-2">
-                                <label class="form-label text-xs text-white-50 mb-0 d-flex justify-content-between">
+                                <label class="form-label text-xs @(IsDarkMode ? "text-white-50" : "text-muted") mb-0 d-flex justify-content-between">
                                     <span>高度 H</span><span>@CurrentParams.Height mm</span>
                                 </label>
-                                <input type="number" class="form-control form-control-sm bg-dark text-white border-secondary mb-1"
+                                <input type="number" class="form-control form-control-sm @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-light-subtle") mb-1"
                                        @bind="CurrentParams.Height" @bind:after="OnParameterChanged" min="1" step="5" />
                                 <input type="range" class="form-range" @bind="CurrentParams.Height" @bind:after="OnParameterChanged" min="10" max="1000" step="5" />
                             </div>
@@ -102,10 +111,10 @@
                         else if (CurrentParams.Type == SectionType.Circle)
                         {
                             <div class="mb-2">
-                                <label class="form-label text-xs text-white-50 mb-0 d-flex justify-content-between">
+                                <label class="form-label text-xs @(IsDarkMode ? "text-white-50" : "text-muted") mb-0 d-flex justify-content-between">
                                     <span>直径 D</span><span>@CurrentParams.OuterDiameter mm</span>
                                 </label>
-                                <input type="number" class="form-control form-control-sm bg-dark text-white border-secondary mb-1"
+                                <input type="number" class="form-control form-control-sm @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-light-subtle") mb-1"
                                        @bind="CurrentParams.OuterDiameter" @bind:after="OnParameterChanged" min="1" step="5" />
                                 <input type="range" class="form-range" @bind="CurrentParams.OuterDiameter" @bind:after="OnParameterChanged" min="10" max="1000" step="5" />
                             </div>
@@ -113,18 +122,18 @@
                         else if (CurrentParams.Type == SectionType.CHS)
                         {
                             <div class="mb-2">
-                                <label class="form-label text-xs text-white-50 mb-0 d-flex justify-content-between">
+                                <label class="form-label text-xs @(IsDarkMode ? "text-white-50" : "text-muted") mb-0 d-flex justify-content-between">
                                     <span>外径 D</span><span>@CurrentParams.OuterDiameter mm</span>
                                 </label>
-                                <input type="number" class="form-control form-control-sm bg-dark text-white border-secondary mb-1"
+                                <input type="number" class="form-control form-control-sm @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-light-subtle") mb-1"
                                        @bind="CurrentParams.OuterDiameter" @bind:after="OnParameterChanged" min="1" step="5" />
                                 <input type="range" class="form-range" @bind="CurrentParams.OuterDiameter" @bind:after="OnParameterChanged" min="20" max="1000" step="5" />
                             </div>
                             <div class="mb-2">
-                                <label class="form-label text-xs text-white-50 mb-0 d-flex justify-content-between">
+                                <label class="form-label text-xs @(IsDarkMode ? "text-white-50" : "text-muted") mb-0 d-flex justify-content-between">
                                     <span>壁厚 t</span><span>@CurrentParams.WallThickness mm</span>
                                 </label>
-                                <input type="number" class="form-control form-control-sm bg-dark text-white border-secondary mb-1"
+                                <input type="number" class="form-control form-control-sm @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-light-subtle") mb-1"
                                        @bind="CurrentParams.WallThickness" @bind:after="OnParameterChanged" min="0.5" step="0.5" />
                                 <input type="range" class="form-range" @bind="CurrentParams.WallThickness" @bind:after="OnParameterChanged" min="1" max="50" step="0.5" />
                             </div>
@@ -132,26 +141,26 @@
                         else if (CurrentParams.Type == SectionType.RHS)
                         {
                             <div class="mb-2">
-                                <label class="form-label text-xs text-white-50 mb-0 d-flex justify-content-between">
+                                <label class="form-label text-xs @(IsDarkMode ? "text-white-50" : "text-muted") mb-0 d-flex justify-content-between">
                                     <span>外宽 B</span><span>@CurrentParams.Width mm</span>
                                 </label>
-                                <input type="number" class="form-control form-control-sm bg-dark text-white border-secondary mb-1"
+                                <input type="number" class="form-control form-control-sm @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-light-subtle") mb-1"
                                        @bind="CurrentParams.Width" @bind:after="OnParameterChanged" min="1" step="5" />
                                 <input type="range" class="form-range" @bind="CurrentParams.Width" @bind:after="OnParameterChanged" min="20" max="1000" step="5" />
                             </div>
                             <div class="mb-2">
-                                <label class="form-label text-xs text-white-50 mb-0 d-flex justify-content-between">
+                                <label class="form-label text-xs @(IsDarkMode ? "text-white-50" : "text-muted") mb-0 d-flex justify-content-between">
                                     <span>外高 H</span><span>@CurrentParams.Height mm</span>
                                 </label>
-                                <input type="number" class="form-control form-control-sm bg-dark text-white border-secondary mb-1"
+                                <input type="number" class="form-control form-control-sm @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-light-subtle") mb-1"
                                        @bind="CurrentParams.Height" @bind:after="OnParameterChanged" min="1" step="5" />
                                 <input type="range" class="form-range" @bind="CurrentParams.Height" @bind:after="OnParameterChanged" min="20" max="1000" step="5" />
                             </div>
                             <div class="mb-2">
-                                <label class="form-label text-xs text-white-50 mb-0 d-flex justify-content-between">
+                                <label class="form-label text-xs @(IsDarkMode ? "text-white-50" : "text-muted") mb-0 d-flex justify-content-between">
                                     <span>壁厚 t</span><span>@CurrentParams.WallThickness mm</span>
                                 </label>
-                                <input type="number" class="form-control form-control-sm bg-dark text-white border-secondary mb-1"
+                                <input type="number" class="form-control form-control-sm @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-light-subtle") mb-1"
                                        @bind="CurrentParams.WallThickness" @bind:after="OnParameterChanged" min="0.5" step="0.5" />
                                 <input type="range" class="form-range" @bind="CurrentParams.WallThickness" @bind:after="OnParameterChanged" min="1" max="50" step="0.5" />
                             </div>
@@ -159,30 +168,30 @@
                         else if (CurrentParams.Type == SectionType.HBeam || CurrentParams.Type == SectionType.Channel || CurrentParams.Type == SectionType.TSection)
                         {
                             <div class="mb-2">
-                                <label class="form-label text-xs text-white-50 mb-0 d-flex justify-content-between">
+                                <label class="form-label text-xs @(IsDarkMode ? "text-white-50" : "text-muted") mb-0 d-flex justify-content-between">
                                     <span>截面高度 H</span><span>@CurrentParams.Height mm</span>
                                 </label>
-                                <input type="number" class="form-control form-control-sm bg-dark text-white border-secondary mb-1"
+                                <input type="number" class="form-control form-control-sm @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-light-subtle") mb-1"
                                        @bind="CurrentParams.Height" @bind:after="OnParameterChanged" min="1" step="5" />
                                 <input type="range" class="form-range" @bind="CurrentParams.Height" @bind:after="OnParameterChanged" min="50" max="1200" step="5" />
                             </div>
                             <div class="mb-2">
-                                <label class="form-label text-xs text-white-50 mb-0 d-flex justify-content-between">
+                                <label class="form-label text-xs @(IsDarkMode ? "text-white-50" : "text-muted") mb-0 d-flex justify-content-between">
                                     <span>翼缘宽度 B</span><span>@CurrentParams.Width mm</span>
                                 </label>
-                                <input type="number" class="form-control form-control-sm bg-dark text-white border-secondary mb-1"
+                                <input type="number" class="form-control form-control-sm @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-light-subtle") mb-1"
                                        @bind="CurrentParams.Width" @bind:after="OnParameterChanged" min="1" step="5" />
                                 <input type="range" class="form-range" @bind="CurrentParams.Width" @bind:after="OnParameterChanged" min="30" max="600" step="5" />
                             </div>
                             <div class="row g-2 mb-2">
                                 <div class="col-6">
-                                    <label class="form-label text-xs text-white-50 mb-0">腹板厚 tw</label>
-                                    <input type="number" class="form-control form-control-sm bg-dark text-white border-secondary"
+                                    <label class="form-label text-xs @(IsDarkMode ? "text-white-50" : "text-muted") mb-0">腹板厚 tw</label>
+                                    <input type="number" class="form-control form-control-sm @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-light-subtle")"
                                            @bind="CurrentParams.WebThickness" @bind:after="OnParameterChanged" min="0.5" step="0.5" />
                                 </div>
                                 <div class="col-6">
-                                    <label class="form-label text-xs text-white-50 mb-0">翼缘厚 tf</label>
-                                    <input type="number" class="form-control form-control-sm bg-dark text-white border-secondary"
+                                    <label class="form-label text-xs @(IsDarkMode ? "text-white-50" : "text-muted") mb-0">翼缘厚 tf</label>
+                                    <input type="number" class="form-control form-control-sm @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-light-subtle")"
                                            @bind="CurrentParams.FlangeThickness" @bind:after="OnParameterChanged" min="0.5" step="0.5" />
                                 </div>
                             </div>
@@ -190,26 +199,26 @@
                         else if (CurrentParams.Type == SectionType.Angle)
                         {
                             <div class="mb-2">
-                                <label class="form-label text-xs text-white-50 mb-0 d-flex justify-content-between">
+                                <label class="form-label text-xs @(IsDarkMode ? "text-white-50" : "text-muted") mb-0 d-flex justify-content-between">
                                     <span>长肢宽 b1</span><span>@CurrentParams.LegWidth1 mm</span>
                                 </label>
-                                <input type="number" class="form-control form-control-sm bg-dark text-white border-secondary mb-1"
+                                <input type="number" class="form-control form-control-sm @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-light-subtle") mb-1"
                                        @bind="CurrentParams.LegWidth1" @bind:after="OnParameterChanged" min="1" step="5" />
                                 <input type="range" class="form-range" @bind="CurrentParams.LegWidth1" @bind:after="OnParameterChanged" min="20" max="300" step="5" />
                             </div>
                             <div class="mb-2">
-                                <label class="form-label text-xs text-white-50 mb-0 d-flex justify-content-between">
+                                <label class="form-label text-xs @(IsDarkMode ? "text-white-50" : "text-muted") mb-0 d-flex justify-content-between">
                                     <span>短肢宽 b2</span><span>@CurrentParams.LegWidth2 mm</span>
                                 </label>
-                                <input type="number" class="form-control form-control-sm bg-dark text-white border-secondary mb-1"
+                                <input type="number" class="form-control form-control-sm @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-light-subtle") mb-1"
                                        @bind="CurrentParams.LegWidth2" @bind:after="OnParameterChanged" min="1" step="5" />
                                 <input type="range" class="form-range" @bind="CurrentParams.LegWidth2" @bind:after="OnParameterChanged" min="20" max="300" step="5" />
                             </div>
                             <div class="mb-2">
-                                <label class="form-label text-xs text-white-50 mb-0 d-flex justify-content-between">
+                                <label class="form-label text-xs @(IsDarkMode ? "text-white-50" : "text-muted") mb-0 d-flex justify-content-between">
                                     <span>角钢厚度 t</span><span>@CurrentParams.LegThickness mm</span>
                                 </label>
-                                <input type="number" class="form-control form-control-sm bg-dark text-white border-secondary mb-1"
+                                <input type="number" class="form-control form-control-sm @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-light-subtle") mb-1"
                                        @bind="CurrentParams.LegThickness" @bind:after="OnParameterChanged" min="1" step="1" />
                                 <input type="range" class="form-range" @bind="CurrentParams.LegThickness" @bind:after="OnParameterChanged" min="2" max="30" step="1" />
                             </div>
@@ -218,37 +227,36 @@
                         {
                             <div class="row g-2 mb-2">
                                 <div class="col-6">
-                                    <label class="form-label text-xs text-white-50 mb-0">竖向高 H</label>
-                                    <input type="number" class="form-control form-control-sm bg-dark text-white border-secondary"
+                                    <label class="form-label text-xs @(IsDarkMode ? "text-white-50" : "text-muted") mb-0">竖向高 H</label>
+                                    <input type="number" class="form-control form-control-sm @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-light-subtle")"
                                            @bind="CurrentParams.Height" @bind:after="OnParameterChanged" min="10" step="10" />
                                 </div>
                                 <div class="col-6">
-                                    <label class="form-label text-xs text-white-50 mb-0">横向宽 B</label>
-                                    <input type="number" class="form-control form-control-sm bg-dark text-white border-secondary"
+                                    <label class="form-label text-xs @(IsDarkMode ? "text-white-50" : "text-muted") mb-0">横向宽 B</label>
+                                    <input type="number" class="form-control form-control-sm @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-light-subtle")"
                                            @bind="CurrentParams.Width" @bind:after="OnParameterChanged" min="10" step="10" />
                                 </div>
                                 <div class="col-6">
-                                    <label class="form-label text-xs text-white-50 mb-0">竖板厚 tw</label>
-                                    <input type="number" class="form-control form-control-sm bg-dark text-white border-secondary"
+                                    <label class="form-label text-xs @(IsDarkMode ? "text-white-50" : "text-muted") mb-0">竖板厚 tw</label>
+                                    <input type="number" class="form-control form-control-sm @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-light-subtle")"
                                            @bind="CurrentParams.WebThickness" @bind:after="OnParameterChanged" min="1" step="1" />
                                 </div>
                                 <div class="col-6">
-                                    <label class="form-label text-xs text-white-50 mb-0">横板厚 tf</label>
-                                    <input type="number" class="form-control form-control-sm bg-dark text-white border-secondary"
+                                    <label class="form-label text-xs @(IsDarkMode ? "text-white-50" : "text-muted") mb-0">横板厚 tf</label>
+                                    <input type="number" class="form-control form-control-sm @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-light-subtle")"
                                            @bind="CurrentParams.FlangeThickness" @bind:after="OnParameterChanged" min="1" step="1" />
                                 </div>
                             </div>
                         }
                         else if (CurrentParams.Type == SectionType.Polygon)
                         {
-                            <!-- 多边形顶点列表 -->
                             <div class="mb-2">
                                 <div class="d-flex justify-content-between align-items-center mb-1">
-                                    <span class="text-xs text-white-50">外边界多边形顶点 (逆时针)</span>
+                                    <span class="text-xs @(IsDarkMode ? "text-white-50" : "text-muted")">外边界多边形顶点 (逆时针)</span>
                                     <button class="btn btn-outline-info btn-sm py-0 px-1 text-xs" @onclick="AddPolygonVertex">+ 加点</button>
                                 </div>
                                 <div class="table-responsive" style="max-height: 140px;">
-                                    <table class="table table-dark table-sm table-bordered text-xs text-center align-middle mb-0 font-monospace">
+                                    <table class="table @(IsDarkMode ? "table-dark" : "table-light") table-sm table-bordered text-xs text-center align-middle mb-0 font-monospace">
                                         <thead>
                                             <tr>
                                                 <th>#</th>
@@ -264,12 +272,12 @@
                                                 <tr>
                                                     <td>@(idx + 1)</td>
                                                     <td>
-                                                        <input type="number" class="form-control form-control-sm bg-dark text-white border-0 p-0 text-center text-xs"
+                                                        <input type="number" class="form-control form-control-sm @(IsDarkMode ? "bg-dark text-white" : "bg-white text-dark") border-0 p-0 text-center text-xs"
                                                                value="@CurrentParams.PolygonOuterLoop[idx].Y"
                                                                @onchange="(e) => UpdatePolygonPointY(idx, e)" />
                                                     </td>
                                                     <td>
-                                                        <input type="number" class="form-control form-control-sm bg-dark text-white border-0 p-0 text-center text-xs"
+                                                        <input type="number" class="form-control form-control-sm @(IsDarkMode ? "bg-dark text-white" : "bg-white text-dark") border-0 p-0 text-center text-xs"
                                                                value="@CurrentParams.PolygonOuterLoop[idx].Z"
                                                                @onchange="(e) => UpdatePolygonPointZ(idx, e)" />
                                                     </td>
@@ -285,10 +293,10 @@
                         }
                     </div>
 
-                    <!-- 材料选择 -->
-                    <div class="p-2 mb-3 bg-dark bg-opacity-50 rounded border border-secondary border-opacity-50">
+                    <!-- 材料设定 -->
+                    <div class="p-2 mb-3 rounded border @(IsDarkMode ? "bg-dark bg-opacity-50 border-secondary border-opacity-50" : "bg-light border-light-subtle")">
                         <label class="form-label text-xs fw-bold text-success mb-1">结构材料设定</label>
-                        <select class="form-select form-select-sm bg-dark text-white border-secondary mb-2"
+                        <select class="form-select form-select-sm @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-light-subtle") mb-2"
                                 @onchange="OnMaterialSelected">
                             @foreach (var mat in MaterialProfile.Presets)
                             {
@@ -297,20 +305,82 @@
                         </select>
                         <div class="row g-2 text-xs">
                             <div class="col-6">
-                                <label class="text-white-50">屈服强度 fy (MPa)</label>
-                                <input type="number" class="form-control form-control-sm bg-dark text-white border-secondary"
+                                <label class="@(IsDarkMode ? "text-white-50" : "text-muted")">屈服强度 fy (MPa)</label>
+                                <input type="number" class="form-control form-control-sm @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-light-subtle")"
                                        @bind="CurrentParams.Material.YieldStrength" @bind:after="OnParameterChanged" />
                             </div>
                             <div class="col-6">
-                                <label class="text-white-50">密度 ρ (kg/m³)</label>
-                                <input type="number" class="form-control form-control-sm bg-dark text-white border-secondary"
+                                <label class="@(IsDarkMode ? "text-white-50" : "text-muted")">密度 ρ (kg/m³)</label>
+                                <input type="number" class="form-control form-control-sm @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-light-subtle")"
                                        @bind="CurrentParams.Material.Density" @bind:after="OnParameterChanged" />
                             </div>
                         </div>
                     </div>
 
+                    <!-- 构件计算长度与面外长细比 (Slenderness Ratio) 配置区 -->
+                    <div class="p-2 mb-3 rounded border @(IsDarkMode ? "bg-dark bg-opacity-50 border-secondary border-opacity-50" : "bg-light border-light-subtle")">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <label class="form-label text-xs fw-bold text-primary mb-0">📏 构件长度与面外长细比 (λx, λy)</label>
+                            <div class="form-check form-switch m-0">
+                                <input class="form-check-input" type="checkbox" id="checkSlender"
+                                       @bind="CurrentBuckling.EnableSlendernessCheck" @bind:after="OnParameterChanged" />
+                            </div>
+                        </div>
+
+                        @if (CurrentBuckling.EnableSlendernessCheck)
+                        {
+                            <div class="mt-2 text-xs">
+                                <div class="mb-2">
+                                    <label class="form-label text-xs @(IsDarkMode ? "text-white-50" : "text-muted") mb-0 d-flex justify-content-between">
+                                        <span>构件几何长度 L</span>
+                                        <span class="fw-bold">@CurrentBuckling.MemberLength mm (@((CurrentBuckling.MemberLength / 1000).ToString("F1")) m)</span>
+                                    </label>
+                                    <input type="number" class="form-control form-control-sm @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-light-subtle") mb-1"
+                                           @bind="CurrentBuckling.MemberLength" @bind:after="OnParameterChanged" min="100" step="500" />
+                                    <div class="d-flex gap-1 mb-1">
+                                        <button class="btn btn-xs @(IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary")" @onclick="() => SetPresetLength(3000)">3m</button>
+                                        <button class="btn btn-xs @(IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary")" @onclick="() => SetPresetLength(6000)">6m</button>
+                                        <button class="btn btn-xs @(IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary")" @onclick="() => SetPresetLength(9000)">9m</button>
+                                        <button class="btn btn-xs @(IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary")" @onclick="() => SetPresetLength(12000)">12m</button>
+                                    </div>
+                                </div>
+
+                                <div class="row g-2 mb-2">
+                                    <div class="col-6">
+                                        <label class="@(IsDarkMode ? "text-white-50" : "text-muted")">面内计算长度系数 μx</label>
+                                        <input type="number" class="form-control form-control-sm @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-light-subtle")"
+                                               @bind="CurrentBuckling.EffectiveLengthFactorX" @bind:after="OnParameterChanged" step="0.1" min="0.1" />
+                                        <span class="@(IsDarkMode ? "text-white-50" : "text-muted")" style="font-size: 10px;">L0x = @CurrentBuckling.L0x.ToString("F0") mm</span>
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="@(IsDarkMode ? "text-white-50" : "text-muted")">面外计算长度系数 μy</label>
+                                        <input type="number" class="form-control form-control-sm @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-light-subtle")"
+                                               @bind="CurrentBuckling.EffectiveLengthFactorY" @bind:after="OnParameterChanged" step="0.1" min="0.1" />
+                                        <span class="@(IsDarkMode ? "text-white-50" : "text-muted")" style="font-size: 10px;">L0y = @CurrentBuckling.L0y.ToString("F0") mm</span>
+                                    </div>
+                                </div>
+
+                                <div class="row g-2">
+                                    <div class="col-6">
+                                        <label class="@(IsDarkMode ? "text-white-50" : "text-muted")">受力类型</label>
+                                        <select class="form-select form-select-sm @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-light-subtle")"
+                                                @onchange="OnForceTypeChanged">
+                                            <option value="Compression" selected="@(CurrentBuckling.ForceType == MemberForceType.Compression)">受压构件 (压杆)</option>
+                                            <option value="Tension" selected="@(CurrentBuckling.ForceType == MemberForceType.Tension)">受拉构件 (拉杆)</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="@(IsDarkMode ? "text-white-50" : "text-muted")">容许限值 [λ]</label>
+                                        <input type="number" class="form-control form-control-sm @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-light-subtle")"
+                                               @bind="CurrentBuckling.AllowableSlenderness" @bind:after="OnParameterChanged" step="10" />
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+
                     <!-- 荷载工况与受力状态 -->
-                    <div class="p-2 bg-dark bg-opacity-50 rounded border border-secondary border-opacity-50">
+                    <div class="p-2 rounded border @(IsDarkMode ? "bg-dark bg-opacity-50 border-secondary border-opacity-50" : "bg-light border-light-subtle")">
                         <div class="d-flex justify-content-between align-items-center mb-1">
                             <label class="form-label text-xs fw-bold text-danger mb-0">截面受力荷载工况</label>
                             <div class="form-check form-switch m-0">
@@ -323,26 +393,26 @@
                         {
                             <div class="row g-2 text-xs mt-1">
                                 <div class="col-6">
-                                    <label class="text-white-50">轴向力 N (kN)</label>
-                                    <input type="number" class="form-control form-control-sm bg-dark text-white border-secondary"
+                                    <label class="@(IsDarkMode ? "text-white-50" : "text-muted")">轴向力 N (kN)</label>
+                                    <input type="number" class="form-control form-control-sm @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-light-subtle")"
                                            @bind="CurrentLoad.AxialForceN" @bind:after="OnParameterChanged" step="10" />
-                                    <span class="text-white-50" style="font-size: 10px;">(拉正压负)</span>
+                                    <span class="@(IsDarkMode ? "text-white-50" : "text-muted")" style="font-size: 10px;">(拉正压负)</span>
                                 </div>
                                 <div class="col-6">
-                                    <label class="text-white-50">弯矩 My (kN·m)</label>
-                                    <input type="number" class="form-control form-control-sm bg-dark text-white border-secondary"
+                                    <label class="@(IsDarkMode ? "text-white-50" : "text-muted")">弯矩 My (kN·m)</label>
+                                    <input type="number" class="form-control form-control-sm @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-light-subtle")"
                                            @bind="CurrentLoad.BendingMomentMy" @bind:after="OnParameterChanged" step="5" />
-                                    <span class="text-white-50" style="font-size: 10px;">(强轴弯矩)</span>
+                                    <span class="@(IsDarkMode ? "text-white-50" : "text-muted")" style="font-size: 10px;">(强轴弯矩)</span>
                                 </div>
                                 <div class="col-6">
-                                    <label class="text-white-50">弯矩 Mz (kN·m)</label>
-                                    <input type="number" class="form-control form-control-sm bg-dark text-white border-secondary"
+                                    <label class="@(IsDarkMode ? "text-white-50" : "text-muted")">弯矩 Mz (kN·m)</label>
+                                    <input type="number" class="form-control form-control-sm @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-light-subtle")"
                                            @bind="CurrentLoad.BendingMomentMz" @bind:after="OnParameterChanged" step="5" />
-                                    <span class="text-white-50" style="font-size: 10px;">(弱轴弯矩)</span>
+                                    <span class="@(IsDarkMode ? "text-white-50" : "text-muted")" style="font-size: 10px;">(弱轴弯矩)</span>
                                 </div>
                                 <div class="col-6">
-                                    <label class="text-white-50">竖向剪力 Vz (kN)</label>
-                                    <input type="number" class="form-control form-control-sm bg-dark text-white border-secondary"
+                                    <label class="@(IsDarkMode ? "text-white-50" : "text-muted")">竖向剪力 Vz (kN)</label>
+                                    <input type="number" class="form-control form-control-sm @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-light-subtle")"
                                            @bind="CurrentLoad.ShearForceVz" @bind:after="OnParameterChanged" step="5" />
                                 </div>
                             </div>
@@ -354,18 +424,18 @@
 
         <!-- ======================= 2. 中间交互 CAD 视口 (5.2 列) ======================= -->
         <div class="col-lg-5 col-xl-5 d-flex flex-column">
-            <SectionSvgCanvas Result="@CurrentResult" Parameters="@CurrentParams" />
+            <SectionSvgCanvas Result="@CurrentResult" Parameters="@CurrentParams" IsDarkMode="@IsDarkMode" />
         </div>
 
         <!-- ======================= 3. 右侧分析与力学指标看板 (3.8 列) ======================= -->
         <div class="col-lg-4 col-xl-4 d-flex flex-column">
-            <div class="card bg-secondary bg-opacity-25 border-secondary h-100 shadow-sm d-flex flex-column">
-                <div class="card-header bg-dark bg-opacity-50 border-secondary py-2 d-flex justify-content-between align-items-center">
-                    <span class="fw-bold text-xs text-uppercase text-success">📊 力学特性指标与综合校核</span>
+            <div class="card @(IsDarkMode ? "bg-secondary bg-opacity-25 border-secondary text-white" : "bg-white border-light-subtle text-dark shadow-sm") h-100 d-flex flex-column">
+                <div class="card-header @(IsDarkMode ? "bg-dark bg-opacity-50 border-secondary" : "bg-light border-light-subtle") py-2 d-flex justify-content-between align-items-center">
+                    <span class="fw-bold text-xs text-uppercase text-success">📊 截面指标 · 长细比 · 强度校核</span>
                     <div class="btn-group btn-group-sm">
-                        <button class="btn btn-xs @(UseCmUnits ? "btn-primary" : "btn-outline-secondary text-white-50")"
+                        <button class="btn btn-xs @(UseCmUnits ? "btn-primary" : (IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary text-muted"))"
                                 @onclick="() => UseCmUnits = true">cm / kg</button>
-                        <button class="btn btn-xs @(!UseCmUnits ? "btn-primary" : "btn-outline-secondary text-white-50")"
+                        <button class="btn btn-xs @(!UseCmUnits ? "btn-primary" : (IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary text-muted"))"
                                 @onclick="() => UseCmUnits = false">mm / N</button>
                     </div>
                 </div>
@@ -373,19 +443,19 @@
                 <div class="card-body p-2 overflow-auto font-monospace" style="max-height: calc(100vh - 120px);">
                     @if (CurrentResult != null)
                     {
-                        <!-- 核心几何摘要 -->
+                        <!-- 核心几何摘要卡片 -->
                         <div class="row g-2 mb-2">
                             <div class="col-6">
-                                <div class="p-2 rounded bg-dark border border-secondary border-opacity-50 text-center">
-                                    <div class="text-white-50 text-xs">截面面积 A</div>
+                                <div class="p-2 rounded border text-center @(IsDarkMode ? "bg-dark border-secondary border-opacity-50" : "bg-light border-light-subtle")">
+                                    <div class="@(IsDarkMode ? "text-white-50" : "text-muted") text-xs">截面面积 A</div>
                                     <div class="fs-5 fw-bold text-info">
                                         @(UseCmUnits ? CurrentResult.AreaCm2.ToString("F2") + " cm²" : CurrentResult.Area.ToString("F0") + " mm²")
                                     </div>
                                 </div>
                             </div>
                             <div class="col-6">
-                                <div class="p-2 rounded bg-dark border border-secondary border-opacity-50 text-center">
-                                    <div class="text-white-50 text-xs">延米理论米重 m</div>
+                                <div class="p-2 rounded border text-center @(IsDarkMode ? "bg-dark border-secondary border-opacity-50" : "bg-light border-light-subtle")">
+                                    <div class="@(IsDarkMode ? "text-white-50" : "text-muted") text-xs">延米理论米重 m</div>
                                     <div class="fs-5 fw-bold text-warning">
                                         @CurrentResult.LinearMass.ToString("F2") kg/m
                                     </div>
@@ -393,100 +463,145 @@
                             </div>
                         </div>
 
+                        <!-- 构件面内与面外长细比验算卡片 (新增) -->
+                        @if (CurrentBuckling.EnableSlendernessCheck && CurrentResult.SlendernessResult != null)
+                        {
+                            var sr = CurrentResult.SlendernessResult;
+                            bool isSlenderOk = sr.IsSatisfied;
+                            double slenderPct = Math.Min(100.0, sr.SlendernessRatio * 100.0);
+
+                            <div class="card @(IsDarkMode ? "bg-dark border-secondary" : "bg-light border-light-subtle") p-2 mb-2">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="text-xs fw-bold text-primary">📐 构件长细比控制 (GB 50017)</span>
+                                    <span class="badge @(isSlenderOk ? "bg-success" : "bg-warning text-dark") text-xs">
+                                        @(isSlenderOk ? "长细比合格 SAFE" : "超限 WARNING")
+                                    </span>
+                                </div>
+
+                                <div class="d-flex justify-content-between text-xs mb-1">
+                                    <span class="@(IsDarkMode ? "text-white-50" : "text-muted")">控制长细比 λmax / [λ]:</span>
+                                    <span class="fw-bold @(isSlenderOk ? "text-success" : "text-warning")">
+                                        @sr.LambdaMax.ToString("F1") / @sr.AllowableLambda.ToString("F0") (@sr.SlendernessRatio.ToString("P1"))
+                                    </span>
+                                </div>
+                                <div class="progress @(IsDarkMode ? "bg-secondary" : "bg-secondary-subtle") mb-2" style="height: 6px;">
+                                    <div class="progress-bar @(sr.SlendernessRatio > 1.0 ? "bg-warning" : "bg-success")"
+                                         role="progressbar" style="width: @slenderPct.ToString("F0")%"></div>
+                                </div>
+
+                                <div class="row g-1 text-xs">
+                                    <div class="col-6">
+                                        <div class="p-1 rounded @(IsDarkMode ? "bg-secondary bg-opacity-25" : "bg-white border border-light-subtle")">
+                                            <div class="@(IsDarkMode ? "text-white-50" : "text-muted")">强轴/面内 λx</div>
+                                            <div class="fw-bold text-primary">@sr.LambdaX.ToString("F1")</div>
+                                            <div class="@(IsDarkMode ? "text-white-50" : "text-muted")" style="font-size:10px;">(L0x=@sr.L0x.ToString("F0"), ix=@sr.RadiusIx.ToString("F1"))</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="p-1 rounded @(IsDarkMode ? "bg-secondary bg-opacity-25" : "bg-white border border-light-subtle")">
+                                            <div class="@(IsDarkMode ? "text-white-50" : "text-muted")">弱轴/面外 λy</div>
+                                            <div class="fw-bold text-warning">@sr.LambdaY.ToString("F1")</div>
+                                            <div class="@(IsDarkMode ? "text-white-50" : "text-muted")" style="font-size:10px;">(L0y=@sr.L0y.ToString("F0"), iy=@sr.RadiusIy.ToString("F1"))</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+
                         <!-- 详细力学参数表格 -->
-                        <div class="table-responsive rounded border border-secondary border-opacity-50 mb-3">
-                            <table class="table table-dark table-sm table-striped mb-0 text-xs align-middle">
+                        <div class="table-responsive rounded border @(IsDarkMode ? "border-secondary border-opacity-50" : "border-light-subtle") mb-3">
+                            <table class="table @(IsDarkMode ? "table-dark table-striped" : "table-hover table-striped") table-sm mb-0 text-xs align-middle">
                                 <tbody>
                                     <tr>
-                                        <td class="text-white-50 ps-2">截面周长 P</td>
+                                        <td class="@(IsDarkMode ? "text-white-50" : "text-muted") ps-2">截面周长 P</td>
                                         <td class="fw-bold text-end pe-2">@CurrentResult.Perimeter.ToString("F1") mm</td>
                                     </tr>
                                     <tr>
-                                        <td class="text-white-50 ps-2">延米涂装展开面积</td>
+                                        <td class="@(IsDarkMode ? "text-white-50" : "text-muted") ps-2">延米涂装展开面积</td>
                                         <td class="fw-bold text-end pe-2">@CurrentResult.PaintingAreaPerMeter.ToString("F3") m²/m</td>
                                     </tr>
                                     <tr>
-                                        <td class="text-white-50 ps-2">形心坐标 (Yc, Zc)</td>
+                                        <td class="@(IsDarkMode ? "text-white-50" : "text-muted") ps-2">形心坐标 (Yc, Zc)</td>
                                         <td class="fw-bold text-end pe-2 text-info">(@CurrentResult.Yc.ToString("F1"), @CurrentResult.Zc.ToString("F1")) mm</td>
                                     </tr>
                                     <tr>
-                                        <td class="text-white-50 ps-2">强轴惯性矩 Iy</td>
+                                        <td class="@(IsDarkMode ? "text-white-50" : "text-muted") ps-2">强轴惯性矩 Iy</td>
                                         <td class="fw-bold text-end pe-2">
                                             @(UseCmUnits ? CurrentResult.IyCm4.ToString("F1") + " cm⁴" : CurrentResult.Iy.ToString("E2") + " mm⁴")
                                         </td>
                                     </tr>
                                     <tr>
-                                        <td class="text-white-50 ps-2">弱轴惯性矩 Iz</td>
+                                        <td class="@(IsDarkMode ? "text-white-50" : "text-muted") ps-2">弱轴惯性矩 Iz</td>
                                         <td class="fw-bold text-end pe-2">
                                             @(UseCmUnits ? CurrentResult.IzCm4.ToString("F1") + " cm⁴" : CurrentResult.Iz.ToString("E2") + " mm⁴")
                                         </td>
                                     </tr>
                                     <tr>
-                                        <td class="text-white-50 ps-2">形心惯性积 Iyz</td>
+                                        <td class="@(IsDarkMode ? "text-white-50" : "text-muted") ps-2">形心惯性积 Iyz</td>
                                         <td class="fw-bold text-end pe-2">
                                             @(Math.Abs(CurrentResult.Iyz) < 1e-4 ? "0.00 (对称)" : (UseCmUnits ? (CurrentResult.Iyz / 1e4).ToString("F1") + " cm⁴" : CurrentResult.Iyz.ToString("E2") + " mm⁴"))
                                         </td>
                                     </tr>
-                                    <tr class="table-primary table-opacity-25">
+                                    <tr class="@(IsDarkMode ? "table-primary table-opacity-25" : "table-success-subtle")">
                                         <td class="ps-2 fw-bold text-success">第一主惯性矩 I1</td>
                                         <td class="fw-bold text-end pe-2 text-success">
                                             @(UseCmUnits ? CurrentResult.I1Cm4.ToString("F1") + " cm⁴" : CurrentResult.I1.ToString("E2") + " mm⁴")
                                         </td>
                                     </tr>
-                                    <tr class="table-primary table-opacity-25">
+                                    <tr class="@(IsDarkMode ? "table-primary table-opacity-25" : "table-warning-subtle")">
                                         <td class="ps-2 fw-bold text-warning">第二主惯性矩 I2</td>
                                         <td class="fw-bold text-end pe-2 text-warning">
                                             @(UseCmUnits ? CurrentResult.I2Cm4.ToString("F1") + " cm⁴" : CurrentResult.I2.ToString("E2") + " mm⁴")
                                         </td>
                                     </tr>
                                     <tr>
-                                        <td class="text-white-50 ps-2">主轴偏角 αp</td>
+                                        <td class="@(IsDarkMode ? "text-white-50" : "text-muted") ps-2">主轴偏角 αp</td>
                                         <td class="fw-bold text-end pe-2 text-info">@CurrentResult.PrincipalAngleDeg.ToString("F2")°</td>
                                     </tr>
                                     <tr>
-                                        <td class="text-white-50 ps-2">惯性半径 (iy, iz)</td>
+                                        <td class="@(IsDarkMode ? "text-white-50" : "text-muted") ps-2">惯性半径 (iy, iz)</td>
                                         <td class="fw-bold text-end pe-2">@CurrentResult.IyRadius.ToString("F1"), @CurrentResult.IzRadius.ToString("F1") mm</td>
                                     </tr>
                                     <tr>
-                                        <td class="text-white-50 ps-2">主惯性半径 (i1, i2)</td>
+                                        <td class="@(IsDarkMode ? "text-white-50" : "text-muted") ps-2">主惯性半径 (i1, i2)</td>
                                         <td class="fw-bold text-end pe-2">@CurrentResult.I1Radius.ToString("F1"), @CurrentResult.I2Radius.ToString("F1") mm</td>
                                     </tr>
                                     <tr>
-                                        <td class="text-white-50 ps-2">弹性截面模量 Wy_min</td>
+                                        <td class="@(IsDarkMode ? "text-white-50" : "text-muted") ps-2">弹性截面模量 Wy_min</td>
                                         <td class="fw-bold text-end pe-2">
                                             @(UseCmUnits ? CurrentResult.WyMinCm3.ToString("F1") + " cm³" : (CurrentResult.WyMinCm3 * 1000).ToString("F0") + " mm³")
                                         </td>
                                     </tr>
                                     <tr>
-                                        <td class="text-white-50 ps-2">弹性截面模量 Wz_min</td>
+                                        <td class="@(IsDarkMode ? "text-white-50" : "text-muted") ps-2">弹性截面模量 Wz_min</td>
                                         <td class="fw-bold text-end pe-2">
                                             @(UseCmUnits ? CurrentResult.WzMinCm3.ToString("F1") + " cm³" : (CurrentResult.WzMinCm3 * 1000).ToString("F0") + " mm³")
                                         </td>
                                     </tr>
                                     <tr>
-                                        <td class="text-white-50 ps-2">塑性截面模量 Wpl_y</td>
+                                        <td class="@(IsDarkMode ? "text-white-50" : "text-muted") ps-2">塑性截面模量 Wpl_y</td>
                                         <td class="fw-bold text-end pe-2">
                                             @(UseCmUnits ? CurrentResult.WplyCm3.ToString("F1") + " cm³" : (CurrentResult.WplyCm3 * 1000).ToString("F0") + " mm³")
                                         </td>
                                     </tr>
                                     <tr>
-                                        <td class="text-white-50 ps-2">塑性截面模量 Wpl_z</td>
+                                        <td class="@(IsDarkMode ? "text-white-50" : "text-muted") ps-2">塑性截面模量 Wpl_z</td>
                                         <td class="fw-bold text-end pe-2">
                                             @(UseCmUnits ? CurrentResult.WplzCm3.ToString("F1") + " cm³" : (CurrentResult.WplzCm3 * 1000).ToString("F0") + " mm³")
                                         </td>
                                     </tr>
                                     <tr>
-                                        <td class="text-white-50 ps-2">截面塑性形状系数 γy</td>
+                                        <td class="@(IsDarkMode ? "text-white-50" : "text-muted") ps-2">截面塑性形状系数 γy</td>
                                         <td class="fw-bold text-end pe-2">@CurrentResult.GammaY.ToString("F3")</td>
                                     </tr>
                                     <tr>
-                                        <td class="text-white-50 ps-2">自由扭转常数 J (It)</td>
+                                        <td class="@(IsDarkMode ? "text-white-50" : "text-muted") ps-2">自由扭转常数 J (It)</td>
                                         <td class="fw-bold text-end pe-2">
                                             @(UseCmUnits ? CurrentResult.TorsionConstantJCm4.ToString("F1") + " cm⁴" : CurrentResult.TorsionConstantJ.ToString("E2") + " mm⁴")
                                         </td>
                                     </tr>
                                     <tr>
-                                        <td class="text-white-50 ps-2">翘曲常数 Iw (Cw)</td>
+                                        <td class="@(IsDarkMode ? "text-white-50" : "text-muted") ps-2">翘曲常数 Iw (Cw)</td>
                                         <td class="fw-bold text-end pe-2">
                                             @(UseCmUnits ? CurrentResult.WarpingConstantIwCm6.ToString("F1") + " cm⁶" : CurrentResult.WarpingConstantIw.ToString("E2") + " mm⁶")
                                         </td>
@@ -503,33 +618,33 @@
                             bool isSafe = s.MaxAbsoluteStress <= fy;
                             double pct = Math.Min(100.0, s.StressRatio * 100.0);
 
-                            <div class="card bg-dark border-secondary p-2 mb-2">
+                            <div class="card @(IsDarkMode ? "bg-dark border-secondary" : "bg-light border-light-subtle") p-2 mb-2">
                                 <div class="d-flex justify-content-between align-items-center mb-1">
-                                    <span class="text-xs fw-bold text-danger">⚠️ 荷载应力校核 (GB 50017)</span>
+                                    <span class="text-xs fw-bold text-danger">⚠️ 荷载正应力校核 (GB 50017)</span>
                                     <span class="badge @(isSafe ? "bg-success" : "bg-danger") text-xs">
                                         @(isSafe ? "应力合规 SAFE" : "超限 WARNING")
                                     </span>
                                 </div>
 
                                 <div class="d-flex justify-content-between text-xs mb-1">
-                                    <span class="text-white-50">应力比利用率 η:</span>
+                                    <span class="@(IsDarkMode ? "text-white-50" : "text-muted")">应力比利用率 η:</span>
                                     <span class="fw-bold @(isSafe ? "text-success" : "text-danger")">@s.StressRatio.ToString("P1")</span>
                                 </div>
-                                <div class="progress bg-secondary mb-2" style="height: 6px;">
+                                <div class="progress @(IsDarkMode ? "bg-secondary" : "bg-secondary-subtle") mb-2" style="height: 6px;">
                                     <div class="progress-bar @(s.StressRatio > 1.0 ? "bg-danger" : (s.StressRatio > 0.85 ? "bg-warning" : "bg-success"))"
                                          role="progressbar" style="width: @pct.ToString("F0")%"></div>
                                 </div>
 
                                 <div class="row g-1 text-xs">
                                     <div class="col-6">
-                                        <div class="p-1 rounded bg-secondary bg-opacity-25">
-                                            <div class="text-white-50">最大拉应力 σ_max</div>
+                                        <div class="p-1 rounded @(IsDarkMode ? "bg-secondary bg-opacity-25" : "bg-white border border-light-subtle")">
+                                            <div class="@(IsDarkMode ? "text-white-50" : "text-muted")">最大拉应力 σ_max</div>
                                             <div class="fw-bold text-danger">+@s.MaxTensileStress.ToString("F1") MPa</div>
                                         </div>
                                     </div>
                                     <div class="col-6">
-                                        <div class="p-1 rounded bg-secondary bg-opacity-25">
-                                            <div class="text-white-50">最大压应力 σ_min</div>
+                                        <div class="p-1 rounded @(IsDarkMode ? "bg-secondary bg-opacity-25" : "bg-white border border-light-subtle")">
+                                            <div class="@(IsDarkMode ? "text-white-50" : "text-muted")">最大压应力 σ_min</div>
                                             <div class="fw-bold text-primary">@s.MinCompressiveStress.ToString("F1") MPa</div>
                                         </div>
                                     </div>
@@ -543,28 +658,33 @@
     </div>
 
     <!-- 国标型钢筛选弹窗 -->
-    <SteelProfileModal @bind-IsOpen="IsSteelModalOpen" OnSelectProfile="HandleStandardProfileSelected" />
+    <SteelProfileModal @bind-IsOpen="IsSteelModalOpen"
+                       OnSelectProfile="HandleStandardProfileSelected"
+                       IsDarkMode="@IsDarkMode" />
 
     <!-- 计算书导出弹窗 -->
     <CalculationReportModal @bind-IsOpen="IsReportModalOpen"
                             Parameters="@CurrentParams"
                             Result="@CurrentResult"
-                            LoadCase="@CurrentLoad" />
+                            LoadCase="@CurrentLoad"
+                            BucklingParameters="@CurrentBuckling"
+                            IsDarkMode="@IsDarkMode" />
 </div>
 
 @code {
     private SectionParameters CurrentParams { get; set; } = new();
     private LoadCase CurrentLoad { get; set; } = new();
+    private MemberBucklingParameters CurrentBuckling { get; set; } = new();
     private SectionPropertiesResult? CurrentResult { get; set; }
     private ParametricSectionCalculator Calculator { get; } = new();
 
+    private bool IsDarkMode { get; set; } = true;
     private bool UseCmUnits { get; set; } = true;
     private bool IsSteelModalOpen { get; set; }
     private bool IsReportModalOpen { get; set; }
 
     protected override void OnInitialized()
     {
-        // 初始截面参数
         CurrentParams.Type = SectionType.HBeam;
         CurrentParams.Height = 300;
         CurrentParams.Width = 300;
@@ -572,7 +692,17 @@
         CurrentParams.FlangeThickness = 15;
         CurrentParams.StandardProfileName = "HW 300×300×10×15";
 
+        CurrentBuckling.MemberLength = 6000;
+        CurrentBuckling.EffectiveLengthFactorX = 1.0;
+        CurrentBuckling.EffectiveLengthFactorY = 1.0;
+        CurrentBuckling.AllowableSlenderness = 150.0;
+
         Recalculate();
+    }
+
+    private void ToggleTheme()
+    {
+        IsDarkMode = !IsDarkMode;
     }
 
     private void OnParameterChanged()
@@ -580,10 +710,43 @@
         Recalculate();
     }
 
+    private void SetPresetLength(double len)
+    {
+        CurrentBuckling.MemberLength = len;
+        Recalculate();
+    }
+
+    private void OnForceTypeChanged(ChangeEventArgs e)
+    {
+        string? val = e.Value?.ToString();
+        if (val == "Tension")
+        {
+            CurrentBuckling.ForceType = MemberForceType.Tension;
+            CurrentBuckling.AllowableSlenderness = 350.0;
+        }
+        else
+        {
+            CurrentBuckling.ForceType = MemberForceType.Compression;
+            CurrentBuckling.AllowableSlenderness = 150.0;
+        }
+        Recalculate();
+    }
+
     private void Recalculate()
     {
         CurrentResult = Calculator.Calculate(CurrentParams);
 
+        // 长细比计算与面外计算长度
+        if (CurrentBuckling.EnableSlendernessCheck)
+        {
+            CurrentResult.SlendernessResult = SlendernessCalculator.Calculate(CurrentResult, CurrentBuckling);
+        }
+        else
+        {
+            CurrentResult.SlendernessResult = null;
+        }
+
+        // 应力计算
         if (CurrentLoad.EnableStressCheck)
         {
             CurrentResult.StressResult = StressAnalysisEngine.Analyze(CurrentResult, CurrentLoad, CurrentParams.Material);
@@ -599,7 +762,6 @@
         CurrentParams.Type = type;
         CurrentParams.StandardProfileName = null;
 
-        // 根据类型适配初始典型参数
         switch (type)
         {
             case SectionType.Rectangle:
@@ -696,13 +858,13 @@
     {
         CurrentParams = new SectionParameters();
         CurrentLoad = new LoadCase();
+        CurrentBuckling = new MemberBucklingParameters();
         Recalculate();
     }
 
     private void OpenStandardDatabase() => IsSteelModalOpen = true;
     private void OpenCalculationReport() => IsReportModalOpen = true;
 
-    // 多边形顶点编辑
     private void AddPolygonVertex()
     {
         double lastY = CurrentParams.PolygonOuterLoop.LastOrDefault()?.Y ?? 0;

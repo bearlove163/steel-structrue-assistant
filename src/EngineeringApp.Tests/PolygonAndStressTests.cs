@@ -130,3 +130,40 @@ public class StandardSteelDatabaseTests
         }
     }
 }
+
+public class SlendernessTests
+{
+    [Fact]
+    public void Test_InPlane_And_OutOfPlane_Slenderness()
+    {
+        var calc = new ParametricSectionCalculator();
+        var p = new SectionParameters
+        {
+            Type = SectionType.Rectangle,
+            Width = 200,
+            Height = 400
+        };
+        var prop = calc.Calculate(p);
+
+        // ix = 400 / sqrt(12) = 115.47 mm
+        // iy = 200 / sqrt(12) = 57.735 mm
+        var buckling = new MemberBucklingParameters
+        {
+            MemberLength = 6000,
+            EffectiveLengthFactorX = 1.0, // L0x = 6000 mm
+            EffectiveLengthFactorY = 0.5, // L0y = 3000 mm (面外设支撑)
+            AllowableSlenderness = 150
+        };
+
+        var res = SlendernessCalculator.Calculate(prop, buckling);
+
+        Assert.Equal(6000.0, res.L0x, 1);
+        Assert.Equal(3000.0, res.L0y, 1);
+        Assert.Equal(51.96, res.LambdaX, 1);
+        Assert.Equal(51.96, res.LambdaY, 1);
+        Assert.Equal(51.96, res.LambdaMax, 1);
+        Assert.True(res.IsSatisfied);
+        Assert.Equal(51.96 / 150.0, res.SlendernessRatio, 2);
+    }
+}
+
