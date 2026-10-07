@@ -1,0 +1,293 @@
+@using EngineeringApp.Shared.Models
+@using Microsoft.JSInterop
+@using System.Text
+@inject IJSRuntime JS
+
+@if (IsOpen)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.7); z-index: 1070;">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content bg-white text-dark shadow-lg border-0">
+                <!-- 顶部操作栏 (打印时不显示) -->
+                <div class="modal-header border-bottom py-2 bg-light d-print-none">
+                    <h5 class="modal-title fs-6 fw-bold text-primary d-flex align-items-center gap-2">
+                        <span>📑 结构截面特性与力学验算计算书</span>
+                        <span class="badge bg-secondary">GB 50017-2017</span>
+                    </h5>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-outline-primary btn-sm" @onclick="CopyMarkdown">
+                            📋 复制 Markdown
+                        </button>
+                        <button class="btn btn-primary btn-sm" @onclick="PrintReport">
+                            🖨️ 打印 / 导出 PDF
+                        </button>
+                        <button type="button" class="btn-close" @onclick="Close"></button>
+                    </div>
+                </div>
+
+                <!-- 计算书正文区域 -->
+                <div class="modal-body p-4 font-monospace print-content" style="max-height: 75vh; overflow-y: auto;">
+                    <div class="text-center mb-4 pb-2 border-bottom">
+                        <h3 class="fw-bold mb-1">工程截面几何与力学特性综合计算书</h3>
+                        <div class="text-muted small">
+                            依据规范: GB 50017-2017《钢结构设计标准》 · JGJ 7-2010 · 计算时间: @DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+                        </div>
+                    </div>
+
+                    <!-- 1. 截面基本参数 -->
+                    <div class="card mb-3 border-light shadow-sm">
+                        <div class="card-header bg-light fw-bold py-1">一、 截面形式与几何参数</div>
+                        <div class="card-body py-2">
+                            <div class="row g-2 small">
+                                <div class="col-md-4"><strong>截面类型：</strong> @(Parameters?.Type.ToString() ?? "-")</div>
+                                <div class="col-md-4"><strong>型号/代号：</strong> @(Parameters?.StandardProfileName ?? "自定义尺寸")</div>
+                                <div class="col-md-4"><strong>选定材料：</strong> @(Parameters?.Material?.Name ?? "Q235")</div>
+                                <div class="col-md-4"><strong>外高 H / 直径 D：</strong> @(Parameters?.Height.ToString("F1") ?? "-") mm</div>
+                                <div class="col-md-4"><strong>外宽 B / 肢宽：</strong> @(Parameters?.Width.ToString("F1") ?? "-") mm</div>
+                                <div class="col-md-4"><strong>板厚 / 壁厚：</strong> tw=@(Parameters?.WebThickness.ToString("F1") ?? "-") mm, tf=@(Parameters?.FlangeThickness.ToString("F1") ?? "-") mm</div>
+                                <div class="col-md-4"><strong>弹性模量 E：</strong> @(Parameters?.Material?.ElasticModulus.ToString("N0") ?? "-") MPa</div>
+                                <div class="col-md-4"><strong>屈服强度 fy：</strong> @(Parameters?.Material?.YieldStrength.ToString("F1") ?? "-") MPa</div>
+                                <div class="col-md-4"><strong>材料密度 ρ：</strong> @(Parameters?.Material?.Density.ToString("F0") ?? "-") kg/m³</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 2. 几何与力学特性结果表 -->
+                    @if (Result != null)
+                    {
+                        <div class="card mb-3 border-light shadow-sm">
+                            <div class="card-header bg-light fw-bold py-1">二、 截面几何与惯性力学特性指标</div>
+                            <div class="card-body p-0">
+                                <table class="table table-bordered table-sm mb-0 small text-center align-middle">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>物理指标项</th>
+                                            <th>符号</th>
+                                            <th>计算值 (工程单位)</th>
+                                            <th>计算值 (国际单位/参考)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td class="text-start ps-3">截面面积</td>
+                                            <td><strong>A</strong></td>
+                                            <td class="text-primary fw-bold">@Result.AreaCm2.ToString("F2") cm²</td>
+                                            <td>@Result.Area.ToString("F1") mm²</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-start ps-3">理论延米线密度 / 米重</td>
+                                            <td><strong>m</strong></td>
+                                            <td class="text-primary fw-bold">@Result.LinearMass.ToString("F2") kg/m</td>
+                                            <td>-</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-start ps-3">理论延米展开涂装面积</td>
+                                            <td><strong>A_paint</strong></td>
+                                            <td>@Result.PaintingAreaPerMeter.ToString("F3") m²/m</td>
+                                            <td>周长 @Result.Perimeter.ToString("F1") mm</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-start ps-3">形心坐标 (相对左下角)</td>
+                                            <td><strong>(Yc, Zc)</strong></td>
+                                            <td>Yc = @Result.Yc.ToString("F2") mm</td>
+                                            <td>Zc = @Result.Zc.ToString("F2") mm</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-start ps-3">形心惯性矩 (水平强轴/弱轴)</td>
+                                            <td><strong>Iy, Iz</strong></td>
+                                            <td>Iy = @Result.IyCm4.ToString("F2") cm⁴</td>
+                                            <td>Iz = @Result.IzCm4.ToString("F2") cm⁴</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-start ps-3">形心惯性积</td>
+                                            <td><strong>Iyz</strong></td>
+                                            <td>@Result.Iyz.ToString("F1") mm⁴</td>
+                                            <td>@(Math.Abs(Result.Iyz) < 1e-3 ? "正交对称 (0.00)" : (Result.Iyz / 1e4).ToString("F2") + " cm⁴")</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-start ps-3">主惯性矩 (第一/第二主轴)</td>
+                                            <td><strong>I1, I2</strong></td>
+                                            <td>I1 = @Result.I1Cm4.ToString("F2") cm⁴</td>
+                                            <td>I2 = @Result.I2Cm4.ToString("F2") cm⁴</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-start ps-3">主轴偏角 (相对水平Y轴)</td>
+                                            <td><strong>αp</strong></td>
+                                            <td>@Result.PrincipalAngleDeg.ToString("F2")°</td>
+                                            <td>@((Result.PrincipalAngleDeg * Math.PI / 180).ToString("F4")) rad</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-start ps-3">回转半径 (惯性半径)</td>
+                                            <td><strong>iy, iz, i1, i2</strong></td>
+                                            <td>iy = @Result.IyRadius.ToString("F2") mm, iz = @Result.IzRadius.ToString("F2") mm</td>
+                                            <td>i1 = @Result.I1Radius.ToString("F2") mm, i2 = @Result.I2Radius.ToString("F2") mm</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-start ps-3">弹性截面模量 (上/下/左/右)</td>
+                                            <td><strong>Wy, Wz</strong></td>
+                                            <td>Wy,min = @Result.WyMinCm3.ToString("F2") cm³</td>
+                                            <td>Wz,min = @Result.WzMinCm3.ToString("F2") cm³</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-start ps-3">塑性截面模量</td>
+                                            <td><strong>Wpl_y, Wpl_z</strong></td>
+                                            <td>Wpl_y = @Result.WplyCm3.ToString("F2") cm³</td>
+                                            <td>Wpl_z = @Result.WplzCm3.ToString("F2") cm³</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-start ps-3">塑性截面形状系数</td>
+                                            <td><strong>γy, γz</strong></td>
+                                            <td>γy = @Result.GammaY.ToString("F3")</td>
+                                            <td>γz = @Result.GammaZ.ToString("F3")</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-start ps-3">自由扭转常数</td>
+                                            <td><strong>J (It)</strong></td>
+                                            <td>@Result.TorsionConstantJCm4.ToString("F2") cm⁴</td>
+                                            <td>@Result.TorsionConstantJ.ToString("F1") mm⁴</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-start ps-3">扇性惯性矩 / 翘曲常数</td>
+                                            <td><strong>Iw (Cw)</strong></td>
+                                            <td>@Result.WarpingConstantIwCm6.ToString("F2") cm⁶</td>
+                                            <td>@Result.WarpingConstantIw.ToString("E2") mm⁶</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- 3. 荷载与截面强度验算 -->
+                        @if (LoadCase != null && LoadCase.EnableStressCheck && Result.StressResult != null)
+                        {
+                            var s = Result.StressResult;
+                            var fy = Parameters?.Material?.YieldStrength ?? 235.0;
+                            bool isSafe = s.MaxAbsoluteStress <= fy;
+
+                            <div class="card mb-3 border-light shadow-sm">
+                                <div class="card-header bg-light fw-bold py-1">三、 荷载工况与截面强度复核</div>
+                                <div class="card-body py-2">
+                                    <div class="row g-2 small mb-2">
+                                        <div class="col-md-3"><strong>轴向力 N：</strong> @LoadCase.AxialForceN.ToString("F1") kN</div>
+                                        <div class="col-md-3"><strong>强轴弯矩 My：</strong> @LoadCase.BendingMomentMy.ToString("F1") kN·m</div>
+                                        <div class="col-md-3"><strong>弱轴弯矩 Mz：</strong> @LoadCase.BendingMomentMz.ToString("F1") kN·m</div>
+                                        <div class="col-md-3"><strong>剪力 Vz：</strong> @LoadCase.ShearForceVz.ToString("F1") kN</div>
+                                    </div>
+                                    <table class="table table-bordered table-sm mb-2 small text-center align-middle">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>校核项目</th>
+                                                <th>计算应力值</th>
+                                                <th>设计容许强度 [f]</th>
+                                                <th>应力比利用率 η</th>
+                                                <th>校核判定</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td class="text-start ps-3">最大拉应力 σ_max</td>
+                                                <td class="text-danger fw-bold">+@s.MaxTensileStress.ToString("F1") MPa</td>
+                                                <td>@fy.ToString("F1") MPa</td>
+                                                <td>@((Math.Abs(s.MaxTensileStress) / fy).ToString("P1"))</td>
+                                                <td>@(Math.Abs(s.MaxTensileStress) <= fy ? "✅ 合规" : "❌ 超限")</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-start ps-3">最大压应力 σ_min</td>
+                                                <td class="text-primary fw-bold">@s.MinCompressiveStress.ToString("F1") MPa</td>
+                                                <td>@fy.ToString("F1") MPa</td>
+                                                <td>@((Math.Abs(s.MinCompressiveStress) / fy).ToString("P1"))</td>
+                                                <td>@(Math.Abs(s.MinCompressiveStress) <= fy ? "✅ 合规" : "❌ 超限")</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                    <div class="alert @(isSafe ? "alert-success" : "alert-danger") py-1 px-3 small mb-0 d-flex justify-content-between align-items-center">
+                                        <span>
+                                            <strong>验算结论：</strong> 截面最大绝对正应力 |σ| = @s.MaxAbsoluteStress.ToString("F1") MPa @(isSafe ? "≤" : ">") [f] = @fy.ToString("F1") MPa。
+                                            @(isSafe ? "截面承载力利用率满足规范要求。" : "截面应力超出容许范围，建议增大截面尺寸或提升材料等级！")
+                                        </span>
+                                        <span class="badge @(isSafe ? "bg-success" : "bg-danger") fs-6">
+                                            @(isSafe ? "合格 PASSED" : "不合格 FAILED")
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    }
+
+                    <div class="text-end text-muted small mt-4 pt-2 border-top">
+                        报告生成引擎: Antigravity Structural Computing Workstation (Blazor WASM)
+                    </div>
+                </div>
+
+                <div class="modal-footer border-top py-2 bg-light d-print-none">
+                    <button type="button" class="btn btn-secondary btn-sm" @onclick="Close">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
+    [Parameter] public SectionParameters? Parameters { get; set; }
+    [Parameter] public SectionPropertiesResult? Result { get; set; }
+    [Parameter] public LoadCase? LoadCase { get; set; }
+
+    private async Task Close()
+    {
+        IsOpen = false;
+        await IsOpenChanged.InvokeAsync(false);
+    }
+
+    private async Task PrintReport()
+    {
+        await JS.InvokeVoidAsync("window.print");
+    }
+
+    private async Task CopyMarkdown()
+    {
+        if (Result == null || Parameters == null) return;
+
+        var sb = new StringBuilder();
+        sb.AppendLine("# 截面几何与力学特性综合计算书");
+        sb.AppendLine();
+        sb.AppendLine($"- **截面类型**：{Parameters.Type}");
+        sb.AppendLine($"- **型号规格**：{Parameters.StandardProfileName ?? "自定义尺寸"}");
+        sb.AppendLine($"- **材料等级**：{Parameters.Material.Name} (fy={Parameters.Material.YieldStrength} MPa, E={Parameters.Material.ElasticModulus} MPa)");
+        sb.AppendLine();
+        sb.AppendLine("## 一、 几何与惯性力学指标");
+        sb.AppendLine("| 物理量名称 | 符号 | 计算数值 | 单位 |");
+        sb.AppendLine("| :--- | :--- | :--- | :--- |");
+        sb.AppendLine($"| 截面面积 | A | {Result.AreaCm2:F2} | cm² |");
+        sb.AppendLine($"| 延米理论米重 | m | {Result.LinearMass:F2} | kg/m |");
+        sb.AppendLine($"| 延米涂装表面积 | A_paint | {Result.PaintingAreaPerMeter:F3} | m²/m |");
+        sb.AppendLine($"| 形心坐标 | (Yc, Zc) | ({Result.Yc:F1}, {Result.Zc:F1}) | mm |");
+        sb.AppendLine($"| 强轴惯性矩 | Iy | {Result.IyCm4:F2} | cm⁴ |");
+        sb.AppendLine($"| 弱轴惯性矩 | Iz | {Result.IzCm4:F2} | cm⁴ |");
+        sb.AppendLine($"| 形心惯性积 | Iyz | {Result.Iyz:F1} | mm⁴ |");
+        sb.AppendLine($"| 第一主惯性矩 | I1 | {Result.I1Cm4:F2} | cm⁴ |");
+        sb.AppendLine($"| 第二主惯性矩 | I2 | {Result.I2Cm4:F2} | cm⁴ |");
+        sb.AppendLine($"| 主轴方位角 | αp | {Result.PrincipalAngleDeg:F2} | ° |");
+        sb.AppendLine($"| 回转半径 | iy, iz | {Result.IyRadius:F2}, {Result.IzRadius:F2} | mm |");
+        sb.AppendLine($"| 弹性截面模量 | Wy,min, Wz,min | {Result.WyMinCm3:F2}, {Result.WzMinCm3:F2} | cm³ |");
+        sb.AppendLine($"| 塑性截面模量 | Wpl_y, Wpl_z | {Result.WplyCm3:F2}, {Result.WplzCm3:F2} | cm³ |");
+        sb.AppendLine($"| 自由扭转常数 | J | {Result.TorsionConstantJCm4:F2} | cm⁴ |");
+        sb.AppendLine($"| 翘曲常数 | Iw | {Result.WarpingConstantIwCm6:F2} | cm⁶ |");
+
+        if (LoadCase != null && LoadCase.EnableStressCheck && Result.StressResult != null)
+        {
+            sb.AppendLine();
+            sb.AppendLine("## 二、 荷载工况与正应力验算");
+            sb.AppendLine($"- 轴力 N = {LoadCase.AxialForceN:F1} kN, 弯矩 My = {LoadCase.BendingMomentMy:F1} kN·m, Mz = {LoadCase.BendingMomentMz:F1} kN·m");
+            sb.AppendLine($"- 最大拉应力 σ_max = +{Result.StressResult.MaxTensileStress:F1} MPa");
+            sb.AppendLine($"- 最大压应力 σ_min = {Result.StressResult.MinCompressiveStress:F1} MPa");
+            sb.AppendLine($"- 应力利用率比值 η = {Result.StressResult.StressRatio:P1}");
+            bool isSafe = Result.StressResult.MaxAbsoluteStress <= Parameters.Material.YieldStrength;
+            sb.AppendLine($"- 验算判定：{(isSafe ? "合格 PASSED" : "不合格 FAILED")}");
+        }
+
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", sb.ToString());
+        await JS.InvokeVoidAsync("alert", "计算书 Markdown 已成功复制到剪贴板！");
+    }
+}
