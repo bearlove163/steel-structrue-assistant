@@ -978,6 +978,8 @@
     <PaintingCalculationModal @bind-IsOpen="IsPaintingModalOpen"
                               Result="@CurrentResult"
                               IsDarkMode="@IsDarkMode"
+                              PresetName="@CurrentPaintPresetName"
+                              ExcludeTop="@ExcludeTopPaintingArea"
                               OnPaintCalculated="HandlePaintCalculated" />
 
     <!-- 计算书导出弹窗 -->

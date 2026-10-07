@@ -217,11 +217,16 @@
                 </div>
 
                 <!-- 弹窗底部 -->
-                <div class="modal-footer @(IsDarkMode ? "bg-black bg-opacity-50 border-secondary" : "bg-light border-light-subtle") py-2 px-3 d-flex justify-content-between">
+                <div class="modal-footer @(IsDarkMode ? "bg-black bg-opacity-50 border-secondary" : "bg-light border-light-subtle") py-2 px-3 d-flex justify-content-between align-items-center">
                     <span class="text-xs @(IsDarkMode ? "text-white-50" : "text-muted")">
                         💡 提示：涂装面积与截面外形、密贴楼板扣除规则动态联动，支持自定义各层固含、损耗率与单价。
                     </span>
-                    <button type="button" class="btn btn-secondary btn-sm" @onclick="Close">完成关闭</button>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="CancelClose">取消</button>
+                        <button type="button" class="btn btn-primary btn-sm d-flex align-items-center gap-1" @onclick="Close">
+                            <span>💾 完成并同步至工作台</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -233,6 +238,8 @@
     [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
     [Parameter] public SectionPropertiesResult? Result { get; set; }
     [Parameter] public bool IsDarkMode { get; set; } = true;
+    [Parameter] public string? PresetName { get; set; }
+    [Parameter] public bool? ExcludeTop { get; set; }
     [Parameter] public EventCallback<PaintSystemCalculationResult> OnPaintCalculated { get; set; }
 
     private string CurrentPreset { get; set; } = "底漆 + 中漆 + 面漆";
@@ -240,6 +247,7 @@
     private double ProjectLengthM { get; set; } = 100.0;
     private List<CoatingLayerConfig> Layers { get; set; } = [];
     private PaintSystemCalculationResult? PaintResult { get; set; }
+    private bool _lastIsOpen;
 
     protected override void OnInitialized()
     {
@@ -248,7 +256,26 @@
 
     protected override void OnParametersSet()
     {
-        if (IsOpen && Result != null)
+        // 仅在弹窗刚打开时初始化一次，严禁在此触发 EventCallback 避免父子组件无限递归渲染死循环
+        if (IsOpen && !_lastIsOpen)
+        {
+            _lastIsOpen = true;
+            if (!string.IsNullOrEmpty(PresetName))
+            {
+                CurrentPreset = PresetName;
+            }
+            if (ExcludeTop.HasValue)
+            {
+                ExcludeTopSurface = ExcludeTop.Value;
+            }
+            Layers = PaintCoatingCalculator.CreatePreset(CurrentPreset);
+            Recalculate();
+        }
+        else if (!IsOpen)
+        {
+            _lastIsOpen = false;
+        }
+        else if (IsOpen && Result != null && PaintResult == null)
         {
             Recalculate();
         }
@@ -280,11 +307,21 @@
     private void Recalculate()
     {
         if (Result == null) return;
+        // 仅在弹窗内部重新核算成果，绝不在此广播 EventCallback
         PaintResult = PaintCoatingCalculator.Calculate(Result, Layers, ExcludeTopSurface, ProjectLengthM);
-        OnPaintCalculated.InvokeAsync(PaintResult);
     }
 
     private async Task Close()
+    {
+        IsOpen = false;
+        await IsOpenChanged.InvokeAsync(false);
+        if (PaintResult != null && OnPaintCalculated.HasDelegate)
+        {
+            await OnPaintCalculated.InvokeAsync(PaintResult);
+        }
+    }
+
+    private async Task CancelClose()
     {
         IsOpen = false;
         await IsOpenChanged.InvokeAsync(false);
