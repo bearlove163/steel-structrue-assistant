@@ -5,10 +5,13 @@ namespace EngineeringApp.Shared.Models;
 /// </summary>
 public class StandardSteelItem
 {
-    /// <summary>所属大类 (如 "GB/T 11263 热轧H型钢", "GB/T 706 工字钢", "GB/T 706 槽钢", "GB/T 706 等边角钢" 等)</summary>
+    /// <summary>所属国家/地区标准体系 (如 "GB/T (国标)", "EN (欧标)", "AISC (美标)")</summary>
+    public string StandardSystem { get; set; } = "GB/T (国标)";
+
+    /// <summary>所属大类 (如 "GB/T 11263 热轧H型钢", "EN 10034 欧标IPE", "AISC W型钢" 等)</summary>
     public string Category { get; set; } = "";
 
-    /// <summary>型号代号 (如 "HW 300×300×10×15", "HN 400×200×8×13", "20a", "L 100×10")</summary>
+    /// <summary>型号代号 (如 "HW 300×300×10×15", "IPE 300", "W14×90")</summary>
     public string Designation { get; set; } = "";
 
     /// <summary>映射的参数化截面类型</summary>

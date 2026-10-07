@@ -8,8 +8,8 @@
             <div class="modal-content @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-light-subtle") shadow-lg">
                 <div class="modal-header @(IsDarkMode ? "border-secondary" : "border-light-subtle bg-light") py-3">
                     <h5 class="modal-title d-flex align-items-center gap-2">
-                        <span class="badge bg-primary">GB/T</span>
-                        <span>中国国家标准型钢截面规格库</span>
+                        <span class="badge bg-primary">标准库</span>
+                        <span>全球标准型钢截面规格库 (国标 GB/T · 欧标 EN · 美标 AISC)</span>
                     </h5>
                     <button type="button" class="btn-close @(IsDarkMode ? "btn-close-white" : "")" @onclick="Close"></button>
                 </div>
@@ -17,22 +17,32 @@
                 <div class="modal-body p-3">
                     <!-- 筛选与搜索工具条 -->
                     <div class="row g-2 mb-3">
-                        <div class="col-md-5">
-                            <div class="input-group">
-                                <span class="input-group-text @(IsDarkMode ? "bg-secondary border-secondary text-white" : "bg-light border-light-subtle text-dark")">🔍 搜索型号</span>
+                        <div class="col-md-3">
+                            <select class="form-select form-select-sm @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark")"
+                                    @bind="SelectedSystem">
+                                <option value="全部">全部标准体系</option>
+                                <option value="GB/T (国标)">🇨🇳 中国国标 (GB/T)</option>
+                                <option value="EN (欧标)">🇪🇺 欧洲标准 (EN)</option>
+                                <option value="AISC (美标)">🇺🇸 美国标准 (AISC)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text @(IsDarkMode ? "bg-secondary border-secondary text-white" : "bg-light border-light-subtle text-dark")">🔍</span>
                                 <input type="text" class="form-control @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-light-subtle")"
-                                       placeholder="输入型号，如 HW 300, 20a, L 100..."
+                                       placeholder="输入型号搜索 (如 HW 300, IPE 240, W14×90)..."
                                        @bind="SearchText" @bind:event="oninput" />
                             </div>
                         </div>
-                        <div class="col-md-7">
+                        <div class="col-md-5">
                             <div class="d-flex flex-wrap gap-1">
-                                <button class="btn btn-sm @(SelectedCategory == null ? "btn-primary" : (IsDarkMode ? "btn-outline-secondary" : "btn-outline-secondary"))"
-                                        @onclick="() => SelectedCategory = null">全部类型</button>
-                                @foreach (var cat in StandardSteelDatabase.Categories)
+                                <button class="btn btn-xs @(SelectedCategory == null ? "btn-primary" : (IsDarkMode ? "btn-outline-secondary" : "btn-outline-secondary"))"
+                                        @onclick="() => SelectedCategory = null">全部系列</button>
+                                @foreach (var cat in AvailableCategories.Take(8))
                                 {
-                                    <button class="btn btn-sm @(SelectedCategory == cat ? "btn-primary" : (IsDarkMode ? "btn-outline-secondary" : "btn-outline-secondary"))"
-                                            @onclick="() => SelectedCategory = cat">@cat.Replace("GB/T ", "").Replace(" 普通", "")</button>
+                                    <button class="btn btn-xs text-truncate @(SelectedCategory == cat ? "btn-primary" : (IsDarkMode ? "btn-outline-secondary" : "btn-outline-secondary"))"
+                                            style="max-width: 130px;"
+                                            @onclick="() => SelectedCategory = cat">@cat.Replace("GB/T ", "").Replace("EN 10034 ", "").Replace("AISC ", "")</button>
                                 }
                             </div>
                         </div>
@@ -43,8 +53,9 @@
                         <table class="table @(IsDarkMode ? "table-dark table-hover table-striped" : "table-hover table-striped") table-sm align-middle mb-0 font-monospace text-xs">
                             <thead class="@(IsDarkMode ? "table-dark border-secondary" : "table-light border-light-subtle") sticky-top border-bottom">
                                 <tr>
+                                    <th>体系</th>
                                     <th>型号代号</th>
-                                    <th>类别</th>
+                                    <th>系列类别</th>
                                     <th>高 h (mm)</th>
                                     <th>宽 b (mm)</th>
                                     <th>腹板 tw (mm)</th>
@@ -60,18 +71,23 @@
                                 @foreach (var item in FilteredItems)
                                 {
                                     <tr>
+                                        <td>
+                                            <span class="badge @(item.StandardSystem.Contains("国标") ? "bg-primary" : (item.StandardSystem.Contains("欧标") ? "bg-info text-dark" : "bg-warning text-dark"))">
+                                                @item.StandardSystem.Split(' ')[0]
+                                            </span>
+                                        </td>
                                         <td class="fw-bold @(IsDarkMode ? "text-info" : "text-primary")">@item.Designation</td>
-                                        <td class="@(IsDarkMode ? "text-white-50" : "text-muted")">@item.Category</td>
+                                        <td class="@(IsDarkMode ? "text-white-50" : "text-muted") text-truncate" style="max-width: 140px;" title="@item.Category">@item.Category</td>
                                         <td>@item.Height</td>
                                         <td>@item.Width</td>
                                         <td>@item.WebThickness</td>
                                         <td>@item.FlangeThickness</td>
                                         <td>@item.StandardAreaCm2.ToString("F1")</td>
-                                        <td>@item.StandardMassKgM.ToString("F1")</td>
+                                        <td class="fw-bold text-warning">@item.StandardMassKgM.ToString("F1")</td>
                                         <td>@item.StandardIxCm4.ToString("F0")</td>
                                         <td>@item.StandardIyCm4.ToString("F0")</td>
                                         <td>
-                                            <button class="btn btn-primary btn-sm py-0 px-2 text-nowrap"
+                                            <button class="btn btn-outline-success btn-xs py-0 px-2 text-nowrap"
                                                     @onclick="() => SelectItem(item)">
                                                 选择应用
                                             </button>
@@ -81,8 +97,8 @@
                                 @if (!FilteredItems.Any())
                                 {
                                     <tr>
-                                        <td colspan="11" class="text-center py-4 @(IsDarkMode ? "text-white-50" : "text-muted")">
-                                            未找到匹配的型钢型号，请调整搜索关键词。
+                                        <td colspan="12" class="text-center py-4 @(IsDarkMode ? "text-white-50" : "text-muted")">
+                                            未找到匹配的型钢型号，请调整搜索关键词或选择不同标准体系。
                                         </td>
                                     </tr>
                                 }
@@ -92,7 +108,9 @@
                 </div>
 
                 <div class="modal-footer @(IsDarkMode ? "border-secondary" : "border-light-subtle bg-light") py-2 justify-content-between">
-                    <span class="@(IsDarkMode ? "text-white-50" : "text-muted") text-xs">共匹配到 @FilteredItems.Count() 种标准型钢规格</span>
+                    <span class="@(IsDarkMode ? "text-white-50" : "text-muted") text-xs">
+                        已收录国标/欧标/美标共 @StructuralSteelLibrary.AllSections.Count 种标准规格型钢
+                    </span>
                     <button type="button" class="btn btn-secondary btn-sm" @onclick="Close">关闭</button>
                 </div>
             </div>
@@ -106,27 +124,29 @@
     [Parameter] public EventCallback<StandardSteelItem> OnSelectProfile { get; set; }
     [Parameter] public bool IsDarkMode { get; set; } = true;
 
+    private string SelectedSystem { get; set; } = "全部";
     private string SearchText { get; set; } = "";
     private string? SelectedCategory { get; set; }
+
+    private IEnumerable<string> AvailableCategories
+    {
+        get
+        {
+            var items = SelectedSystem == "全部"
+                ? StructuralSteelLibrary.AllSections
+                : StructuralSteelLibrary.GetByStandardSystem(SelectedSystem);
+            return items.Select(x => x.Category).Distinct();
+        }
+    }
 
     private IEnumerable<StandardSteelItem> FilteredItems
     {
         get
         {
-            var query = StandardSteelDatabase.AllItems.AsEnumerable();
-
-            if (!string.IsNullOrWhiteSpace(SelectedCategory))
-            {
-                query = query.Where(x => x.Category == SelectedCategory);
-            }
-
-            if (!string.IsNullOrWhiteSpace(SearchText))
-            {
-                query = query.Where(x => x.Designation.Contains(SearchText, StringComparison.OrdinalIgnoreCase) ||
-                                         x.Category.Contains(SearchText, StringComparison.OrdinalIgnoreCase));
-            }
-
-            return query;
+            return StructuralSteelLibrary.Filter(
+                SelectedSystem == "全部" ? null : SelectedSystem,
+                SelectedCategory,
+                SearchText);
         }
     }
 

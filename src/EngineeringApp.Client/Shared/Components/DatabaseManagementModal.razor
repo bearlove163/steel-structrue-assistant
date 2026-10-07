@@ -1,0 +1,280 @@
+@using EngineeringApp.Shared.Models
+@using EngineeringApp.Shared.Data
+
+@if (IsOpen)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.65); z-index: 1055;">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-light-subtle") shadow-lg">
+                <!-- 弹窗顶部 -->
+                <div class="modal-header @(IsDarkMode ? "bg-black bg-opacity-50 border-secondary" : "bg-light border-light-subtle") py-2 px-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="fs-5">🗄️</span>
+                        <div>
+                            <h6 class="modal-title mb-0 fw-bold">工程后台基础数据库工作站</h6>
+                            <span class="@(IsDarkMode ? "text-white-50" : "text-muted") text-xs">
+                                SQLite + EF Core 持久化支撑 · 欧标/美标/国标型钢库 · 涂料与防腐价格基准
+                            </span>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close @(IsDarkMode ? "btn-close-white" : "")" @onclick="Close"></button>
+                </div>
+
+                <!-- 导航选项卡 (Tabs) -->
+                <div class="px-3 pt-2 border-bottom @(IsDarkMode ? "border-secondary" : "border-light-subtle")">
+                    <ul class="nav nav-tabs border-0 text-xs">
+                        <li class="nav-item">
+                            <button class="nav-link @(ActiveTab == "Euro" ? "active fw-bold" : "") @(IsDarkMode ? "text-white" : "text-dark")"
+                                    @onclick='() => SetTab("Euro")'>
+                                🇪🇺 欧标型钢数据库 (EN 10034 / Euronorm)
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link @(ActiveTab == "Aisc" ? "active fw-bold" : "") @(IsDarkMode ? "text-white" : "text-dark")"
+                                    @onclick='() => SetTab("Aisc")'>
+                                🇺🇸 美标型钢数据库 (AISC 15th / ASTM)
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link @(ActiveTab == "Gb" ? "active fw-bold" : "") @(IsDarkMode ? "text-white" : "text-dark")"
+                                    @onclick='() => SetTab("Gb")'>
+                                🇨🇳 国标型钢数据库 (GB/T 11263 / 706)
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link @(ActiveTab == "Paint" ? "active fw-bold" : "") @(IsDarkMode ? "text-white" : "text-dark")"
+                                    @onclick='() => SetTab("Paint")'>
+                                🎨 油漆涂料价格与参数数据库
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 弹窗内容 -->
+                <div class="modal-body p-3 font-monospace">
+                    @if (ActiveTab == "Euro" || ActiveTab == "Aisc" || ActiveTab == "Gb")
+                    {
+                        <!-- 搜索与系列分类过滤 -->
+                        <div class="row g-2 mb-3 align-items-center">
+                            <div class="col-md-4">
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-light border-light-subtle")">🔍</span>
+                                    <input type="text" class="form-control @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white border-light-subtle")"
+                                           placeholder="输入型号搜索 (如 IPE 300, W14×90, HW 300)..."
+                                           @bind="SearchKeyword" @bind:event="oninput" />
+                                </div>
+                            </div>
+                            <div class="col-md-5">
+                                <div class="d-flex gap-1 flex-wrap">
+                                    <button class="btn btn-xs @(SelectedCategory == "全部" ? "btn-primary" : (IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary"))"
+                                            @onclick='() => SelectCategory("全部")'>全部系列</button>
+                                    @foreach (var cat in GetCurrentTabCategories())
+                                    {
+                                        <button class="btn btn-xs text-truncate @(SelectedCategory == cat ? "btn-primary" : (IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary"))"
+                                                style="max-width: 140px;"
+                                                @onclick="() => SelectCategory(cat)">
+                                            @cat
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+                            <div class="col-md-3 text-end text-xs @(IsDarkMode ? "text-white-50" : "text-muted")">
+                                匹配记录: <strong>@GetFilteredSteelList().Count()</strong> 项
+                            </div>
+                        </div>
+
+                        <!-- 型钢数据表格 -->
+                        <div class="table-responsive rounded border @(IsDarkMode ? "border-secondary" : "border-light-subtle")" style="max-height: 440px;">
+                            <table class="table table-sm table-striped @(IsDarkMode ? "table-dark table-hover" : "table-hover") align-middle mb-0 text-xs">
+                                <thead class="@(IsDarkMode ? "table-secondary table-opacity-25" : "table-light") sticky-top">
+                                    <tr>
+                                        <th>体系</th>
+                                        <th>系列类别</th>
+                                        <th>规格型号</th>
+                                        <th class="text-end">H (mm)</th>
+                                        <th class="text-end">B (mm)</th>
+                                        <th class="text-end">tw (mm)</th>
+                                        <th class="text-end">tf (mm)</th>
+                                        <th class="text-end">理论重量 (kg/m)</th>
+                                        <th class="text-end">截面面积 (cm²)</th>
+                                        <th class="text-center" style="width: 110px;">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var item in GetFilteredSteelList())
+                                    {
+                                        <tr>
+                                            <td><span class="badge @(item.StandardSystem.Contains("欧标") ? "bg-info text-dark" : (item.StandardSystem.Contains("美标") ? "bg-warning text-dark" : "bg-primary"))">@item.StandardSystem</span></td>
+                                            <td class="text-truncate" style="max-width: 160px;" title="@item.Category">@item.Category</td>
+                                            <td class="fw-bold">@item.Designation</td>
+                                            <td class="text-end">@item.Height.ToString("F1")</td>
+                                            <td class="text-end">@item.Width.ToString("F1")</td>
+                                            <td class="text-end">@item.WebThickness.ToString("F1")</td>
+                                            <td class="text-end">@item.FlangeThickness.ToString("F1")</td>
+                                            <td class="text-end fw-bold text-warning">@item.StandardMassKgM.ToString("F2")</td>
+                                            <td class="text-end text-info">@item.StandardAreaCm2.ToString("F1")</td>
+                                            <td class="text-center">
+                                                <button class="btn btn-outline-success btn-xs py-0 px-2"
+                                                        @onclick="() => SelectAndImportProfile(item)">
+                                                    ✔ 导入计算
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else if (ActiveTab == "Paint")
+                    {
+                        <!-- 油漆涂料价格与参数库 -->
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-xs text-primary fw-bold">🎨 工业重防腐涂料与防火涂料标准参考报价 (支持在线调整)</span>
+                            <span class="text-xs @(IsDarkMode ? "text-white-50" : "text-muted")">
+                                数据库容量: <strong>@PaintProducts.Count</strong> 款标准工程涂料
+                            </span>
+                        </div>
+
+                        <div class="table-responsive rounded border @(IsDarkMode ? "border-secondary" : "border-light-subtle")" style="max-height: 440px;">
+                            <table class="table table-sm @(IsDarkMode ? "table-dark table-hover" : "table-hover") align-middle mb-0 text-xs">
+                                <thead class="@(IsDarkMode ? "table-secondary table-opacity-25" : "table-light") sticky-top">
+                                    <tr>
+                                        <th>类别</th>
+                                        <th>涂料规格名称</th>
+                                        <th>代表品牌</th>
+                                        <th class="text-end" style="width: 100px;">固含(VS%)</th>
+                                        <th class="text-end" style="width: 100px;">比重(kg/L)</th>
+                                        <th class="text-end" style="width: 100px;">推荐膜厚</th>
+                                        <th class="text-end" style="width: 120px;">材料单价(元/kg)</th>
+                                        <th class="text-end" style="width: 120px;">工费单价(元/m²)</th>
+                                        <th>技术描述</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var p in PaintProducts)
+                                    {
+                                        <tr>
+                                            <td>
+                                                <span class="badge @GetPaintBadgeClass(p.LayerType)">@p.LayerType</span>
+                                            </td>
+                                            <td class="fw-bold">@p.Name</td>
+                                            <td>@p.Brand</td>
+                                            <td class="text-end">
+                                                <input type="number" class="form-control form-control-sm text-end p-0 border-0 @(IsDarkMode ? "bg-dark text-white" : "bg-white")"
+                                                       @bind="p.VolumeSolidsPercent" step="1" />
+                                            </td>
+                                            <td class="text-end">
+                                                <input type="number" class="form-control form-control-sm text-end p-0 border-0 @(IsDarkMode ? "bg-dark text-white" : "bg-white")"
+                                                       @bind="p.DensityKgL" step="0.05" />
+                                            </td>
+                                            <td class="text-end">
+                                                <span>@p.DefaultDft @(p.LayerType == CoatingLayerType.Fireproof ? "mm" : "μm")</span>
+                                            </td>
+                                            <td class="text-end">
+                                                <input type="number" class="form-control form-control-sm text-end p-0 border-0 fw-bold text-success @(IsDarkMode ? "bg-dark" : "bg-white")"
+                                                       @bind="p.MaterialUnitPricePerKg" step="1" />
+                                            </td>
+                                            <td class="text-end">
+                                                <input type="number" class="form-control form-control-sm text-end p-0 border-0 fw-bold text-primary @(IsDarkMode ? "bg-dark" : "bg-white")"
+                                                       @bind="p.LaborUnitPricePerM2" step="1" />
+                                            </td>
+                                            <td class="text-truncate @(IsDarkMode ? "text-white-50" : "text-muted")" style="max-width: 240px;" title="@p.Description">
+                                                @p.Description
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+
+                <!-- 弹窗底部 -->
+                <div class="modal-footer @(IsDarkMode ? "bg-black bg-opacity-50 border-secondary" : "bg-light border-light-subtle") py-2 px-3 d-flex justify-content-between">
+                    <span class="text-xs @(IsDarkMode ? "text-white-50" : "text-muted")">
+                        ✅ 点击任意截面右侧「导入计算」，即可将精准几何尺寸自动映射至工作站视口并实时重算。
+                    </span>
+                    <button type="button" class="btn btn-secondary btn-sm" @onclick="Close">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
+    [Parameter] public bool IsDarkMode { get; set; } = true;
+    [Parameter] public EventCallback<StandardSteelItem> OnSelectProfile { get; set; }
+
+    private string ActiveTab { get; set; } = "Euro";
+    private string SearchKeyword { get; set; } = "";
+    private string SelectedCategory { get; set; } = "全部";
+
+    private List<PaintProductItem> PaintProducts { get; set; } = [];
+
+    protected override void OnInitialized()
+    {
+        PaintProducts = PaintProductDatabase.AllProducts.ToList();
+    }
+
+    private void SetTab(string tab)
+    {
+        ActiveTab = tab;
+        SelectedCategory = "全部";
+        SearchKeyword = "";
+    }
+
+    private void SelectCategory(string cat)
+    {
+        SelectedCategory = cat;
+    }
+
+    private IEnumerable<string> GetCurrentTabCategories()
+    {
+        string sys = ActiveTab switch
+        {
+            "Euro" => "EN (欧标)",
+            "Aisc" => "AISC (美标)",
+            "Gb" => "GB/T (国标)",
+            _ => ""
+        };
+
+        return StructuralSteelLibrary.GetCategoriesBySystem(sys);
+    }
+
+    private IEnumerable<StandardSteelItem> GetFilteredSteelList()
+    {
+        string sys = ActiveTab switch
+        {
+            "Euro" => "EN (欧标)",
+            "Aisc" => "AISC (美标)",
+            "Gb" => "GB/T (国标)",
+            _ => ""
+        };
+
+        return StructuralSteelLibrary.Filter(sys, SelectedCategory == "全部" ? null : SelectedCategory, SearchKeyword);
+    }
+
+    private async Task SelectAndImportProfile(StandardSteelItem item)
+    {
+        await OnSelectProfile.InvokeAsync(item);
+        await Close();
+    }
+
+    private async Task Close()
+    {
+        IsOpen = false;
+        await IsOpenChanged.InvokeAsync(false);
+    }
+
+    private string GetPaintBadgeClass(CoatingLayerType type) => type switch
+    {
+        CoatingLayerType.Primer => "bg-primary",
+        CoatingLayerType.Intermediate => "bg-info text-dark",
+        CoatingLayerType.Sealer => "bg-secondary",
+        CoatingLayerType.Topcoat => "bg-success",
+        CoatingLayerType.Fireproof => "bg-danger",
+        _ => "bg-secondary"
+    };
+}

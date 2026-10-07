@@ -30,45 +30,88 @@
             <!-- 暗黑/亮色主题切换按钮 -->
             <button class="btn btn-sm d-flex align-items-center gap-1 @(IsDarkMode ? "btn-outline-warning" : "btn-outline-dark")"
                     @onclick="ToggleTheme" title="切换暗黑/亮色主题界面类型">
-                <span>@(IsDarkMode ? "☀️ 亮色模式" : "🌙 暗黑模式")</span>
+                <span>@(IsDarkMode ? "☀️ 亮色" : "🌙 暗黑")</span>
             </button>
 
-            <button class="btn btn-outline-info btn-sm d-flex align-items-center gap-1" @onclick="OpenStandardDatabase">
-                <span>📖 国标型钢库</span>
-                <span class="badge bg-info text-dark">GB/T</span>
+            <!-- 视口分栏比例快捷预设 -->
+            <div class="btn-group btn-group-sm">
+                <button class="btn btn-xs @(Math.Abs(LeftWidthPercent - 20) < 0.5 ? "btn-primary fw-bold" : (IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary"))"
+                        @onclick="() => SetLayoutPreset(20, 20)" title="默认比例: 左 20% - 中 60% - 右 20%">
+                    20:60:20
+                </button>
+                <button class="btn btn-xs @(Math.Abs(LeftWidthPercent - 15) < 0.5 ? "btn-primary fw-bold" : (IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary"))"
+                        @onclick="() => SetLayoutPreset(15, 15)" title="宽视口: 左 15% - 中 70% - 右 15%">
+                    15:70:15
+                </button>
+                <button class="btn btn-xs @(Math.Abs(LeftWidthPercent - 25) < 0.5 ? "btn-primary fw-bold" : (IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary"))"
+                        @onclick="() => SetLayoutPreset(25, 25)" title="看板优先: 左 25% - 中 50% - 右 25%">
+                    25:50:25
+                </button>
+            </div>
+
+            <!-- 后台数据库工作站按钮 -->
+            <button class="btn btn-outline-info btn-sm d-flex align-items-center gap-1" @onclick="OpenDatabaseModal" title="查看欧标、美标、国标型钢库及油漆单价数据库">
+                <span>🗄️ 基础数据库</span>
+                <span class="badge bg-info text-dark">欧/美/国/涂料</span>
+            </button>
+
+            <!-- 油漆与防火算量工作台按钮 -->
+            <button class="btn btn-outline-warning btn-sm d-flex align-items-center gap-1" @onclick="OpenPaintingModal" title="打开油漆防腐与防火涂料多层配套算量工作台">
+                <span>🎨 油漆与防火算量</span>
+            </button>
+
+            <button class="btn btn-outline-secondary btn-sm" @onclick="OpenStandardDatabase" title="打开常用型钢检索库">
+                <span>📖 快速型钢</span>
             </button>
             <button class="btn btn-primary btn-sm d-flex align-items-center gap-1" @onclick="OpenCalculationReport">
                 <span>📑 生成计算书</span>
             </button>
             <button class="btn btn-outline-secondary btn-sm" @onclick="ResetToDefault">
-                🔄 重置参数
+                🔄 重置
             </button>
         </div>
     </header>
 
-    <!-- ======================= 工作站三栏式主体架构 ======================= -->
+    <!-- ======================= 工作站三栏式主体架构 (可拖拽可调分栏 20% - 60% - 20%) ======================= -->
     <style>
         .workstation-grid {
             display: flex;
             flex-direction: row;
-            gap: 0.5rem;
+            gap: 0;
             flex: 1 1 auto;
             min-height: 0;
             overflow: hidden;
+            position: relative;
         }
         .workstation-pane-sidebar {
-            width: 15%;
-            min-width: 220px;
-            flex: 0 0 15%;
             display: flex;
             flex-direction: column;
+            overflow: hidden;
         }
         .workstation-pane-center {
-            width: 70%;
-            min-width: 0;
-            flex: 1 1 70%;
             display: flex;
             flex-direction: column;
+            overflow: hidden;
+        }
+        .splitter-bar {
+            width: 8px;
+            cursor: col-resize;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+            transition: background-color 0.15s ease;
+            z-index: 10;
+            background-color: transparent;
+        }
+        .splitter-bar:hover, .splitter-bar.active {
+            background-color: #0284c7 !important;
+        }
+        .splitter-handle {
+            width: 2px;
+            height: 32px;
+            border-radius: 1px;
+            background-color: rgba(150, 150, 150, 0.4);
         }
         @@media (max-width: 1199.98px) {
             .workstation-grid {
@@ -78,12 +121,15 @@
             .workstation-pane-sidebar {
                 width: 100% !important;
                 min-width: auto;
-                flex: 1 1 auto;
+                flex: 1 1 auto !important;
             }
             .workstation-pane-center {
                 width: 100% !important;
                 min-height: 480px;
-                flex: 1 1 auto;
+                flex: 1 1 auto !important;
+            }
+            .splitter-bar {
+                display: none;
             }
         }
         .collapsible-module {
@@ -100,15 +146,19 @@
         }
     </style>
 
-    <!-- ======================= 工作站三栏式主体架构 (左15% - 中70% - 右15%) ======================= -->
-    <div class="workstation-grid flex-grow-1">
+    <!-- ======================= 工作站主体：左右分栏支持手工鼠标拖拽比例 ======================= -->
+    <div class="workstation-grid flex-grow-1"
+         @onmousemove="HandleSplitterMouseMove"
+         @onmouseup="HandleSplitterMouseUp"
+         @onmouseleave="HandleSplitterMouseUp">
 
-        <!-- ======================= 1. 左侧参数控制栏 (占比 15%) ======================= -->
-        <aside class="workstation-pane-sidebar workstation-pane-left d-flex flex-column">
+        <!-- ======================= 1. 左侧参数控制栏 (默认 20%，可拖动) ======================= -->
+        <aside class="workstation-pane-sidebar workstation-pane-left d-flex flex-column pe-1"
+               style="width: @(LeftWidthPercent.ToString("F1"))%; min-width: 220px; flex: 0 0 @(LeftWidthPercent.ToString("F1"))%;">
             <div class="card @(IsDarkMode ? "bg-secondary bg-opacity-25 border-secondary text-white" : "bg-white border-light-subtle text-dark shadow-sm") h-100 d-flex flex-column">
                 <div class="card-header @(IsDarkMode ? "bg-dark bg-opacity-50 border-secondary" : "bg-light border-light-subtle") py-2 d-flex justify-content-between align-items-center">
                     <div class="d-flex align-items-center gap-1">
-                        <span class="fw-bold text-xs text-uppercase @(IsDarkMode ? "text-info" : "text-primary")">🛠️ 参数控制 (15%)</span>
+                        <span class="fw-bold text-xs text-uppercase @(IsDarkMode ? "text-info" : "text-primary")">🛠️ 控制栏 (@(LeftWidthPercent.ToString("F0"))%)</span>
                         <span class="badge bg-primary text-xs">@CurrentParams.Type</span>
                     </div>
                     <button class="btn btn-xs py-0 px-2 @(IsDarkMode ? "btn-outline-light text-white-50" : "btn-outline-secondary")"
@@ -536,21 +586,99 @@
                             </div>
                         }
                     </div>
+
+                    <!-- 6. 涂装防腐与防火涂料计算 -->
+                    <div class="collapsible-module mb-2 border rounded overflow-hidden @(IsDarkMode ? "bg-dark bg-opacity-50 border-secondary border-opacity-50" : "bg-light border-light-subtle")">
+                        <div class="collapsible-header d-flex justify-content-between align-items-center px-2 py-1 @(IsDarkMode ? "bg-secondary bg-opacity-25 text-white" : "bg-white text-dark")"
+                             @onclick="() => IsPaintingOpen = !IsPaintingOpen">
+                            <span class="text-xs fw-bold text-warning">🎨 涂装防腐与防火计算</span>
+                            <div class="d-flex align-items-center gap-1" @onclick:stopPropagation="true">
+                                <button class="btn btn-xs py-0 px-1 btn-outline-warning" @onclick="OpenPaintingModal" title="展开高级算量工作台">
+                                    ⚙️ 详表
+                                </button>
+                                <span class="badge @(IsDarkMode ? "bg-secondary" : "bg-secondary-subtle text-dark") text-xs" style="cursor: pointer;" @onclick="() => IsPaintingOpen = !IsPaintingOpen">
+                                    @(IsPaintingOpen ? "▲" : "▼")
+                                </span>
+                            </div>
+                        </div>
+
+                        @if (IsPaintingOpen)
+                        {
+                            <div class="p-2">
+                                <div class="text-xs">
+                                    <div class="mb-2">
+                                        <label class="form-label text-xs @(IsDarkMode ? "text-white-50" : "text-muted") mb-1 d-flex justify-content-between">
+                                            <span>配套施工体系</span>
+                                        </label>
+                                        <select class="form-select form-select-sm @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-light-subtle")"
+                                                @onchange="OnPaintPresetChanged">
+                                            @foreach (var preset in AvailablePaintPresets)
+                                            {
+                                                <option value="@preset" selected="@(preset == CurrentPaintPresetName)">@preset</option>
+                                            }
+                                        </select>
+                                    </div>
+
+                                    <div class="form-check form-switch mb-2">
+                                        <input class="form-check-input" type="checkbox" id="chkExcludeTop"
+                                               @bind="ExcludeTopPaintingArea" @bind:after="OnParameterChanged" />
+                                        <label class="form-check-label @(IsDarkMode ? "text-white-50" : "text-muted")" for="chkExcludeTop">
+                                            扣除顶面贴合免喷区
+                                        </label>
+                                    </div>
+
+                                    @if (LivePaintResult != null)
+                                    {
+                                        <div class="p-2 rounded border @(IsDarkMode ? "bg-dark border-secondary border-opacity-50" : "bg-light border-light-subtle") mb-2">
+                                            <div class="d-flex justify-content-between mb-1">
+                                                <span class="@(IsDarkMode ? "text-white-50" : "text-muted")">涂装平米单价:</span>
+                                                <span class="fw-bold text-info">¥@LivePaintResult.TotalCostPerM2.ToString("F1")/m²</span>
+                                            </div>
+                                            <div class="d-flex justify-content-between mb-1">
+                                                <span class="@(IsDarkMode ? "text-white-50" : "text-muted")">延米造价:</span>
+                                                <span class="fw-bold text-success">¥@LivePaintResult.TotalCostPerMeter.ToString("F1")/m</span>
+                                            </div>
+                                            <div class="d-flex justify-content-between">
+                                                <span class="@(IsDarkMode ? "text-white-50" : "text-muted")">吨钢造价:</span>
+                                                <span class="fw-bold text-warning">¥@LivePaintResult.TotalCostPerTon.ToString("F0")/t</span>
+                                            </div>
+                                        </div>
+                                    }
+
+                                    <button class="btn btn-xs btn-outline-info w-100" @onclick="OpenPaintingModal">
+                                        📋 调整膜厚/损耗/单价详单 &gt;&gt;
+                                    </button>
+                                </div>
+                            </div>
+                        }
+                    </div>
                 </div>
             </div>
         </aside>
 
-        <!-- ======================= 2. 中间交互 CAD 视口 (占比 70%) ======================= -->
-        <main class="workstation-pane-center d-flex flex-column">
+        <!-- 左侧拖拽分割条 -->
+        <div class="splitter-bar @(IsDraggingLeft ? "active" : "")" @onmousedown="StartDragLeft" title="按住拖拽调整左侧栏比例">
+            <div class="splitter-handle"></div>
+        </div>
+
+        <!-- ======================= 2. 中间交互 CAD 视口 (默认 60%，自适应) ======================= -->
+        <main class="workstation-pane-center d-flex flex-column"
+              style="width: @(CenterWidthPercent.ToString("F1"))%; flex: 1 1 @(CenterWidthPercent.ToString("F1"))%; min-width: 0;">
             <SectionSvgCanvas Result="@CurrentResult" Parameters="@CurrentParams" IsDarkMode="@IsDarkMode" />
         </main>
 
-        <!-- ======================= 3. 右侧分析与力学指标看板 (占比 15%) ======================= -->
-        <aside class="workstation-pane-sidebar workstation-pane-right d-flex flex-column">
+        <!-- 右侧拖拽分割条 -->
+        <div class="splitter-bar @(IsDraggingRight ? "active" : "")" @onmousedown="StartDragRight" title="按住拖拽调整右侧栏比例">
+            <div class="splitter-handle"></div>
+        </div>
+
+        <!-- ======================= 3. 右侧分析与力学指标看板 (默认 20%，可拖动) ======================= -->
+        <aside class="workstation-pane-sidebar workstation-pane-right d-flex flex-column"
+               style="width: @(RightWidthPercent.ToString("F1"))%; min-width: 220px; flex: 0 0 @(RightWidthPercent.ToString("F1"))%;">
             <div class="card @(IsDarkMode ? "bg-secondary bg-opacity-25 border-secondary text-white" : "bg-white border-light-subtle text-dark shadow-sm") h-100 d-flex flex-column">
                 <div class="card-header @(IsDarkMode ? "bg-dark bg-opacity-50 border-secondary" : "bg-light border-light-subtle") py-2 d-flex justify-content-between align-items-center">
                     <div class="d-flex align-items-center gap-1">
-                        <span class="fw-bold text-xs text-uppercase text-success">📊 指标看板 (15%)</span>
+                        <span class="fw-bold text-xs text-uppercase text-success">📊 指标看板 (@(RightWidthPercent.ToString("F0"))%)</span>
                         <button class="btn btn-xs py-0 px-1 @(IsDarkMode ? "btn-outline-light text-white-50" : "btn-outline-secondary")"
                                 @onclick="ToggleAllRight" title="一键全部折叠/展开右侧模块">
                             @(IsAllRightOpen ? "▲" : "▼")
@@ -841,6 +969,17 @@
                        OnSelectProfile="HandleStandardProfileSelected"
                        IsDarkMode="@IsDarkMode" />
 
+    <!-- 基础数据库管理弹窗 (欧标/美标/国标/油漆) -->
+    <DatabaseManagementModal @bind-IsOpen="IsDatabaseModalOpen"
+                             IsDarkMode="@IsDarkMode"
+                             OnSelectProfile="HandleStandardProfileSelected" />
+
+    <!-- 油漆与防火涂料计算工作台弹窗 -->
+    <PaintingCalculationModal @bind-IsOpen="IsPaintingModalOpen"
+                              Result="@CurrentResult"
+                              IsDarkMode="@IsDarkMode"
+                              OnPaintCalculated="HandlePaintCalculated" />
+
     <!-- 计算书导出弹窗 -->
     <CalculationReportModal @bind-IsOpen="IsReportModalOpen"
                             Parameters="@CurrentParams"
@@ -860,7 +999,106 @@
     private bool IsDarkMode { get; set; } = true;
     private bool UseCmUnits { get; set; } = true;
     private bool IsSteelModalOpen { get; set; }
+    private bool IsDatabaseModalOpen { get; set; }
+    private bool IsPaintingModalOpen { get; set; }
     private bool IsReportModalOpen { get; set; }
+
+    // ================= 分栏比例与鼠标手工拖拽 =================
+    private double LeftWidthPercent { get; set; } = 20.0;
+    private double RightWidthPercent { get; set; } = 20.0;
+    private double CenterWidthPercent => Math.Max(20.0, 100.0 - LeftWidthPercent - RightWidthPercent);
+
+    private bool IsDraggingLeft { get; set; }
+    private bool IsDraggingRight { get; set; }
+    private double DragStartX { get; set; }
+    private double DragInitialLeft { get; set; }
+    private double DragInitialRight { get; set; }
+
+    private void SetLayoutPreset(double left, double right)
+    {
+        LeftWidthPercent = left;
+        RightWidthPercent = right;
+    }
+
+    private void StartDragLeft(MouseEventArgs e)
+    {
+        IsDraggingLeft = true;
+        IsDraggingRight = false;
+        DragStartX = e.ClientX;
+        DragInitialLeft = LeftWidthPercent;
+    }
+
+    private void StartDragRight(MouseEventArgs e)
+    {
+        IsDraggingRight = true;
+        IsDraggingLeft = false;
+        DragStartX = e.ClientX;
+        DragInitialRight = RightWidthPercent;
+    }
+
+    private void HandleSplitterMouseMove(MouseEventArgs e)
+    {
+        if (IsDraggingLeft)
+        {
+            double deltaPct = (e.ClientX - DragStartX) * 0.065;
+            double newVal = Math.Clamp(DragInitialLeft + deltaPct, 12.0, 38.0);
+            LeftWidthPercent = Math.Round(newVal, 1);
+        }
+        else if (IsDraggingRight)
+        {
+            double deltaPct = (DragStartX - e.ClientX) * 0.065;
+            double newVal = Math.Clamp(DragInitialRight + deltaPct, 12.0, 38.0);
+            RightWidthPercent = Math.Round(newVal, 1);
+        }
+    }
+
+    private void HandleSplitterMouseUp()
+    {
+        IsDraggingLeft = false;
+        IsDraggingRight = false;
+    }
+
+    // ================= 油漆与防火涂料计算状态 =================
+    private bool IsPaintingOpen { get; set; } = true;
+    private static readonly string[] AvailablePaintPresets =
+    [
+        "底漆 + 中漆",
+        "底漆 + 中漆 + 面漆",
+        "底漆 + 中漆 + 防火涂料",
+        "底漆 + 封闭漆 + 面漆",
+        "底漆 + 中漆 + 防火涂料 + 面漆"
+    ];
+    private string CurrentPaintPresetName { get; set; } = "底漆 + 中漆 + 面漆";
+    private List<CoatingLayerConfig> CurrentPaintLayers { get; set; } = [];
+    private bool ExcludeTopPaintingArea { get; set; }
+    private PaintSystemCalculationResult? LivePaintResult { get; set; }
+
+    private void OpenDatabaseModal() => IsDatabaseModalOpen = true;
+    private void OpenPaintingModal() => IsPaintingModalOpen = true;
+
+    private void OnPaintPresetChanged(ChangeEventArgs e)
+    {
+        string? name = e.Value?.ToString();
+        if (!string.IsNullOrEmpty(name))
+        {
+            CurrentPaintPresetName = name;
+            CurrentPaintLayers = PaintCoatingCalculator.CreatePreset(name);
+            RecalculatePaint();
+        }
+    }
+
+    private void HandlePaintCalculated(PaintSystemCalculationResult result)
+    {
+        LivePaintResult = result;
+    }
+
+    private void RecalculatePaint()
+    {
+        if (CurrentResult != null && CurrentPaintLayers.Count > 0)
+        {
+            LivePaintResult = PaintCoatingCalculator.Calculate(CurrentResult, CurrentPaintLayers, ExcludeTopPaintingArea);
+        }
+    }
 
     // 左侧模块独立折叠收缩状态
     private bool IsSectionTypeOpen { get; set; } = true;
@@ -875,7 +1113,7 @@
     private bool IsStressCardOpen { get; set; } = true;
     private bool IsDetailTableOpen { get; set; } = true;
 
-    private bool IsAllLeftOpen => IsSectionTypeOpen || IsGeometryOpen || IsMaterialOpen || IsBucklingOpen || IsLoadOpen;
+    private bool IsAllLeftOpen => IsSectionTypeOpen || IsGeometryOpen || IsMaterialOpen || IsBucklingOpen || IsLoadOpen || IsPaintingOpen;
     private bool IsAllRightOpen => IsSummaryOpen || IsSlenderCardOpen || IsStressCardOpen || IsDetailTableOpen;
 
     private void ToggleAllLeft()
@@ -886,6 +1124,7 @@
         IsMaterialOpen = target;
         IsBucklingOpen = target;
         IsLoadOpen = target;
+        IsPaintingOpen = target;
     }
 
     private void ToggleAllRight()
@@ -910,6 +1149,10 @@
         CurrentBuckling.EffectiveLengthFactorX = 1.0;
         CurrentBuckling.EffectiveLengthFactorY = 1.0;
         CurrentBuckling.AllowableSlenderness = 150.0;
+
+        // 初始化涂装施工预设
+        CurrentPaintPresetName = "底漆 + 中漆 + 面漆";
+        CurrentPaintLayers = PaintCoatingCalculator.CreatePreset(CurrentPaintPresetName);
 
         Recalculate();
     }
@@ -969,6 +1212,9 @@
         {
             CurrentResult.StressResult = null;
         }
+
+        // 实时油漆防腐与防火涂装工程量计算
+        RecalculatePaint();
     }
 
     private void ChangeSectionType(SectionType type)
