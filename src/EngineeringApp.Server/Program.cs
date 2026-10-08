@@ -117,4 +117,49 @@ app.MapGet("/api/database/sections", async (string? system, string? category, st
     return Results.Ok(results);
 });
 
+// ======================== 材料定价域 API 端点 ========================
+
+// 8. 获取材料价格时间快照列表
+app.MapGet("/api/pricing/snapshots", async (AppDbContext db) =>
+{
+    var snapshots = await db.MaterialPriceSnapshots
+        .OrderByDescending(s => s.EffectiveDate)
+        .ToListAsync();
+    return Results.Ok(snapshots);
+});
+
+// 9. 获取全国及国际钢厂品牌字典
+app.MapGet("/api/pricing/mills", () =>
+{
+    return Results.Ok(EngineeringApp.Shared.Material.Pricing.SeedSteelMills.AllMills);
+});
+
+// 10. 获取物流调运路线费率库
+app.MapGet("/api/pricing/routes", () =>
+{
+    return Results.Ok(EngineeringApp.Shared.Material.Pricing.SeedFreightRoutes.AllRoutes);
+});
+
+// 11. 钢板多维加价核算接口
+app.MapPost("/api/pricing/calculate-plate", (EngineeringApp.Shared.Material.Pricing.PlatePricingParameters input, string? snapshotId) =>
+{
+    var snapshot = string.IsNullOrEmpty(snapshotId)
+        ? EngineeringApp.Shared.Material.Pricing.SeedPriceSnapshots.Latest
+        : EngineeringApp.Shared.Material.Pricing.SeedPriceSnapshots.GetById(snapshotId);
+
+    var result = EngineeringApp.Shared.Material.Pricing.PlatePricingRuleEngine.Calculate(input, snapshot);
+    return Results.Ok(result);
+});
+
+// 12. 型材商业价格与工艺核算接口
+app.MapPost("/api/pricing/calculate-profile", (EngineeringApp.Shared.Material.Pricing.ProfilePricingParameters input, string? snapshotId) =>
+{
+    var snapshot = string.IsNullOrEmpty(snapshotId)
+        ? EngineeringApp.Shared.Material.Pricing.SeedPriceSnapshots.Latest
+        : EngineeringApp.Shared.Material.Pricing.SeedPriceSnapshots.GetById(snapshotId);
+
+    var result = EngineeringApp.Shared.Material.Pricing.ProfilePricingRuleEngine.Calculate(input, snapshot);
+    return Results.Ok(result);
+});
+
 app.Run();

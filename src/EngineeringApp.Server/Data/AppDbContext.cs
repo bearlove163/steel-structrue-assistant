@@ -46,6 +46,30 @@ public class PaintProductEntity
 }
 
 /// <summary>
+/// 基础数据实体：材料价格基准快照持久化模型
+/// </summary>
+public class MaterialPriceSnapshotEntity
+{
+    public int Id { get; set; }
+    public string SnapshotId { get; set; } = "";
+    public string SnapshotName { get; set; } = "";
+    public DateTime EffectiveDate { get; set; }
+    public EngineeringApp.Shared.Material.Pricing.PriceSourceType SourceType { get; set; }
+    public string SourceSupplier { get; set; } = "";
+    public bool IsTaxInclusive { get; set; } = true;
+    public EngineeringApp.Shared.Material.Pricing.DeliveryCondition DefaultDelivery { get; set; }
+    public double PlateBaseQ235B { get; set; }
+    public double PlateBaseQ355B { get; set; }
+    public double HBeamBaseQ235B { get; set; }
+    public double HBeamBaseQ355B { get; set; }
+    public double HotRolledCoilBase { get; set; }
+    public double WeldedTubeBase { get; set; }
+    public double SeamlessTubeBase { get; set; }
+    public bool IsLocked { get; set; }
+    public string Remarks { get; set; } = "";
+}
+
+/// <summary>
 /// SQLite 数据库上下文
 /// </summary>
 public class AppDbContext : DbContext
@@ -56,6 +80,7 @@ public class AppDbContext : DbContext
 
     public DbSet<StandardSteelEntity> StandardSteels => Set<StandardSteelEntity>();
     public DbSet<PaintProductEntity> PaintProducts => Set<PaintProductEntity>();
+    public DbSet<MaterialPriceSnapshotEntity> MaterialPriceSnapshots => Set<MaterialPriceSnapshotEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -74,10 +99,17 @@ public class AppDbContext : DbContext
             e.HasKey(x => x.Id);
             e.HasIndex(x => x.LayerType);
         });
+
+        modelBuilder.Entity<MaterialPriceSnapshotEntity>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.SnapshotId).IsUnique();
+            e.HasIndex(x => x.EffectiveDate);
+        });
     }
 
     /// <summary>
-    /// 初始化并自动填充基准数据 (欧标、美标、国标型钢及油漆价格数据)
+    /// 初始化并自动填充基准数据 (欧标、美标、国标型钢、油漆及材料价格快照)
     /// </summary>
     public static void SeedData(AppDbContext db)
     {
@@ -130,6 +162,35 @@ public class AppDbContext : DbContext
             }).ToList();
 
             db.StandardSteels.AddRange(seedSteels);
+            db.SaveChanges();
+        }
+
+        // 填充材料价格时间快照数据
+        if (!db.MaterialPriceSnapshots.Any())
+        {
+            int sId = 1;
+            var seedSnapshots = EngineeringApp.Shared.Material.Pricing.SeedPriceSnapshots.AllSnapshots.Select(s => new MaterialPriceSnapshotEntity
+            {
+                Id = sId++,
+                SnapshotId = s.SnapshotId,
+                SnapshotName = s.SnapshotName,
+                EffectiveDate = s.EffectiveDate,
+                SourceType = s.SourceType,
+                SourceSupplier = s.SourceSupplier,
+                IsTaxInclusive = s.IsTaxInclusive,
+                DefaultDelivery = s.DefaultDelivery,
+                PlateBaseQ235B = s.PlateBaseQ235B,
+                PlateBaseQ355B = s.PlateBaseQ355B,
+                HBeamBaseQ235B = s.HBeamBaseQ235B,
+                HBeamBaseQ355B = s.HBeamBaseQ355B,
+                HotRolledCoilBase = s.HotRolledCoilBase,
+                WeldedTubeBase = s.WeldedTubeBase,
+                SeamlessTubeBase = s.SeamlessTubeBase,
+                IsLocked = s.IsLocked,
+                Remarks = s.Remarks
+            }).ToList();
+
+            db.MaterialPriceSnapshots.AddRange(seedSnapshots);
             db.SaveChanges();
         }
     }

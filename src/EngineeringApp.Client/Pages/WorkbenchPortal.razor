@@ -1,0 +1,305 @@
+@page "/"
+@page "/portal"
+@using EngineeringApp.Shared.Material.Pricing
+@using EngineeringApp.Client.Services
+@inject NavigationManager Nav
+@inject ThemeState Theme
+@implements IDisposable
+
+<PageTitle>钢结构工程工作台统一导航门户</PageTitle>
+
+<div class="container-fluid py-3 px-4 min-vh-100 workstation-root d-flex flex-column @(Theme.IsDarkMode ? "bg-dark text-white" : "bg-light text-dark")"
+     data-theme="@(Theme.IsDarkMode ? "dark" : "light")">
+
+    <!-- ======================= 顶部大盘与项目全局上下文 ======================= -->
+    <header class="d-flex flex-wrap align-items-center justify-content-between pb-3 mb-4 border-bottom @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle bg-white rounded p-3 shadow-sm")">
+        <div class="d-flex align-items-center gap-3">
+            <div class="p-2 bg-gradient bg-primary rounded-3 text-white fw-bold d-flex align-items-center justify-content-center shadow" style="width: 44px; height: 44px; font-size: 22px;">
+                ⚙️
+            </div>
+            <div>
+                <div class="d-flex align-items-center gap-2">
+                    <h4 class="mb-0 fw-bold tracking-tight @(Theme.IsDarkMode ? "text-white" : "text-dark")">钢结构工程算量与商业报价工作站</h4>
+                    <span class="badge @(Theme.IsDarkMode ? "bg-primary-subtle text-primary border border-primary" : "bg-primary text-white") text-xs">统一导航门户 Hub</span>
+                    <span class="badge bg-success text-xs">.NET 9 WASM</span>
+                </div>
+                <div class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted") small mt-1">
+                    贯通【材料物性与价格域】·【截面几何力学域】·【防腐涂装防火域】·【构件装配BOM定额域】·【综合总装报价】
+                </div>
+            </div>
+        </div>
+
+        <!-- 全局项目状态、主题切换与多国标准体系选择 -->
+        <div class="d-flex align-items-center gap-3 mt-2 mt-md-0">
+            <!-- 暗黑/亮色主题切换按钮 (和 /sections 完全同款风格) -->
+            <button class="btn btn-sm d-flex align-items-center gap-1 @(Theme.IsDarkMode ? "btn-outline-warning" : "btn-outline-dark")"
+                    @onclick="Theme.ToggleTheme" title="切换暗黑/亮色主题界面类型">
+                <span>@(Theme.IsDarkMode ? "☀️ 亮色" : "🌙 暗黑")</span>
+            </button>
+
+            <!-- 标准体系切换器 -->
+            <div class="@(Theme.IsDarkMode ? "bg-black bg-opacity-50 border-secondary" : "bg-light border-light-subtle") p-2 rounded-3 border d-flex align-items-center gap-2">
+                <span class="small @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">标准体系:</span>
+                <div class="btn-group btn-group-sm">
+                    <button class="btn @(CurrentStandard == StandardSystem.GB ? "btn-primary fw-bold" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary"))"
+                            @onclick="() => SetStandard(StandardSystem.GB)">
+                        🇨🇳 国标 (GB)
+                    </button>
+                    <button class="btn @(CurrentStandard == StandardSystem.EN ? "btn-primary fw-bold" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary"))"
+                            @onclick="() => SetStandard(StandardSystem.EN)">
+                        🇪🇺 欧标 (EN)
+                    </button>
+                    <button class="btn @(CurrentStandard == StandardSystem.ASTM ? "btn-primary fw-bold" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary"))"
+                            @onclick="() => SetStandard(StandardSystem.ASTM)">
+                        🇺🇸 美标 (ASTM)
+                    </button>
+                </div>
+            </div>
+
+            <!-- 当前大盘生效日期卡片 -->
+            <div class="@(Theme.IsDarkMode ? "bg-black bg-opacity-50 border-secondary" : "bg-light border-light-subtle") px-3 py-2 rounded-3 border text-end">
+                <div class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")" style="font-size: 11px;">价格基准日 (网价)</div>
+                <div class="fw-bold @(Theme.IsDarkMode ? "text-warning" : "text-primary") small">📅 2026-10-08 (秋季最新)</div>
+            </div>
+        </div>
+    </header>
+
+    <!-- ======================= 项目快速上下文与行情指标 ======================= -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card @(Theme.IsDarkMode ? "bg-secondary bg-opacity-25 border-secondary text-white" : "bg-white border-light-subtle shadow-sm text-dark") p-3 h-100">
+                <div class="d-flex justify-content-between align-items-center @(Theme.IsDarkMode ? "text-white-50" : "text-muted") small mb-1">
+                    <span>当前测试项目</span>
+                    <span class="badge bg-info text-dark">设计深化阶段</span>
+                </div>
+                <div class="fw-bold fs-6">华东超高层钢结构中心</div>
+                <div class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted") small mt-1">主受力构件：箱型柱 + 桁架梁</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card @(Theme.IsDarkMode ? "bg-secondary bg-opacity-25 border-secondary text-white" : "bg-white border-light-subtle shadow-sm text-dark") p-3 h-100">
+                <div class="d-flex justify-content-between align-items-center @(Theme.IsDarkMode ? "text-white-50" : "text-muted") small mb-1">
+                    <span>钢材大盘指数 (Q355B 普板)</span>
+                    <span class="badge bg-success">微涨 +30</span>
+                </div>
+                <div class="fw-bold fs-5 text-success">¥ 4,050 <span class="fs-6 fw-normal @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">元/吨</span></div>
+                <div class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted") small mt-1">数据来源：上海我的钢铁网 MySteel</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card @(Theme.IsDarkMode ? "bg-secondary bg-opacity-25 border-secondary text-white" : "bg-white border-light-subtle shadow-sm text-dark") p-3 h-100">
+                <div class="d-flex justify-content-between align-items-center @(Theme.IsDarkMode ? "text-white-50" : "text-muted") small mb-1">
+                    <span>指定首选钢厂与基地</span>
+                    <span class="badge bg-primary">一线央企</span>
+                </div>
+                <div class="fw-bold fs-6 text-primary">宝武集团 · 宝钢股份</div>
+                <div class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted") small mt-1">生产基地：上海宝山 (溢价 +¥200/t)</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card @(Theme.IsDarkMode ? "bg-secondary bg-opacity-25 border-secondary text-white" : "bg-white border-light-subtle shadow-sm text-dark") p-3 h-100">
+                <div class="d-flex justify-content-between align-items-center @(Theme.IsDarkMode ? "text-white-50" : "text-muted") small mb-1">
+                    <span>默认调运目的地与交货</span>
+                    <span class="badge bg-warning text-dark">含干线运费</span>
+                </div>
+                <div class="fw-bold fs-6 @(Theme.IsDarkMode ? "text-warning" : "text-dark")">华东-浙江制造车间</div>
+                <div class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted") small mt-1">短途板车调运费：约 ¥50 / 吨</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ======================= 专业模块卡片导航阵列 ======================= -->
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <h5 class="fw-bold mb-0 @(Theme.IsDarkMode ? "text-light" : "text-dark") d-flex align-items-center gap-2">
+            <span>🧩 专业工程模块独立操作视窗</span>
+            <span class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted") small fw-normal">(点击卡片直达对应专业工作台)</span>
+        </h5>
+        <div class="small @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">
+            架构模式：先分后合 · 独立操作 · 底层数据互通
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <!-- 模块 1：材料域 (核心) -->
+        <div class="col-lg-6 col-xl-3">
+            <div class="card @(Theme.IsDarkMode ? "bg-dark border-primary" : "bg-white border-primary shadow-sm") border-2 h-100 shadow-sm d-flex flex-column hover-card position-relative overflow-hidden">
+                <div class="position-absolute top-0 end-0 bg-primary text-white px-2 py-1 small rounded-bottom-start fw-bold" style="font-size: 11px;">
+                    模块 1
+                </div>
+                <div class="card-body d-flex flex-column p-4">
+                    <div class="d-flex align-items-center gap-3 mb-3">
+                        <div class="p-2 bg-primary bg-opacity-25 rounded-3 text-primary fs-3">
+                            🧱
+                        </div>
+                        <div>
+                            <h5 class="card-title fw-bold @(Theme.IsDarkMode ? "text-white" : "text-dark") mb-0">材料价格与供应链</h5>
+                            <span class="badge bg-success-subtle text-success text-xs">● 已就绪 ACTIVE</span>
+                        </div>
+                    </div>
+                    <p class="card-text @(Theme.IsDarkMode ? "text-white-50" : "text-muted") small flex-grow-1">
+                        钢板五维加价规则矩阵（厚度、定尺、GB/T 709 C类保全厚度公差、TMCP、Z25向性能、一级探伤）；型材热轧加价与圆转方冷成型工艺费；宝钢/沙钢钢厂溢价及浙江/广东调运物流费。
+                    </p>
+                    <div class="mb-3 d-flex flex-wrap gap-1">
+                        <span class="badge @(Theme.IsDarkMode ? "bg-secondary" : "bg-light text-dark border") text-xs">五维加价</span>
+                        <span class="badge @(Theme.IsDarkMode ? "bg-secondary" : "bg-light text-dark border") text-xs">圆转方成型</span>
+                        <span class="badge @(Theme.IsDarkMode ? "bg-secondary" : "bg-light text-dark border") text-xs">调运费(¥50/¥200)</span>
+                        <span class="badge @(Theme.IsDarkMode ? "bg-secondary" : "bg-light text-dark border") text-xs">标准Describe输出</span>
+                    </div>
+                    <button class="btn btn-primary w-100 fw-bold d-flex align-items-center justify-content-center gap-2 py-2"
+                            @onclick='() => Nav.NavigateTo("/material-pricing")'>
+                        <span>进入材料价格工作台</span>
+                        <span>→</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 模块 2：截面域 -->
+        <div class="col-lg-6 col-xl-3">
+            <div class="card @(Theme.IsDarkMode ? "bg-dark border-secondary" : "bg-white border-light-subtle shadow-sm") h-100 shadow-sm d-flex flex-column hover-card position-relative overflow-hidden">
+                <div class="position-absolute top-0 end-0 @(Theme.IsDarkMode ? "bg-secondary text-white" : "bg-secondary-subtle text-dark") px-2 py-1 small rounded-bottom-start fw-bold" style="font-size: 11px;">
+                    模块 2
+                </div>
+                <div class="card-body d-flex flex-column p-4">
+                    <div class="d-flex align-items-center gap-3 mb-3">
+                        <div class="p-2 bg-info bg-opacity-25 rounded-3 text-info fs-3">
+                            📐
+                        </div>
+                        <div>
+                            <h5 class="card-title fw-bold @(Theme.IsDarkMode ? "text-white" : "text-dark") mb-0">截面力学与应力视窗</h5>
+                            <span class="badge bg-success-subtle text-success text-xs">● 已就绪 ACTIVE</span>
+                        </div>
+                    </div>
+                    <p class="card-text @(Theme.IsDarkMode ? "text-white-50" : "text-muted") small flex-grow-1">
+                        国标/欧标/美标全系列标准型钢库，参数化箱型、H型、圆管、角钢几何特性（惯性矩、塑性抵抗矩、扇形翘曲常数 Cw）、长细比验算与 CAD 级双模交互应力云图。
+                    </p>
+                    <div class="mb-3 d-flex flex-wrap gap-1">
+                        <span class="badge @(Theme.IsDarkMode ? "bg-secondary" : "bg-light text-dark border") text-xs">国标/欧标/美标</span>
+                        <span class="badge @(Theme.IsDarkMode ? "bg-secondary" : "bg-light text-dark border") text-xs">截面几何模量</span>
+                        <span class="badge @(Theme.IsDarkMode ? "bg-secondary" : "bg-light text-dark border") text-xs">CAD云图视窗</span>
+                        <span class="badge @(Theme.IsDarkMode ? "bg-secondary" : "bg-light text-dark border") text-xs">应力极值验算</span>
+                    </div>
+                    <button class="btn @(Theme.IsDarkMode ? "btn-outline-info" : "btn-info text-white") w-100 fw-bold d-flex align-items-center justify-content-center gap-2 py-2"
+                            @onclick='() => Nav.NavigateTo("/sections")'>
+                        <span>进入截面力学工作台</span>
+                        <span>→</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 模块 3：涂装域 -->
+        <div class="col-lg-6 col-xl-3">
+            <div class="card @(Theme.IsDarkMode ? "bg-dark border-secondary" : "bg-white border-light-subtle shadow-sm") h-100 shadow-sm d-flex flex-column hover-card position-relative overflow-hidden">
+                <div class="position-absolute top-0 end-0 bg-warning text-dark px-2 py-1 small rounded-bottom-start fw-bold" style="font-size: 11px;">
+                    模块 3
+                </div>
+                <div class="card-body d-flex flex-column p-4">
+                    <div class="d-flex align-items-center gap-3 mb-3">
+                        <div class="p-2 bg-warning bg-opacity-25 rounded-3 text-warning fs-3">
+                            🎨
+                        </div>
+                        <div>
+                            <h5 class="card-title fw-bold @(Theme.IsDarkMode ? "text-white" : "text-dark") mb-0">防腐涂装与防火算量</h5>
+                            <span class="badge bg-success-subtle text-success text-xs">● 已就绪 ACTIVE</span>
+                        </div>
+                    </div>
+                    <p class="card-text @(Theme.IsDarkMode ? "text-white-50" : "text-muted") small flex-grow-1">
+                        依据截面展开周长与构件长度精算外表面积（m²），工业级底漆/中间漆/面漆/防火涂料多层配套方案，体积固体分、DFT厚度与漆浆用量定额核算。
+                    </p>
+                    <div class="mb-3 d-flex flex-wrap gap-1">
+                        <span class="badge @(Theme.IsDarkMode ? "bg-secondary" : "bg-light text-dark border") text-xs">展开涂装面积</span>
+                        <span class="badge @(Theme.IsDarkMode ? "bg-secondary" : "bg-light text-dark border") text-xs">比表面积(m²/t)</span>
+                        <span class="badge @(Theme.IsDarkMode ? "bg-secondary" : "bg-light text-dark border") text-xs">多层漆膜配套</span>
+                        <span class="badge @(Theme.IsDarkMode ? "bg-secondary" : "bg-light text-dark border") text-xs">防火涂料定额</span>
+                    </div>
+                    <button class="btn @(Theme.IsDarkMode ? "btn-outline-warning" : "btn-warning text-dark") w-100 fw-bold d-flex align-items-center justify-content-center gap-2 py-2"
+                            @onclick='() => Nav.NavigateTo("/sections")'>
+                        <span>进入涂装算量视窗</span>
+                        <span>→</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 模块 4：定额与BOM域 -->
+        <div class="col-lg-6 col-xl-3">
+            <div class="card @(Theme.IsDarkMode ? "bg-dark border-secondary" : "bg-white border-light-subtle shadow-sm") h-100 shadow-sm d-flex flex-column hover-card position-relative overflow-hidden">
+                <div class="position-absolute top-0 end-0 bg-danger text-white px-2 py-1 small rounded-bottom-start fw-bold" style="font-size: 11px;">
+                    模块 4
+                </div>
+                <div class="card-body d-flex flex-column p-4">
+                    <div class="d-flex align-items-center gap-3 mb-3">
+                        <div class="p-2 bg-danger bg-opacity-25 rounded-3 text-danger fs-3">
+                            ⚙️
+                        </div>
+                        <div>
+                            <h5 class="card-title fw-bold @(Theme.IsDarkMode ? "text-white" : "text-dark") mb-0">构件装配BOM与定额</h5>
+                            <span class="badge bg-success-subtle text-success text-xs">● 已就绪 ACTIVE</span>
+                        </div>
+                    </div>
+                    <p class="card-text @(Theme.IsDarkMode ? "text-white-50" : "text-muted") small flex-grow-1">
+                        “构件角色 (MemberRole)”与“截面特性 (SectionType)”双字段正交解耦。装配构件零件树 BOM，箱型柱牛腿/内隔板工时加成，车间制造直接工费核算。
+                    </p>
+                    <div class="mb-3 d-flex flex-wrap gap-1">
+                        <span class="badge @(Theme.IsDarkMode ? "bg-secondary" : "bg-light text-dark border") text-xs">正交双字段</span>
+                        <span class="badge @(Theme.IsDarkMode ? "bg-secondary" : "bg-light text-dark border") text-xs">装配零件BOM</span>
+                        <span class="badge @(Theme.IsDarkMode ? "bg-secondary" : "bg-light text-dark border") text-xs">牛腿隔板加成</span>
+                        <span class="badge @(Theme.IsDarkMode ? "bg-secondary" : "bg-light text-dark border") text-xs">车间直接工费</span>
+                    </div>
+                    <button class="btn @(Theme.IsDarkMode ? "btn-outline-light" : "btn-outline-danger") w-100 fw-bold d-flex align-items-center justify-content-center gap-2 py-2"
+                            @onclick='() => Nav.NavigateTo("/sections")'>
+                        <span>进入构件BOM定额</span>
+                        <span>→</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ======================= 总装与数据贯通总览横幅 ======================= -->
+    <div class="card @(Theme.IsDarkMode ? "bg-gradient bg-black border-secondary" : "bg-white border-light-subtle shadow-sm text-dark") p-4 shadow-lg mb-4">
+        <div class="row align-items-center">
+            <div class="col-lg-8">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <span class="badge bg-primary">全域数据拉通架构 (Data Continuity)</span>
+                    <span class="badge @(Theme.IsDarkMode ? "bg-secondary" : "bg-secondary-subtle text-secondary")">总装规划</span>
+                </div>
+                <h4 class="fw-bold @(Theme.IsDarkMode ? "text-white" : "text-dark") mb-2">📊 综合商务报价与 BIM 工程量总装台</h4>
+                <p class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted") small mb-0">
+                    在当前架构下，数据正交拉通流向：
+                    <b class="text-primary">【模块1材料采购到厂单价】</b> + 
+                    <b class="text-info">【模块2截面理论米重与采购毛重】</b> + 
+                    <b class="text-warning">【模块3涂装平米直接费】</b> + 
+                    <b class="text-danger">【模块4车间制作工费】</b> 
+                    $\implies$ 最终实时汇总为工程总直接费、吨钢综合单价，并一键导出标准清单 Excel 与国标清单项。
+                </p>
+            </div>
+            <div class="col-lg-4 text-lg-end mt-3 mt-lg-0">
+                <button class="btn btn-primary btn-lg fw-bold px-4" @onclick='() => Nav.NavigateTo("/material-pricing")'>
+                    🚀 从【材料价格工作台】开始试算
+                </button>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+@code {
+    private StandardSystem CurrentStandard = StandardSystem.GB;
+
+    protected override void OnInitialized()
+    {
+        Theme.OnChange += StateHasChanged;
+    }
+
+    public void Dispose()
+    {
+        Theme.OnChange -= StateHasChanged;
+    }
+
+    private void SetStandard(StandardSystem standard)
+    {
+        CurrentStandard = standard;
+    }
+}

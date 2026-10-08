@@ -1,7 +1,21 @@
 @inherits LayoutComponentBase
+@inject EngineeringApp.Client.Services.ThemeState Theme
+@implements IDisposable
 
-<div class="workstation-wrapper bg-dark text-white min-vh-100">
+<div class="workstation-wrapper @(Theme.IsDarkMode ? "bg-dark text-white" : "bg-light text-dark") min-vh-100" data-theme="@(Theme.IsDarkMode ? "dark" : "light")">
     <main>
         @Body
     </main>
 </div>
+
+@code {
+    protected override void OnInitialized()
+    {
+        Theme.OnChange += StateHasChanged;
+    }
+
+    public void Dispose()
+    {
+        Theme.OnChange -= StateHasChanged;
+    }
+}
