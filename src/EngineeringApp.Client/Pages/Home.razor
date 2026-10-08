@@ -1,8 +1,10 @@
-@page "/"
+@page "/sections"
 @using EngineeringApp.Shared.Models
 @using EngineeringApp.Shared.Algorithms
 @using EngineeringApp.Shared.Data
 @using EngineeringApp.Client.Shared.Components
+@inject NavigationManager Nav
+@inject EngineeringApp.Client.Services.ThemeState Theme
 
 <PageTitle>截面特性计算与力学分析工作站</PageTitle>
 
@@ -12,6 +14,10 @@
     <!-- ======================= 顶部工程工作站标题栏 ======================= -->
     <header class="d-flex flex-wrap align-items-center justify-content-between pb-2 mb-2 border-bottom @(IsDarkMode ? "border-secondary" : "border-light-subtle bg-white rounded p-2 shadow-sm")">
         <div class="d-flex align-items-center gap-3">
+            <button class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1" @onclick='() => Nav.NavigateTo("/portal")' title="返回统一门户中心">
+                <span>←</span>
+                <span>门户中心</span>
+            </button>
             <div class="p-2 bg-primary rounded-3 text-white fw-bold d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
                 ⬡
             </div>
@@ -27,6 +33,11 @@
         </div>
 
         <div class="d-flex align-items-center gap-2 mt-2 mt-md-0">
+            <!-- 模块 1：材料价格快捷跳转 -->
+            <button class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1" @onclick='() => Nav.NavigateTo("/material-pricing")'>
+                <span>🧱 材料价格与供应链</span>
+            </button>
+
             <!-- 暗黑/亮色主题切换按钮 -->
             <button class="btn btn-sm d-flex align-items-center gap-1 @(IsDarkMode ? "btn-outline-warning" : "btn-outline-dark")"
                     @onclick="ToggleTheme" title="切换暗黑/亮色主题界面类型">
@@ -998,7 +1009,7 @@
     private SectionPropertiesResult? CurrentResult { get; set; }
     private ParametricSectionCalculator Calculator { get; } = new();
 
-    private bool IsDarkMode { get; set; } = true;
+    private bool IsDarkMode => Theme.IsDarkMode;
     private bool UseCmUnits { get; set; } = true;
     private bool IsSteelModalOpen { get; set; }
     private bool IsDatabaseModalOpen { get; set; }
@@ -1161,7 +1172,7 @@
 
     private void ToggleTheme()
     {
-        IsDarkMode = !IsDarkMode;
+        Theme.ToggleTheme();
     }
 
     private void OnParameterChanged()

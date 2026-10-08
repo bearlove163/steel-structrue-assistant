@@ -1,4 +1,5 @@
 using EngineeringApp.Shared.Material;
+using EngineeringApp.Shared.Material.Pricing;
 using EngineeringApp.Shared.Models;
 using EngineeringApp.Shared.Quota;
 
@@ -79,6 +80,70 @@ public static class MemberPricingCalculator
             double pricePerTon = matInfo.CalculateProcurementPricePerTon(part.ThicknessMm);
             double partTotalGrossTon = (part.GrossWeightKg * part.QuantityPerAssembly * assembly.Quantity) / 1000.0;
             totalMaterialCost += partTotalGrossTon * pricePerTon;
+        }
+        result.MaterialProcurementCost = totalMaterialCost;
+
+        // 2. 车间加工制作直接工费核算 (正交定额查询 + 厚度调整 + 牛腿配件加成)
+        var quotaItem = FabricationQuotaDatabase.Query(assembly.MainSectionType, assembly.Role);
+        result.BaseFabricationPricePerTon = quotaItem.BaseFabricationUnitPricePerTon;
+
+        double thickFactor = QuotaDifficultyRules.CalculateThicknessFactor(assembly.MaxThicknessMm);
+        double fittingSurcharge = QuotaDifficultyRules.CalculateFittingSurchargePerTon(
+            assembly.CantileverBracketCount,
+            assembly.FittingWeightRatio);
+
+        double adjustedFabPrice = (quotaItem.BaseFabricationUnitPricePerTon * thickFactor) + fittingSurcharge;
+        result.AdjustedFabricationPricePerTon = adjustedFabPrice;
+        result.FabricationCost = result.TotalNetWeightTon * adjustedFabPrice;
+
+        // 3. 涂装防腐直接费
+        result.CoatingCost = result.TotalPaintingAreaM2 * Math.Max(0, coatingUnitPricePerM2);
+
+        return result;
+    }
+
+    /// <summary>
+    /// 支持指定材料价格时间快照、钢厂产地及调运目的地的全要素装配构件工料机成本核算
+    /// </summary>
+    public static MemberPricingResult Calculate(
+        SteelAssemblyItem assembly,
+        MaterialPriceSnapshot snapshot,
+        string millId = "Baosteel",
+        string destinationRegion = "华东-浙江制造车间",
+        double coatingUnitPricePerM2 = 45.0)
+    {
+        ArgumentNullException.ThrowIfNull(assembly);
+        ArgumentNullException.ThrowIfNull(snapshot);
+
+        var result = new MemberPricingResult
+        {
+            AssemblyMark = assembly.AssemblyMark,
+            Role = assembly.Role,
+            MainSectionType = assembly.MainSectionType,
+            Quantity = assembly.Quantity,
+            TotalNetWeightTon = assembly.TotalBatchNetWeightTon,
+            TotalGrossWeightTon = assembly.TotalBatchGrossWeightTon,
+            TotalPaintingAreaM2 = assembly.TotalBatchPaintingAreaM2
+        };
+
+        // 1. 采用材料价格规则引擎进行多维精确算价 (含厚度加价、公差加价、钢厂溢价、调运费)
+        double totalMaterialCost = 0.0;
+        foreach (var part in assembly.Parts)
+        {
+            var plateParams = new PlatePricingParameters
+            {
+                Grade = part.MaterialGrade,
+                ThicknessMm = part.ThicknessMm,
+                SteelMillId = millId,
+                Delivery = DeliveryCondition.Delivered_FabricationPlant,
+                DestinationRegion = destinationRegion,
+                CutType = PlateDimensionCutType.FixedDimension,
+                Tolerance = ToleranceClass.ClassA
+            };
+
+            var priceItem = PlatePricingRuleEngine.Calculate(plateParams, snapshot);
+            double partTotalGrossTon = (part.GrossWeightKg * part.QuantityPerAssembly * assembly.Quantity) / 1000.0;
+            totalMaterialCost += partTotalGrossTon * priceItem.FinalPricePerTon;
         }
         result.MaterialProcurementCost = totalMaterialCost;
 
