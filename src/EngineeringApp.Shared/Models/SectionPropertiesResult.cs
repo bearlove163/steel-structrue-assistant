@@ -46,34 +46,6 @@ public class SectionPropertiesResult
     /// <summary>吨钢比表面积 / 展开度 (m²/t，延米外表面积 / 延米吨重，商务防腐/防火涂料报价核心指标)</summary>
     public double AreaPerTon => LinearMass > 1e-4 ? (GrossPaintingAreaPerMeter / (LinearMass / 1000.0)) : 0;
 
-    /// <summary>
-    /// 根据涂装计算选项（如扣除楼板、扣除底面、包含内孔等）计算延米净涂装面积 (m²/m)
-    /// </summary>
-    public double CalculatePaintingArea(PaintingCalculationOptions? options = null)
-    {
-        if (options == null) return GrossPaintingAreaPerMeter;
-
-        double basePerimeter = OuterPerimeter > 0 ? OuterPerimeter : Perimeter;
-        if (options.IncludeInnerSurface)
-        {
-            basePerimeter += InnerPerimeter;
-        }
-
-        if (options.ExcludeTopSurface)
-        {
-            double deduct = options.TopSurfaceDeductionWidth ?? TopSurfaceWidth;
-            basePerimeter -= deduct;
-        }
-
-        if (options.ExcludeBottomSurface)
-        {
-            double deduct = options.BottomSurfaceDeductionWidth ?? BottomSurfaceWidth;
-            basePerimeter -= deduct;
-        }
-
-        double netArea = Math.Max(0, basePerimeter) / 1000.0;
-        return netArea * options.LossRatio;
-    }
 
     /// <summary>形心横坐标 Yc (mm, 相对外轮廓包络矩形左下角)</summary>
     public double Yc { get; set; }
