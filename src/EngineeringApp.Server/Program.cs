@@ -284,6 +284,38 @@ app.MapPost("/api/pricing/provenance-records", async (EngineeringApp.Shared.Mate
     return Results.Created($"/api/pricing/provenance-records/{saved.Id}", saved);
 });
 
+// 14.1 更新/修订物料出处记录 (写入变更履历与新版本)
+app.MapPut("/api/pricing/provenance-records/{id:int}", async (int id, EngineeringApp.Shared.Material.Pricing.MaterialProvenanceRecord input, AppDbContext db) =>
+{
+    var existing = await db.MaterialProvenanceRecords.FindAsync(id);
+    if (existing == null) return Results.NotFound();
+
+    existing.DisplayTitle = input.DisplayTitle;
+    existing.ProjectReference = input.ProjectReference;
+    existing.InquiryBatchId = input.InquiryBatchId;
+    existing.InquiryDate = input.InquiryDate;
+    existing.InquiryVendor = input.InquiryVendor;
+    existing.RevisionNumber = input.RevisionNumber;
+    existing.PricingPrincipleNote = input.PricingPrincipleNote;
+    existing.BasePricePerTon = input.BasePricePerTon;
+    existing.MillPremiumPerTon = input.MillPremiumPerTon;
+    existing.ThicknessSurchargePerTon = input.ThicknessSurchargePerTon;
+    existing.ContractThicknessSurchargePerTon = input.ContractThicknessSurchargePerTon;
+    existing.DimensionSurchargePerTon = input.DimensionSurchargePerTon;
+    existing.ToleranceSurchargePerTon = input.ToleranceSurchargePerTon;
+    existing.PerformanceSurchargePerTon = input.PerformanceSurchargePerTon;
+    existing.InspectionSurchargePerTon = input.InspectionSurchargePerTon;
+    existing.FreightPerTon = input.FreightPerTon;
+    existing.ContractFreightPerTon = input.ContractFreightPerTon;
+    existing.FinalPricePerTon = input.FinalPricePerTon;
+    existing.FullDescription = input.FullDescription;
+    existing.RevisionLogsJson = System.Text.Json.JsonSerializer.Serialize(input.RevisionLogs ?? []);
+    existing.PlateParametersJson = System.Text.Json.JsonSerializer.Serialize(input.PlateParameters);
+
+    await db.SaveChangesAsync();
+    return Results.Ok(existing.ToDomain());
+});
+
 // 15. 删除指定物料出处记录
 app.MapDelete("/api/pricing/provenance-records/{id:int}", async (int id, AppDbContext db) =>
 {

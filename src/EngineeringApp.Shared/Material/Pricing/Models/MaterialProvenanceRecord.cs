@@ -37,6 +37,46 @@ public static class MaterialProvenanceTagBuilder
 }
 
 /// <summary>
+/// 跨时序回溯时加价原则应用模式 (Pricing Principle Retrospection Mode)
+/// </summary>
+public enum RetrospectionPrincipleMode
+{
+    /// <summary>
+    /// 【模式 A：合同锁定加价原则】：沿用原询价建档时约定的加价原则 (固定加价)，仅回溯大盘基价波动
+    /// </summary>
+    ContractFixedPrinciples,
+
+    /// <summary>
+    /// 【模式 B：目标时序现行原则】：厚度/定尺/公差等加价规则完全按照目标快照时期的最新规则矩阵重算
+    /// </summary>
+    TargetDateCurrentPrinciples,
+
+    /// <summary>
+    /// 【模式 C：最新修订与实付议价】：直接以该物料最新修订履历中的实付加价为准
+    /// </summary>
+    LatestRevisedOverride
+}
+
+/// <summary>
+/// 物料价格与加价原则变更履历 (Material Price & Principle Revision Audit Log)
+/// 记录由于“加价原则变更”、“询价时间差异”或“二次议价”引发的修改过程与痕迹
+/// </summary>
+public class MaterialPriceRevisionLog
+{
+    public int Id { get; set; }
+    public int RecordId { get; set; }
+    public int RevisionNumber { get; set; }
+    public DateTime RevisedAt { get; set; } = DateTime.Now;
+    public string RevisedBy { get; set; } = "造价工程师";
+    public string Reason { get; set; } = ""; // 变更原因，如“加价原则调整”、“不同询价日重核”、“现货加价政策变更”
+    public double PreviousPricePerTon { get; set; }
+    public double NewPricePerTon { get; set; }
+    public double PriceDelta => NewPricePerTon - PreviousPricePerTon;
+    public string ChangeDetails { get; set; } = ""; // 明细对比文本
+    public string AppliedPrinciple { get; set; } = ""; // 本次适用的加价原则版本
+}
+
+/// <summary>
 /// 材料特征出处记录模型 (Material Provenance Record)
 /// 记录每张特定特性的钢板/型材在特定时间节点的完整成本拆解出处，支持跨时序回溯与项目成本重算
 /// </summary>
@@ -80,6 +120,25 @@ public class MaterialProvenanceRecord
     /// <summary>交货目的地与物流描述</summary>
     public string DeliveryAndFreightText { get; set; } = "";
 
+    // ================= 询价时间差异与批次管理 =================
+    /// <summary>询价批次编号 (如 "INQ-20260315-LOT01")</summary>
+    public string InquiryBatchId { get; set; } = "INQ-LOT-01";
+
+    /// <summary>具体询价时间 (可不同于大盘基准快照日期，体现同一工程不同时间批次询价差异)</summary>
+    public DateTime InquiryDate { get; set; } = DateTime.Today;
+
+    /// <summary>询价渠道/报价供应商 (如 "宝武直供", "南钢现货仓", "华东分销商")</summary>
+    public string InquiryVendor { get; set; } = "主流钢厂直供通道";
+
+    /// <summary>当前修订版本号 (初始询价为 Rev 1，每次修改后累加递增)</summary>
+    public int RevisionNumber { get; set; } = 1;
+
+    /// <summary>当期适用的加价原则版本或政策依据说明 (如 "2026Q1钢厂加价公函", "2026-10现货紧平衡新规")</summary>
+    public string PricingPrincipleNote { get; set; } = "行业出厂常规阶梯与定尺规则";
+
+    /// <summary>过程修改与调价历史履历 (Audit Trail & Revision History)</summary>
+    public List<MaterialPriceRevisionLog> RevisionLogs { get; set; } = [];
+
     // ================= 建档时的单价拆解 (元/吨) =================
     public double BasePricePerTon { get; set; }
     public double MillPremiumPerTon { get; set; }
@@ -89,6 +148,11 @@ public class MaterialProvenanceRecord
     public double PerformanceSurchargePerTon { get; set; }
     public double InspectionSurchargePerTon { get; set; }
     public double FreightPerTon { get; set; }
+
+    /// <summary>初始合同约定的厚度加价 (用于模式A合同锁定回溯)</summary>
+    public double ContractThicknessSurchargePerTon { get; set; }
+    /// <summary>初始合同约定的调运费 (用于模式A合同锁定回溯)</summary>
+    public double ContractFreightPerTon { get; set; }
 
     /// <summary>建档综合采购单价 (元/吨)</summary>
     public double FinalPricePerTon { get; set; }
@@ -100,14 +164,93 @@ public class MaterialProvenanceRecord
     public PlatePricingParameters PlateParameters { get; set; } = new();
 
     /// <summary>
-    /// 对当前物料出处记录，指定任意历史或未来价格快照进行时序价格回溯核算
+    /// 对当前物料出处记录，指定任意历史或未来价格快照及加价原则模式进行时序价格回溯核算
     /// </summary>
     public StandardMaterialItemPrice CalculateAtSnapshot(
         MaterialPriceSnapshot targetSnapshot,
         IList<PlateThicknessLadder>? ladders = null,
-        IList<PlateDimensionRule>? dimRules = null)
+        IList<PlateDimensionRule>? dimRules = null,
+        RetrospectionPrincipleMode principleMode = RetrospectionPrincipleMode.TargetDateCurrentPrinciples)
     {
         ArgumentNullException.ThrowIfNull(targetSnapshot);
-        return PlatePricingRuleEngine.Calculate(PlateParameters, targetSnapshot, ladders, dimRules);
+
+        if (principleMode == RetrospectionPrincipleMode.ContractFixedPrinciples)
+        {
+            // 模式 A：合同锁价加价模式。加价项沿用原合同/初次询价时约定的固定加价，仅大盘基价随目标快照浮动
+            var calculated = PlatePricingRuleEngine.Calculate(PlateParameters, targetSnapshot, ladders, dimRules);
+            calculated.MillPremiumPerTon = MillPremiumPerTon;
+            calculated.ThicknessSurchargePerTon = ContractThicknessSurchargePerTon > 0 ? ContractThicknessSurchargePerTon : ThicknessSurchargePerTon;
+            calculated.DimensionSurchargePerTon = DimensionSurchargePerTon;
+            calculated.ToleranceSurchargePerTon = ToleranceSurchargePerTon;
+            calculated.PerformanceSurchargePerTon = PerformanceSurchargePerTon;
+            calculated.InspectionSurchargePerTon = InspectionSurchargePerTon;
+            calculated.FreightPerTon = ContractFreightPerTon > 0 ? ContractFreightPerTon : FreightPerTon;
+            return calculated;
+        }
+
+        if (principleMode == RetrospectionPrincipleMode.LatestRevisedOverride)
+        {
+            // 模式 C：最新修订与实付议价模式。直接以该物料最新修订履历中的实付加价与最新协商运费为准
+            var calculated = PlatePricingRuleEngine.Calculate(PlateParameters, targetSnapshot, ladders, dimRules);
+            calculated.MillPremiumPerTon = MillPremiumPerTon;
+            calculated.ThicknessSurchargePerTon = ThicknessSurchargePerTon;
+            calculated.DimensionSurchargePerTon = DimensionSurchargePerTon;
+            calculated.ToleranceSurchargePerTon = ToleranceSurchargePerTon;
+            calculated.PerformanceSurchargePerTon = PerformanceSurchargePerTon;
+            calculated.InspectionSurchargePerTon = InspectionSurchargePerTon;
+            calculated.FreightPerTon = FreightPerTon;
+            return calculated;
+        }
+
+        // 模式 B：目标时序现行原则模式。厚度/定尺等加价规则完全按照目标快照时期的最新规则矩阵重算
+        var dynamicParams = new PlatePricingParameters
+        {
+            Standard = PlateParameters.Standard,
+            Grade = PlateParameters.Grade,
+            ThicknessMm = PlateParameters.ThicknessMm,
+            WidthMm = PlateParameters.WidthMm,
+            LengthMm = PlateParameters.LengthMm,
+            CutType = PlateParameters.CutType,
+            Tolerance = PlateParameters.Tolerance,
+            Flatness = PlateParameters.Flatness,
+            Impact = PlateParameters.Impact,
+            ZDirection = PlateParameters.ZDirection,
+            Metallurgy = PlateParameters.Metallurgy,
+            UT = PlateParameters.UT,
+            Certificate = PlateParameters.Certificate,
+            SteelMillId = PlateParameters.SteelMillId,
+            Delivery = PlateParameters.Delivery,
+            DestinationRegion = PlateParameters.DestinationRegion,
+            CustomThicknessSurcharge = null,
+            CustomDimensionSurcharge = null,
+            CustomMillPremium = PlateParameters.CustomMillPremium,
+            CustomFreightPerTon = PlateParameters.CustomFreightPerTon
+        };
+        return PlatePricingRuleEngine.Calculate(dynamicParams, targetSnapshot, ladders, dimRules);
+    }
+
+    /// <summary>
+    /// 记录一次价格或原则变更过程，生成审计履历并递增版本号
+    /// </summary>
+    public void AddRevision(string reason, string revisedBy, double newPricePerTon, string changeDetails, string appliedPrinciple)
+    {
+        var log = new MaterialPriceRevisionLog
+        {
+            Id = RevisionLogs.Count + 1,
+            RecordId = Id,
+            RevisionNumber = RevisionNumber + 1,
+            RevisedAt = DateTime.Now,
+            RevisedBy = string.IsNullOrWhiteSpace(revisedBy) ? "造价工程师" : revisedBy,
+            Reason = string.IsNullOrWhiteSpace(reason) ? "工程询价单价修正" : reason,
+            PreviousPricePerTon = FinalPricePerTon,
+            NewPricePerTon = newPricePerTon,
+            ChangeDetails = changeDetails,
+            AppliedPrinciple = appliedPrinciple
+        };
+
+        RevisionLogs.Add(log);
+        RevisionNumber = log.RevisionNumber;
+        FinalPricePerTon = newPricePerTon;
+        PricingPrincipleNote = appliedPrinciple;
     }
 }

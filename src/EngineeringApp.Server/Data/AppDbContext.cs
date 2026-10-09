@@ -159,14 +159,22 @@ public class MaterialProvenanceRecordEntity
     public string ProjectReference { get; set; } = "";
     public string MillName { get; set; } = "";
     public string DeliveryAndFreightText { get; set; } = "";
+    public string InquiryBatchId { get; set; } = "INQ-LOT-01";
+    public DateTime InquiryDate { get; set; } = DateTime.Today;
+    public string InquiryVendor { get; set; } = "";
+    public int RevisionNumber { get; set; } = 1;
+    public string PricingPrincipleNote { get; set; } = "";
+    public string RevisionLogsJson { get; set; } = "";
     public double BasePricePerTon { get; set; }
     public double MillPremiumPerTon { get; set; }
     public double ThicknessSurchargePerTon { get; set; }
+    public double ContractThicknessSurchargePerTon { get; set; }
     public double DimensionSurchargePerTon { get; set; }
     public double ToleranceSurchargePerTon { get; set; }
     public double PerformanceSurchargePerTon { get; set; }
     public double InspectionSurchargePerTon { get; set; }
     public double FreightPerTon { get; set; }
+    public double ContractFreightPerTon { get; set; }
     public double FinalPricePerTon { get; set; }
     public string FullDescription { get; set; } = "";
     public string PlateParametersJson { get; set; } = "";
@@ -179,6 +187,16 @@ public class MaterialProvenanceRecordEntity
             try
             {
                 p = System.Text.Json.JsonSerializer.Deserialize<PlatePricingParameters>(PlateParametersJson) ?? new();
+            }
+            catch { }
+        }
+
+        List<MaterialPriceRevisionLog> logs = [];
+        if (!string.IsNullOrEmpty(RevisionLogsJson))
+        {
+            try
+            {
+                logs = System.Text.Json.JsonSerializer.Deserialize<List<MaterialPriceRevisionLog>>(RevisionLogsJson) ?? [];
             }
             catch { }
         }
@@ -198,14 +216,22 @@ public class MaterialProvenanceRecordEntity
             ProjectReference = ProjectReference,
             MillName = MillName,
             DeliveryAndFreightText = DeliveryAndFreightText,
+            InquiryBatchId = InquiryBatchId,
+            InquiryDate = InquiryDate,
+            InquiryVendor = InquiryVendor,
+            RevisionNumber = RevisionNumber,
+            PricingPrincipleNote = PricingPrincipleNote,
+            RevisionLogs = logs,
             BasePricePerTon = BasePricePerTon,
             MillPremiumPerTon = MillPremiumPerTon,
             ThicknessSurchargePerTon = ThicknessSurchargePerTon,
+            ContractThicknessSurchargePerTon = ContractThicknessSurchargePerTon,
             DimensionSurchargePerTon = DimensionSurchargePerTon,
             ToleranceSurchargePerTon = ToleranceSurchargePerTon,
             PerformanceSurchargePerTon = PerformanceSurchargePerTon,
             InspectionSurchargePerTon = InspectionSurchargePerTon,
             FreightPerTon = FreightPerTon,
+            ContractFreightPerTon = ContractFreightPerTon,
             FinalPricePerTon = FinalPricePerTon,
             FullDescription = FullDescription,
             PlateParameters = p
@@ -227,14 +253,22 @@ public class MaterialProvenanceRecordEntity
         ProjectReference = r.ProjectReference,
         MillName = r.MillName,
         DeliveryAndFreightText = r.DeliveryAndFreightText,
+        InquiryBatchId = string.IsNullOrWhiteSpace(r.InquiryBatchId) ? "INQ-LOT-01" : r.InquiryBatchId,
+        InquiryDate = r.InquiryDate == default ? DateTime.Today : r.InquiryDate,
+        InquiryVendor = r.InquiryVendor,
+        RevisionNumber = r.RevisionNumber <= 0 ? 1 : r.RevisionNumber,
+        PricingPrincipleNote = r.PricingPrincipleNote,
+        RevisionLogsJson = System.Text.Json.JsonSerializer.Serialize(r.RevisionLogs ?? []),
         BasePricePerTon = r.BasePricePerTon,
         MillPremiumPerTon = r.MillPremiumPerTon,
         ThicknessSurchargePerTon = r.ThicknessSurchargePerTon,
+        ContractThicknessSurchargePerTon = r.ContractThicknessSurchargePerTon,
         DimensionSurchargePerTon = r.DimensionSurchargePerTon,
         ToleranceSurchargePerTon = r.ToleranceSurchargePerTon,
         PerformanceSurchargePerTon = r.PerformanceSurchargePerTon,
         InspectionSurchargePerTon = r.InspectionSurchargePerTon,
         FreightPerTon = r.FreightPerTon,
+        ContractFreightPerTon = r.ContractFreightPerTon,
         FinalPricePerTon = r.FinalPricePerTon,
         FullDescription = r.FullDescription,
         PlateParametersJson = System.Text.Json.JsonSerializer.Serialize(r.PlateParameters)
@@ -488,34 +522,7 @@ public class AppDbContext : DbContext
         // 8. 填充物料出处记录库 (Seed Provenance Records)
         if (!db.MaterialProvenanceRecords.Any())
         {
-            int recId = 1;
-            var seedRecords = SeedProvenanceRecords.AllRecords.Select(r => new MaterialProvenanceRecordEntity
-            {
-                Id = recId++,
-                MaterialTag = r.MaterialTag,
-                DisplayTitle = r.DisplayTitle,
-                Category = r.Category,
-                StandardSpecification = r.StandardSpecification,
-                DimensionText = r.DimensionText,
-                SnapshotId = r.SnapshotId,
-                SnapshotName = r.SnapshotName,
-                EffectiveDate = r.EffectiveDate,
-                RecordedAt = r.RecordedAt,
-                ProjectReference = r.ProjectReference,
-                MillName = r.MillName,
-                DeliveryAndFreightText = r.DeliveryAndFreightText,
-                BasePricePerTon = r.BasePricePerTon,
-                MillPremiumPerTon = r.MillPremiumPerTon,
-                ThicknessSurchargePerTon = r.ThicknessSurchargePerTon,
-                DimensionSurchargePerTon = r.DimensionSurchargePerTon,
-                ToleranceSurchargePerTon = r.ToleranceSurchargePerTon,
-                PerformanceSurchargePerTon = r.PerformanceSurchargePerTon,
-                InspectionSurchargePerTon = r.InspectionSurchargePerTon,
-                FreightPerTon = r.FreightPerTon,
-                FinalPricePerTon = r.FinalPricePerTon,
-                FullDescription = r.FullDescription,
-                PlateParametersJson = System.Text.Json.JsonSerializer.Serialize(r.PlateParameters)
-            }).ToList();
+            var seedRecords = SeedProvenanceRecords.AllRecords.Select(r => MaterialProvenanceRecordEntity.FromDomain(r)).ToList();
 
             db.MaterialProvenanceRecords.AddRange(seedRecords);
             db.SaveChanges();
