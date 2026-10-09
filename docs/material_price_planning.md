@@ -246,7 +246,74 @@ graph TD
 
 ---
 
-## 八、落地方案与代码改造路线图 (Proposed Changes)
+## 八、用户自主规则配置与数据库持久化体系 (v5.0 核心突破)
+
+针对实际工程商务谈判与供应链变动，系统确立了**“基准参考 + 自主微调 + 矩阵配置 + 数据库持久化”**的灵活架构：
+
+```mermaid
+graph TD
+    subgraph UIInteraction["前端交互层 (MaterialPriceWorkbench.razor)"]
+        ThkInput["板厚加价: 参考阶梯 + 自由输入修改 + [恢复基准]"]
+        DimInput["尺寸加价: 规则参考 + 自由输入修改 + [恢复参考]"]
+        MillInput["钢厂溢价: 参考基准 + 实付溢价修改 + [恢复参考]"]
+        FreightInput["调运运费: 预设运费 + 实际运费修改 + [恢复预设]"]
+        ConfigMatrix["阶梯矩阵配置: 7级厚度区间可编辑表 + 5项尺寸规则表"]
+    end
+
+    subgraph RuleEngineLayer["规则与计算引擎 (PlatePricingRuleEngine)"]
+        Eval["优先采用用户手动设定值 (CustomValue)；<br/>若为空则按规则阶梯自动解算 (EffectiveSurcharge)；<br/>输出详细命中原则说明 (PrincipleExplanation) 与时序快照关联"]
+    end
+
+    subgraph DBPersistenceLayer["数据库持久化层 (EF Core + SQLite)"]
+        T1["PlateThicknessLadders (板厚7级加价阶梯表)"]
+        T2["PlateDimensionRules (板宽与定尺5大规则表)"]
+        T3["SteelMills & SteelMillSnapshotPremiums (钢厂品牌与时序溢价表)"]
+        T4["FreightRoutes (全国与出口物流调运费率表)"]
+    end
+
+    UIInteraction --> RuleEngineLayer
+    RuleEngineLayer --> DBPersistenceLayer
+```
+
+### 1. 钢板厚度加价原则透明化与自主设置
+* **加价原则透明公开**：
+  * $t < 8\text{mm}$：极薄规格板加价（薄辊轧制与慢速下料，参考 +¥120/t）
+  * $8\text{mm} \le t < 14\text{mm}$：次基准常用板（常规中板，参考 +¥50/t）
+  * $14\text{mm} \le t \le 20\text{mm}$：**行业黄金基价点**（全国钢厂出厂基价点，¥0 加价）
+  * $20\text{mm} < t \le 40\text{mm}$：常用中厚板（重载梁柱主力规格，参考 +¥80/t）
+  * $40\text{mm} < t \le 60\text{mm}$：特厚板（大压下量与心部致密性工艺加价，参考 +¥180/t）
+  * $60\text{mm} < t \le 100\text{mm}$：超厚板（特厚坯连铸连轧、心部探伤与偏析控制加价，参考 +¥380/t）
+  * $t > 100\text{mm}$：极厚板（大型模铸大型钢锭锻压轧制，参考 +¥650/t）
+* **自主设置与微调**：
+  * 在当前板厚输入旁提供可直接编辑的加价输入框，支持用户任意改写；
+  * 提供 `[恢复基准]` 一键复原按钮；
+  * 提供展开式阶梯配置表，用户可修改任意区间的阶梯价并一键保存到数据库。
+
+### 2. 板宽与定尺尺寸加价原则透明化与自主设置
+* **原则与规则清单**：
+  * `FixedCut`：定宽定尺加价（常规开平板剪切下料，参考 +¥60/t）
+  * `SmallCut`：小定尺精密下料（单张板长 $< 4\text{m}$，剪切刀次增加与余料损耗补偿，参考 +¥100/t）
+  * `SuperWide_2800`：特宽板（$2800\text{mm} < \text{宽} \le 3200\text{mm}$，特大宽厚板轧机专轧，参考 +¥160/t）
+  * `SuperWide_3200`：超宽板（板宽 $> 3200\text{mm}$，5m 极宽轧机专轧与超宽大件运输，参考 +¥280/t）
+  * `SuperLong_15m`：超长板（板长 $> 15\text{m}$，冷却平直度控制与长途超长车辆运输，参考 +¥180/t）
+* **自主设置**：支持用户直接在界面上自定义实付尺寸加价，并可随时重置回规则计算参考值。
+
+### 3. 钢厂品牌溢价与时序关联
+* **参考基准与直接编辑**：选择钢厂品牌（如宝钢、沙钢、津西、南钢等）时带入先期参考溢价，旁边配有可直接输入的实付溢价框；
+* **时序快照关联**：溢价规则与当前价格快照（Snapshot）关联绑定，不同时期可沉淀不同的钢厂溢价数据。
+
+### 4. 区域调运物流费自主调整
+* **先期设定与现场微调**：选择浙江车间（预设 ¥50）、广东现场（预设 ¥200）、上海港 FOB（预设 ¥220）等路线时，先给出先期设定参考值，用户可根据当前物流车队实际运价自由填写。
+
+### 5. 材料数据库持久化表结构
+* `PlateThicknessLadders`：存储各厚度区间 $MinThickness \sim MaxThickness$ 的基准加价与自定义加价；
+* `PlateDimensionRules`：存储各定尺与超宽超长规则的基准加价与自定义加价；
+* `SteelMills` & `SteelMillSnapshotPremiums`：存储各钢厂品牌及其在不同快照时期的溢价记录；
+* `FreightRoutes`：存储各大产地到各工程区域与出口港口的路线运费记录。
+
+---
+
+## 九、落地方案与工程落地架构 (v5.0 更新)
 
 ```text
 src/
@@ -288,7 +355,7 @@ src/
 
 ---
 
-## 九、验证方案 (Verification Plan)
+## 十、验证方案 (Verification Plan)
 
 ### 1. 自动化单元测试 (`MaterialPricingTests.cs`)
 1. **多国标准适配测试**：

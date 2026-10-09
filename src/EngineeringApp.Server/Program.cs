@@ -128,16 +128,107 @@ app.MapGet("/api/pricing/snapshots", async (AppDbContext db) =>
     return Results.Ok(snapshots);
 });
 
-// 9. 获取全国及国际钢厂品牌字典
-app.MapGet("/api/pricing/mills", () =>
+// 9. 获取全国及国际钢厂品牌字典 (从数据库持久化层获取)
+app.MapGet("/api/pricing/mills", async (AppDbContext db) =>
 {
-    return Results.Ok(EngineeringApp.Shared.Material.Pricing.SeedSteelMills.AllMills);
+    var mills = await db.SteelMills.OrderBy(m => m.Tier).ThenBy(m => m.Id).ToListAsync();
+    return Results.Ok(mills);
 });
 
-// 10. 获取物流调运路线费率库
-app.MapGet("/api/pricing/routes", () =>
+// 9.1 更新钢厂自定义溢价
+app.MapPut("/api/pricing/mills/{millId}", async (string millId, double? customPremium, AppDbContext db) =>
 {
-    return Results.Ok(EngineeringApp.Shared.Material.Pricing.SeedFreightRoutes.AllRoutes);
+    var mill = await db.SteelMills.FirstOrDefaultAsync(m => m.MillId == millId);
+    if (mill == null) return Results.NotFound();
+    mill.CustomPremiumPerTon = customPremium;
+    await db.SaveChangesAsync();
+    return Results.Ok(mill);
+});
+
+// 10. 获取物流调运路线费率库 (从数据库持久化层获取)
+app.MapGet("/api/pricing/routes", async (AppDbContext db) =>
+{
+    var routes = await db.FreightRoutes.OrderBy(r => r.Id).ToListAsync();
+    return Results.Ok(routes);
+});
+
+// 10.1 更新物流路线调运费
+app.MapPut("/api/pricing/routes/{routeId}", async (string routeId, double? customFreight, AppDbContext db) =>
+{
+    var route = await db.FreightRoutes.FirstOrDefaultAsync(r => r.RouteId == routeId);
+    if (route == null) return Results.NotFound();
+    route.CustomFreightPerTon = customFreight;
+    await db.SaveChangesAsync();
+    return Results.Ok(route);
+});
+
+// 10.2 获取板厚加价阶梯表
+app.MapGet("/api/pricing/rules/thickness-ladders", async (AppDbContext db) =>
+{
+    var ladders = await db.PlateThicknessLadders.OrderBy(l => l.MinThicknessMm).ToListAsync();
+    return Results.Ok(ladders);
+});
+
+// 10.3 批量保存板厚加价阶梯
+app.MapPut("/api/pricing/rules/thickness-ladders", async (List<PlateThicknessLadderEntity> input, AppDbContext db) =>
+{
+    foreach (var item in input)
+    {
+        var existing = await db.PlateThicknessLadders.FindAsync(item.Id);
+        if (existing != null)
+        {
+            existing.CustomSurcharge = item.CustomSurcharge;
+            existing.Description = item.Description;
+        }
+    }
+    await db.SaveChangesAsync();
+    return Results.Ok(await db.PlateThicknessLadders.OrderBy(l => l.MinThicknessMm).ToListAsync());
+});
+
+// 10.4 获取定尺与尺寸加价规则表
+app.MapGet("/api/pricing/rules/dimension-rules", async (AppDbContext db) =>
+{
+    var rules = await db.PlateDimensionRules.OrderBy(r => r.Id).ToListAsync();
+    return Results.Ok(rules);
+});
+
+// 10.5 批量保存定尺与尺寸加价规则
+app.MapPut("/api/pricing/rules/dimension-rules", async (List<PlateDimensionRuleEntity> input, AppDbContext db) =>
+{
+    foreach (var item in input)
+    {
+        var existing = await db.PlateDimensionRules.FindAsync(item.Id);
+        if (existing != null)
+        {
+            existing.CustomSurcharge = item.CustomSurcharge;
+            existing.Name = item.Name;
+        }
+    }
+    await db.SaveChangesAsync();
+    return Results.Ok(await db.PlateDimensionRules.OrderBy(r => r.Id).ToListAsync());
+});
+
+// 10.6 恢复所有加价规则与运费为行业出厂基准
+app.MapPost("/api/pricing/rules/reset-defaults", async (AppDbContext db) =>
+{
+    // 重置厚度阶梯
+    var ladders = await db.PlateThicknessLadders.ToListAsync();
+    foreach (var l in ladders) l.CustomSurcharge = null;
+
+    // 重置尺寸规则
+    var dimRules = await db.PlateDimensionRules.ToListAsync();
+    foreach (var d in dimRules) d.CustomSurcharge = null;
+
+    // 重置钢厂溢价
+    var mills = await db.SteelMills.ToListAsync();
+    foreach (var m in mills) m.CustomPremiumPerTon = null;
+
+    // 重置路线运费
+    var routes = await db.FreightRoutes.ToListAsync();
+    foreach (var r in routes) r.CustomFreightPerTon = null;
+
+    await db.SaveChangesAsync();
+    return Results.Ok(new { Message = "All pricing rules and logistics routes have been reset to benchmark defaults." });
 });
 
 // 11. 钢板多维加价核算接口

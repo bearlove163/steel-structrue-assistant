@@ -226,4 +226,113 @@ public class MaterialPricingTests
         Assert.True(pricingResult.TotalDirectCost > 0);
         Assert.True(pricingResult.DirectUnitPricePerTon > 0);
     }
+
+    [Fact]
+    public void PlatePricing_CustomThicknessSurcharge_OverridesLadderAndExplainsPrinciple()
+    {
+        // 场景：50mm 厚板，行业标准阶梯为 40~60mm (+180 元/t)
+        // 用户自主将厚度加价微调设定为 130 元/t
+        var p = new PlatePricingParameters
+        {
+            Standard = StandardSystem.GB,
+            Grade = SteelGrade.Q355B,
+            ThicknessMm = 50.0,
+            SteelMillId = "Baosteel",
+            CustomThicknessSurcharge = 130.0
+        };
+
+        var result = PlatePricingRuleEngine.Calculate(p);
+
+        Assert.Equal(180.0, result.BenchmarkThicknessSurcharge);
+        Assert.Equal(130.0, result.ThicknessSurchargePerTon);
+        Assert.True(result.IsThicknessSurchargeCustomized);
+        Assert.Contains("用户自主微调", result.ThicknessPrincipleExplanation);
+        Assert.Contains("180", result.ThicknessPrincipleExplanation);
+    }
+
+    [Fact]
+    public void PlatePricing_CustomDimensionSurcharge_OverridesDimensionRules()
+    {
+        // 场景：定宽定尺(60) + 特宽板2900mm(160)，规则合计参考为 220 元/t
+        // 用户自主将定尺/超限加价微调设定为 150 元/t
+        var p = new PlatePricingParameters
+        {
+            Standard = StandardSystem.GB,
+            Grade = SteelGrade.Q355B,
+            WidthMm = 2900.0,
+            CutType = PlateDimensionCutType.FixedDimension,
+            CustomDimensionSurcharge = 150.0
+        };
+
+        var result = PlatePricingRuleEngine.Calculate(p);
+
+        Assert.Equal(220.0, result.BenchmarkDimensionSurcharge);
+        Assert.Equal(150.0, result.DimensionSurchargePerTon);
+        Assert.True(result.IsDimensionSurchargeCustomized);
+        Assert.Contains("用户自主微调", result.DimensionPrincipleExplanation);
+    }
+
+    [Fact]
+    public void PlatePricing_CustomMillPremium_OverridesBenchmarkAndTracksTemporal()
+    {
+        // 场景：宝钢参考溢价为 200 元/t
+        // 用户根据当前采购期实际议价，自主设定为 110 元/t
+        var p = new PlatePricingParameters
+        {
+            Standard = StandardSystem.GB,
+            Grade = SteelGrade.Q355B,
+            SteelMillId = "Baosteel",
+            CustomMillPremium = 110.0
+        };
+
+        var result = PlatePricingRuleEngine.Calculate(p);
+
+        Assert.Equal(200.0, result.BenchmarkMillPremium);
+        Assert.Equal(110.0, result.MillPremiumPerTon);
+        Assert.True(result.IsMillPremiumCustomized);
+    }
+
+    [Fact]
+    public void PlatePricing_CustomFreight_OverridesPresetFreight()
+    {
+        // 场景：广东工程现场预设路线运费为 200 元/t
+        // 用户联系回程货运车队，将实际调运费调整为 160 元/t
+        var p = new PlatePricingParameters
+        {
+            Standard = StandardSystem.GB,
+            Grade = SteelGrade.Q355B,
+            SteelMillId = "Baosteel",
+            Delivery = DeliveryCondition.Delivered_JobSite,
+            DestinationRegion = "华南-广东工程现场",
+            CustomFreightPerTon = 160.0
+        };
+
+        var result = PlatePricingRuleEngine.Calculate(p);
+
+        Assert.Equal(200.0, result.BenchmarkFreight);
+        Assert.Equal(160.0, result.FreightPerTon);
+        Assert.True(result.IsFreightCustomized);
+    }
+
+    [Fact]
+    public void PlatePricing_CustomThicknessLadderMatrix_AppliesConfiguredLadders()
+    {
+        // 场景：用户修改全局阶梯矩阵，将 40~60mm 特厚板从默认 180 调整为 210
+        var customLadders = PlateThicknessLadder.GetDefaultLadders();
+        var targetLadder = customLadders.First(l => l.Matches(50.0));
+        targetLadder.CustomSurcharge = 210.0;
+
+        var p = new PlatePricingParameters
+        {
+            Standard = StandardSystem.GB,
+            Grade = SteelGrade.Q355B,
+            ThicknessMm = 50.0,
+            SteelMillId = "Baosteel"
+        };
+
+        var result = PlatePricingRuleEngine.Calculate(p, customLadders: customLadders);
+
+        Assert.Equal(210.0, result.ThicknessSurchargePerTon);
+        Assert.True(result.IsThicknessSurchargeCustomized);
+    }
 }

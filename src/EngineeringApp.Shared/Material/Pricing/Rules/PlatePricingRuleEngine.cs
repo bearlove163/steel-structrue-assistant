@@ -8,7 +8,11 @@ public static class PlatePricingRuleEngine
     /// <summary>
     /// 对给定的钢板加价参数及价格快照进行全要素采购价格核算
     /// </summary>
-    public static StandardMaterialItemPrice Calculate(PlatePricingParameters parameters, MaterialPriceSnapshot? snapshot = null)
+    public static StandardMaterialItemPrice Calculate(
+        PlatePricingParameters parameters,
+        MaterialPriceSnapshot? snapshot = null,
+        IList<PlateThicknessLadder>? customLadders = null,
+        IList<PlateDimensionRule>? customDimRules = null)
     {
         ArgumentNullException.ThrowIfNull(parameters);
         snapshot ??= SeedPriceSnapshots.Latest;
@@ -29,14 +33,62 @@ public static class PlatePricingRuleEngine
         // 1. 基准大盘单价
         result.BasePricePerTon = strategy.GetBasePrice(snapshot, parameters.Grade, isPlate: true);
 
-        // 2. 钢厂品牌溢价
-        result.MillPremiumPerTon = mill.BrandPremiumPerTon;
+        // 2. 钢厂品牌溢价 (支持用户直接修改或采用参考基准)
+        result.BenchmarkMillPremium = mill.BrandPremiumPerTon;
+        if (parameters.CustomMillPremium.HasValue)
+        {
+            result.MillPremiumPerTon = parameters.CustomMillPremium.Value;
+            result.IsMillPremiumCustomized = Math.Abs(result.MillPremiumPerTon - result.BenchmarkMillPremium) > 0.001;
+        }
+        else
+        {
+            result.MillPremiumPerTon = result.BenchmarkMillPremium;
+            result.IsMillPremiumCustomized = false;
+        }
 
-        // 3. 规格厚度加价阶梯 (行业标准中厚板加价单)
-        result.ThicknessSurchargePerTon = CalculateThicknessSurcharge(parameters.ThicknessMm);
+        // 3. 规格厚度加价阶梯 (支持阶梯匹配、用户自定义及透明规则解释)
+        var ladders = (customLadders != null && customLadders.Count > 0)
+            ? customLadders
+            : PlateThicknessLadder.GetDefaultLadders();
 
-        // 4. 定尺与超限加价
-        result.DimensionSurchargePerTon = CalculateDimensionSurcharge(parameters);
+        var matchedLadder = ladders.FirstOrDefault(l => l.Matches(parameters.ThicknessMm))
+            ?? (parameters.ThicknessMm <= 0 ? ladders[0] : ladders[^1]);
+
+        result.BenchmarkThicknessSurcharge = matchedLadder.BenchmarkSurcharge;
+
+        if (parameters.CustomThicknessSurcharge.HasValue)
+        {
+            result.ThicknessSurchargePerTon = parameters.CustomThicknessSurcharge.Value;
+            result.IsThicknessSurchargeCustomized = Math.Abs(result.ThicknessSurchargePerTon - result.BenchmarkThicknessSurcharge) > 0.001;
+            result.ThicknessPrincipleExplanation = $"【用户自主微调】¥{result.ThicknessSurchargePerTon:0.##}/t (命中标准: {matchedLadder.Description}, 行业参考: ¥{matchedLadder.BenchmarkSurcharge:0.##}/t)";
+        }
+        else
+        {
+            result.ThicknessSurchargePerTon = matchedLadder.EffectiveSurcharge;
+            result.IsThicknessSurchargeCustomized = matchedLadder.IsCustomized;
+            result.ThicknessPrincipleExplanation = $"命中规则: {matchedLadder.Description} (基准加价: ¥{matchedLadder.EffectiveSurcharge:0.##}/t)";
+        }
+
+        // 4. 定尺与超限加价 (支持规则匹配与自主设定)
+        var dimRules = (customDimRules != null && customDimRules.Count > 0)
+            ? customDimRules
+            : PlateDimensionRule.GetDefaultRules();
+
+        var (calcDimSurcharge, dimExplanation) = EvaluateDimensionRules(parameters, dimRules);
+        result.BenchmarkDimensionSurcharge = calcDimSurcharge;
+
+        if (parameters.CustomDimensionSurcharge.HasValue)
+        {
+            result.DimensionSurchargePerTon = parameters.CustomDimensionSurcharge.Value;
+            result.IsDimensionSurchargeCustomized = Math.Abs(result.DimensionSurchargePerTon - result.BenchmarkDimensionSurcharge) > 0.001;
+            result.DimensionPrincipleExplanation = $"【用户自主微调】¥{result.DimensionSurchargePerTon:0.##}/t (规则计算参考: ¥{result.BenchmarkDimensionSurcharge:0.##}/t, {dimExplanation})";
+        }
+        else
+        {
+            result.DimensionSurchargePerTon = result.BenchmarkDimensionSurcharge;
+            result.IsDimensionSurchargeCustomized = false;
+            result.DimensionPrincipleExplanation = dimExplanation;
+        }
 
         // 5. 公差精度加价 (含保全厚度与平整度)
         double tolSurcharge = strategy.GetToleranceSurcharge(parameters.Tolerance);
@@ -65,8 +117,19 @@ public static class PlatePricingRuleEngine
         // 8. 工艺成型加价 (平板加工为 0)
         result.ProcessSurchargePerTon = 0.0;
 
-        // 9. 物流调运费
-        result.FreightPerTon = FreightCalculator.Calculate(parameters.SteelMillId, parameters.Delivery, parameters.DestinationRegion);
+        // 9. 物流调运费 (支持用户直接修改或采用路线参考值)
+        double benchmarkFreight = FreightCalculator.Calculate(parameters.SteelMillId, parameters.Delivery, parameters.DestinationRegion);
+        result.BenchmarkFreight = benchmarkFreight;
+        if (parameters.CustomFreightPerTon.HasValue)
+        {
+            result.FreightPerTon = parameters.CustomFreightPerTon.Value;
+            result.IsFreightCustomized = Math.Abs(result.FreightPerTon - result.BenchmarkFreight) > 0.001;
+        }
+        else
+        {
+            result.FreightPerTon = benchmarkFreight;
+            result.IsFreightCustomized = false;
+        }
 
         // 10. 格式化标准材质标注
         result.StandardSpecification = strategy.FormatStandardSpecification(
@@ -90,41 +153,66 @@ public static class PlatePricingRuleEngine
     /// <summary>
     /// 标准行业厚度加价阶梯表 (元/吨)
     /// </summary>
-    public static double CalculateThicknessSurcharge(double thicknessMm)
+    public static double CalculateThicknessSurcharge(double thicknessMm, IList<PlateThicknessLadder>? ladders = null)
     {
-        if (thicknessMm < 8.0) return 120.0;      // 薄板薄辊加价
-        if (thicknessMm < 14.0) return 50.0;     // 8~12mm 次基准
-        if (thicknessMm <= 20.0) return 0.0;     // 14~20mm 行业黄金基价点 (0元)
-        if (thicknessMm <= 40.0) return 80.0;    // 22~40mm 常用厚板加价
-        if (thicknessMm <= 60.0) return 180.0;   // 42~60mm 特厚板加价
-        if (thicknessMm <= 100.0) return 380.0;  // 62~100mm 超厚板心部质量保证
-        return 650.0;                            // >100mm 极厚板大型锭轧加价
+        var list = (ladders != null && ladders.Count > 0) ? ladders : PlateThicknessLadder.GetDefaultLadders();
+        var match = list.FirstOrDefault(l => l.Matches(thicknessMm));
+        if (match != null) return match.EffectiveSurcharge;
+        if (thicknessMm < 8.0) return 120.0;
+        return 650.0;
     }
 
-    private static double CalculateDimensionSurcharge(PlatePricingParameters p)
+    private static (double Surcharge, string Explanation) EvaluateDimensionRules(PlatePricingParameters p, IList<PlateDimensionRule> rules)
     {
-        double surcharge = 0.0;
+        double total = 0.0;
+        var details = new List<string>();
+
+        // 定尺判定
         if (p.CutType == PlateDimensionCutType.FixedDimension)
         {
-            surcharge += 60.0;
+            var rule = rules.FirstOrDefault(r => r.RuleCode == "FixedCut") ?? new PlateDimensionRule { BenchmarkSurcharge = 60.0 };
+            double val = rule.EffectiveSurcharge;
+            total += val;
+            details.Add($"定宽定尺(+¥{val:0})");
         }
         else if (p.CutType == PlateDimensionCutType.SmallCut)
         {
-            surcharge += 100.0;
+            var rule = rules.FirstOrDefault(r => r.RuleCode == "SmallCut") ?? new PlateDimensionRule { BenchmarkSurcharge = 100.0 };
+            double val = rule.EffectiveSurcharge;
+            total += val;
+            details.Add($"小定尺精密下料(+¥{val:0})");
         }
 
-        // 超宽超长加价
-        if (p.CutType == PlateDimensionCutType.SuperWide || p.WidthMm > 2800.0)
+        // 超宽判定 (根据宽度 mm 触发)
+        if (p.WidthMm > 3200.0)
         {
-            surcharge += (p.WidthMm > 3200.0) ? 280.0 : 160.0;
+            var rule = rules.FirstOrDefault(r => r.RuleCode == "SuperWide_3200") ?? new PlateDimensionRule { BenchmarkSurcharge = 280.0 };
+            double val = rule.EffectiveSurcharge;
+            total += val;
+            details.Add($"超宽板宽度{p.WidthMm:0}mm>3200(+¥{val:0})");
+        }
+        else if (p.CutType == PlateDimensionCutType.SuperWide || p.WidthMm > 2800.0)
+        {
+            var rule = rules.FirstOrDefault(r => r.RuleCode == "SuperWide_2800") ?? new PlateDimensionRule { BenchmarkSurcharge = 160.0 };
+            double val = rule.EffectiveSurcharge;
+            total += val;
+            details.Add($"特宽板宽度{p.WidthMm:0}mm>2800(+¥{val:0})");
         }
 
+        // 超长判定
         if (p.CutType == PlateDimensionCutType.SuperLong || p.LengthMm > 15000.0)
         {
-            surcharge += 180.0;
+            var rule = rules.FirstOrDefault(r => r.RuleCode == "SuperLong_15m") ?? new PlateDimensionRule { BenchmarkSurcharge = 180.0 };
+            double val = rule.EffectiveSurcharge;
+            total += val;
+            details.Add($"超长板长度{p.LengthMm:0}mm>15m(+¥{val:0})");
         }
 
-        return surcharge;
+        string explanation = details.Count > 0
+            ? string.Join("，", details)
+            : "标准散尺尺寸，无定尺/超限加价 (¥0)";
+
+        return (total, explanation);
     }
 
     private static string FormatDeliveryText(DeliveryCondition delivery, string destination, double freight)

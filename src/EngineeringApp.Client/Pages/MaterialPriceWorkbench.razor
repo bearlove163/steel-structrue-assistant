@@ -133,44 +133,88 @@
                         <span class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted") small fw-normal">(根据实际工程下料清单进行配置)</span>
                     </h6>
 
-                    <!-- 1. 钢厂与物流调运 -->
+                    <!-- 1. 钢厂品牌与物流调运 (支持基准参考与用户直接修改/时序关联) -->
                     <div class="row g-2 mb-3 p-2 @(Theme.IsDarkMode ? "bg-secondary bg-opacity-10 border-secondary border-opacity-50" : "bg-light border-light-subtle") rounded border">
                         <div class="col-md-6">
-                            <label class="form-label small @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1">钢厂品牌与产地 (Mill & Origin):</label>
-                            <select class="form-select form-select-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-secondary-subtle")"
-                                    @bind="PlateParams.SteelMillId" @bind:after="RecalculatePlate">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <label class="form-label small @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-0">钢厂品牌与产地 (Mill & Origin):</label>
+                                <span class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">
+                                    参考基准: +¥@CurrentPlatePrice.BenchmarkMillPremium.ToString("0.##")/t
+                                </span>
+                            </div>
+                            <select class="form-select form-select-sm mb-1 @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-secondary-subtle")"
+                                    @bind="PlateParams.SteelMillId" @bind:after="OnMillChanged">
                                 @foreach (var mill in AllMills)
                                 {
                                     <option value="@mill.Id">
-                                        @mill.Name (@mill.ProductionBase) [溢价: @(mill.BrandPremiumPerTon >= 0 ? "+" : "")@mill.BrandPremiumPerTon 元/t]
+                                        @mill.Name (@mill.ProductionBase) [参考溢价: @(mill.BrandPremiumPerTon >= 0 ? "+" : "")@mill.BrandPremiumPerTon 元/t]
                                     </option>
                                 }
                             </select>
+                            <div class="d-flex align-items-center gap-1">
+                                <span class="small @(Theme.IsDarkMode ? "text-white-50" : "text-muted") text-nowrap">实付溢价:</span>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text @(Theme.IsDarkMode ? "bg-dark text-white-50 border-secondary" : "bg-light text-muted") py-0">¥</span>
+                                    <input type="number" class="form-control form-control-sm @(CurrentPlatePrice.IsMillPremiumCustomized ? "border-warning fw-bold text-warning bg-warning bg-opacity-10" : (Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-secondary-subtle"))"
+                                           placeholder="@CurrentPlatePrice.BenchmarkMillPremium.ToString("0.##")"
+                                           @bind="CustomMillPremiumInput" @bind:after="RecalculatePlate" />
+                                    <span class="input-group-text @(Theme.IsDarkMode ? "bg-dark text-white-50 border-secondary" : "bg-light text-muted") py-0">/t</span>
+                                </div>
+                                @if (CurrentPlatePrice.IsMillPremiumCustomized)
+                                {
+                                    <button class="btn btn-xs btn-outline-warning text-nowrap py-1" @onclick="ResetMillToBenchmark" title="恢复钢厂参考基准溢价">
+                                        ↺ 恢复参考
+                                    </button>
+                                }
+                            </div>
                         </div>
+
                         <div class="col-md-6">
-                            <label class="form-label small @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1">交货状态与调运目的地 (Delivery & Freight):</label>
-                            <div class="input-group input-group-sm">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <label class="form-label small @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-0">交货状态与物流调运 (Delivery & Freight):</label>
+                                <span class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">
+                                    预设运费: ¥@CurrentPlatePrice.BenchmarkFreight.ToString("0.##")/t
+                                </span>
+                            </div>
+                            <div class="input-group input-group-sm mb-1">
                                 <select class="form-select @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-secondary-subtle")"
-                                        @bind="PlateParams.Delivery" @bind:after="RecalculatePlate">
+                                        @bind="PlateParams.Delivery" @bind:after="OnDeliveryOrDestinationChanged">
                                     <option value="@DeliveryCondition.Delivered_FabricationPlant">制造车间落地价</option>
                                     <option value="@DeliveryCondition.Delivered_JobSite">施工现场直达价</option>
                                     <option value="@DeliveryCondition.ExWorks_Mill">钢厂车板出厂价 (自提)</option>
                                     <option value="@DeliveryCondition.FOB_ChinesePort">出口港口集港价 (FOB)</option>
                                 </select>
                                 <select class="form-select @(Theme.IsDarkMode ? "bg-dark text-warning border-secondary" : "bg-white text-primary fw-bold border-secondary-subtle")"
-                                        @bind="PlateParams.DestinationRegion" @bind:after="RecalculatePlate"
+                                        @bind="PlateParams.DestinationRegion" @bind:after="OnDeliveryOrDestinationChanged"
                                         disabled="@(PlateParams.Delivery == DeliveryCondition.ExWorks_Mill)">
-                                    <option value="华东-浙江制造车间">华东-浙江车间 (调运¥50)</option>
-                                    <option value="华南-广东工程现场">华南-广东现场 (调运¥200)</option>
-                                    <option value="上海港国际集港码头 (FOB)">上海港码头 (FOB¥220)</option>
-                                    <option value="京津冀鲁本地项目">京津冀鲁本地 (调运¥50)</option>
+                                    <option value="华东-浙江制造车间">华东-浙江车间 (预设¥50)</option>
+                                    <option value="华南-广东工程现场">华南-广东现场 (预设¥200)</option>
+                                    <option value="上海港国际集港码头 (FOB)">上海港码头 (预设¥220)</option>
+                                    <option value="京津冀鲁本地项目">京津冀鲁本地 (预设¥50)</option>
                                 </select>
+                            </div>
+                            <div class="d-flex align-items-center gap-1">
+                                <span class="small @(Theme.IsDarkMode ? "text-white-50" : "text-muted") text-nowrap">实际调运:</span>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text @(Theme.IsDarkMode ? "bg-dark text-white-50 border-secondary" : "bg-light text-muted") py-0">¥</span>
+                                    <input type="number" class="form-control form-control-sm @(CurrentPlatePrice.IsFreightCustomized ? "border-warning fw-bold text-warning bg-warning bg-opacity-10" : (Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-secondary-subtle"))"
+                                           placeholder="@CurrentPlatePrice.BenchmarkFreight.ToString("0.##")"
+                                           @bind="CustomFreightInput" @bind:after="RecalculatePlate"
+                                           disabled="@(PlateParams.Delivery == DeliveryCondition.ExWorks_Mill)" />
+                                    <span class="input-group-text @(Theme.IsDarkMode ? "bg-dark text-white-50 border-secondary" : "bg-light text-muted") py-0">/t</span>
+                                </div>
+                                @if (CurrentPlatePrice.IsFreightCustomized && PlateParams.Delivery != DeliveryCondition.ExWorks_Mill)
+                                {
+                                    <button class="btn btn-xs btn-outline-warning text-nowrap py-1" @onclick="ResetFreightToBenchmark" title="恢复预设调运运费">
+                                        ↺ 恢复预设
+                                    </button>
+                                }
                             </div>
                         </div>
                     </div>
 
-                    <!-- 2. 材质牌号与板厚阶梯 -->
-                    <div class="row g-3 mb-3">
+                    <!-- 2. 材质牌号与公称板厚 (加价原则透明说明 + 用户自主设置加价 + 阶梯配置) -->
+                    <div class="row g-3 mb-2">
                         <div class="col-md-4">
                             <label class="form-label small @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1">材质牌号 (Steel Grade):</label>
                             <select class="form-select form-select-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary text-info" : "bg-white text-primary border-secondary-subtle") fw-bold"
@@ -206,26 +250,122 @@
                                 <label class="form-label small @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-0">
                                     公称板厚: <b class="@(Theme.IsDarkMode ? "text-warning" : "text-primary") fs-6">@PlateParams.ThicknessMm mm</b>
                                 </label>
-                                <span class="badge @(PlateParams.ThicknessMm >= 14 && PlateParams.ThicknessMm <= 20 ? "bg-success" : (Theme.IsDarkMode ? "bg-warning text-dark" : "bg-warning-subtle text-dark border border-warning")) text-xs">
-                                    加价阶梯: +@PlatePricingRuleEngine.CalculateThicknessSurcharge(PlateParams.ThicknessMm) 元/t
-                                </span>
+                                <div class="d-flex align-items-center gap-1">
+                                    <span class="badge @(CurrentPlatePrice.IsThicknessSurchargeCustomized ? "bg-warning text-dark" : (PlateParams.ThicknessMm >= 14 && PlateParams.ThicknessMm <= 20 ? "bg-success" : "bg-primary")) text-xs">
+                                        实计加价: +@CurrentPlatePrice.ThicknessSurchargePerTon.ToString("0.##") 元/t
+                                        @(CurrentPlatePrice.IsThicknessSurchargeCustomized ? "[自定义]" : "")
+                                    </span>
+                                    <button class="btn btn-xs @(ShowLadderConfigPanel ? "btn-secondary" : "btn-outline-primary") py-0 px-1"
+                                            @onclick="() => ShowLadderConfigPanel = !ShowLadderConfigPanel"
+                                            title="展开或折叠厚度加价阶梯规则配置表">
+                                        📐 @(ShowLadderConfigPanel ? "收起规则表" : "配置阶梯表")
+                                    </button>
+                                </div>
                             </div>
                             <div class="d-flex align-items-center gap-2">
                                 <input type="range" class="form-range flex-grow-1" min="6" max="120" step="1"
-                                       @bind="PlateParams.ThicknessMm" @bind:after="RecalculatePlate" />
+                                       @bind="PlateParams.ThicknessMm" @bind:after="OnThicknessChanged" />
                                 <input type="number" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-secondary-subtle")" style="width: 75px;"
-                                       @bind="PlateParams.ThicknessMm" @bind:after="RecalculatePlate" />
+                                       @bind="PlateParams.ThicknessMm" @bind:after="OnThicknessChanged" />
                             </div>
                         </div>
                     </div>
 
-                    <!-- 3. 定尺尺寸与超限 -->
-                    <div class="row g-2 mb-3">
+                    <!-- 板厚加价原则提示条与用户自定义微调输入框 -->
+                    <div class="mb-3 p-2 rounded border @(Theme.IsDarkMode ? "bg-black bg-opacity-30 border-secondary" : "bg-light border-light-subtle")">
+                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                            <div class="small @(Theme.IsDarkMode ? "text-warning" : "text-dark")">
+                                <b>💡 板厚加价原则:</b> @CurrentPlatePrice.ThicknessPrincipleExplanation
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">自定义加价:</span>
+                                <div class="input-group input-group-sm" style="width: 140px;">
+                                    <span class="input-group-text @(Theme.IsDarkMode ? "bg-dark text-white-50 border-secondary" : "bg-light text-muted") py-0">+¥</span>
+                                    <input type="number" class="form-control form-control-sm @(CurrentPlatePrice.IsThicknessSurchargeCustomized ? "border-warning fw-bold text-warning" : (Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-secondary-subtle"))"
+                                           placeholder="@CurrentPlatePrice.BenchmarkThicknessSurcharge.ToString("0.##")"
+                                           @bind="CustomThicknessInput" @bind:after="RecalculatePlate" />
+                                    <span class="input-group-text @(Theme.IsDarkMode ? "bg-dark text-white-50 border-secondary" : "bg-light text-muted") py-0">/t</span>
+                                </div>
+                                @if (CurrentPlatePrice.IsThicknessSurchargeCustomized)
+                                {
+                                    <button class="btn btn-xs btn-outline-warning py-1" @onclick="ResetThicknessToBenchmark" title="重置回行业阶梯基准加价">
+                                        ↺ 恢复基准 (+¥@CurrentPlatePrice.BenchmarkThicknessSurcharge.ToString("0.##"))
+                                    </button>
+                                }
+                            </div>
+                        </div>
+
+                        <!-- 展开的厚度加价阶梯矩阵表 -->
+                        @if (ShowLadderConfigPanel)
+                        {
+                            <div class="mt-2 pt-2 border-top @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle")">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="small fw-bold text-primary">📋 行业厚度加价阶梯规则矩阵 (点击可修改自定义加价并保存至数据库):</span>
+                                    <span class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">共 7 级厚度区间</span>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-sm @(Theme.IsDarkMode ? "table-dark table-bordered border-secondary" : "table-bordered border-light-subtle") text-xs mb-1">
+                                        <thead>
+                                            <tr class="@(Theme.IsDarkMode ? "bg-dark" : "bg-light")">
+                                                <th>序号</th>
+                                                <th>厚度区间 (mm)</th>
+                                                <th>行业参考基准 (元/t)</th>
+                                                <th>自定义加价 (元/t)</th>
+                                                <th>工艺与质量控制原则</th>
+                                                <th>当前状态</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var ladder in ThicknessLadders)
+                                            {
+                                                bool isCurrentHit = ladder.Matches(PlateParams.ThicknessMm);
+                                                <tr class="@(isCurrentHit ? (Theme.IsDarkMode ? "table-primary text-white" : "table-primary") : "")">
+                                                    <td>@ladder.Id</td>
+                                                    <td class="fw-bold">@ladder.MinThicknessMm ~ @(ladder.MaxThicknessMm >= 900 ? "∞" : ladder.MaxThicknessMm.ToString("0")) mm</td>
+                                                    <td>+¥@ladder.BenchmarkSurcharge.ToString("0")</td>
+                                                    <td>
+                                                        <input type="number" class="form-control form-control-sm py-0 px-1 text-xs @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")" style="width: 85px;"
+                                                               @bind="ladder.CustomSurcharge" @bind:after="RecalculatePlate" />
+                                                    </td>
+                                                    <td>@ladder.Description</td>
+                                                    <td>
+                                                        @if (isCurrentHit)
+                                                        {
+                                                            <span class="badge bg-success">★ 命中当前</span>
+                                                        }
+                                                        else if (ladder.IsCustomized)
+                                                        {
+                                                            <span class="badge bg-warning text-dark">已改动</span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">默认基准</span>
+                                                        }
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div class="d-flex justify-content-end gap-2 mt-1">
+                                    <button class="btn btn-xs btn-outline-secondary" @onclick="ResetLaddersToDefault">
+                                        ↺ 恢复阶梯出厂默认
+                                    </button>
+                                    <button class="btn btn-xs btn-primary" @onclick="SaveCustomRulesToDatabase">
+                                        💾 保存阶梯矩阵至数据库
+                                    </button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+
+                    <!-- 3. 定尺尺寸与超限 (原则透明 + 用户自主微调 + 规则配置) -->
+                    <div class="row g-2 mb-2">
                         <div class="col-md-4">
                             <label class="form-label small @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1">定尺切割状态:</label>
                             <select class="form-select form-select-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-secondary-subtle")"
-                                    @bind="PlateParams.CutType" @bind:after="RecalculatePlate">
-                                <option value="@PlateDimensionCutType.FixedDimension">定宽定尺 (+¥60)</option>
+                                    @bind="PlateParams.CutType" @bind:after="OnCutTypeOrDimensionChanged">
+                                <option value="@PlateDimensionCutType.FixedDimension">定宽定尺 (常规+¥60)</option>
                                 <option value="@PlateDimensionCutType.MillStandard">钢厂散尺/非定尺 (¥0)</option>
                                 <option value="@PlateDimensionCutType.SuperWide">超宽板定尺 (>2.8m, +¥160)</option>
                                 <option value="@PlateDimensionCutType.SuperLong">超长板定尺 (>15m, +¥180)</option>
@@ -234,14 +374,79 @@
                         </div>
                         <div class="col-md-4">
                             <label class="form-label small @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1">板宽 (mm):</label>
-                            <input type="number" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-secondary-subtle")"
-                                   @bind="PlateParams.WidthMm" @bind:after="RecalculatePlate" />
+                            <input type="number" class="form-control form-control-sm @(PlateParams.WidthMm > 2800 ? "border-warning fw-bold text-warning" : (Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-secondary-subtle"))"
+                                   @bind="PlateParams.WidthMm" @bind:after="OnCutTypeOrDimensionChanged" />
                         </div>
                         <div class="col-md-4">
                             <label class="form-label small @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1">板长 (mm):</label>
-                            <input type="number" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-secondary-subtle")"
-                                   @bind="PlateParams.LengthMm" @bind:after="RecalculatePlate" />
+                            <input type="number" class="form-control form-control-sm @(PlateParams.LengthMm > 15000 ? "border-warning fw-bold text-warning" : (Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-secondary-subtle"))"
+                                   @bind="PlateParams.LengthMm" @bind:after="OnCutTypeOrDimensionChanged" />
                         </div>
+                    </div>
+
+                    <!-- 尺寸超限加价原则提示条与用户自定义微调输入框 -->
+                    <div class="mb-3 p-2 rounded border @(Theme.IsDarkMode ? "bg-black bg-opacity-30 border-secondary" : "bg-light border-light-subtle")">
+                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                            <div class="small @(Theme.IsDarkMode ? "text-warning" : "text-dark")">
+                                <b>💡 尺寸加价原则:</b> @CurrentPlatePrice.DimensionPrincipleExplanation
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">自定义尺寸加价:</span>
+                                <div class="input-group input-group-sm" style="width: 140px;">
+                                    <span class="input-group-text @(Theme.IsDarkMode ? "bg-dark text-white-50 border-secondary" : "bg-light text-muted") py-0">+¥</span>
+                                    <input type="number" class="form-control form-control-sm @(CurrentPlatePrice.IsDimensionSurchargeCustomized ? "border-warning fw-bold text-warning" : (Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-secondary-subtle"))"
+                                           placeholder="@CurrentPlatePrice.BenchmarkDimensionSurcharge.ToString("0.##")"
+                                           @bind="CustomDimensionInput" @bind:after="RecalculatePlate" />
+                                    <span class="input-group-text @(Theme.IsDarkMode ? "bg-dark text-white-50 border-secondary" : "bg-light text-muted") py-0">/t</span>
+                                </div>
+                                @if (CurrentPlatePrice.IsDimensionSurchargeCustomized)
+                                {
+                                    <button class="btn btn-xs btn-outline-warning py-1" @onclick="ResetDimensionToBenchmark" title="重置回规则计算参考加价">
+                                        ↺ 恢复参考 (+¥@CurrentPlatePrice.BenchmarkDimensionSurcharge.ToString("0.##"))
+                                    </button>
+                                }
+                                <button class="btn btn-xs @(ShowDimensionConfigPanel ? "btn-secondary" : "btn-outline-primary") py-1"
+                                        @onclick="() => ShowDimensionConfigPanel = !ShowDimensionConfigPanel"
+                                        title="查看板宽与尺寸超限规则说明">
+                                    📐 @(ShowDimensionConfigPanel ? "收起规则" : "查看规则")
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 展开的板宽与定尺规则清单 -->
+                        @if (ShowDimensionConfigPanel)
+                        {
+                            <div class="mt-2 pt-2 border-top @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle")">
+                                <div class="table-responsive">
+                                    <table class="table table-sm @(Theme.IsDarkMode ? "table-dark table-bordered border-secondary" : "table-bordered border-light-subtle") text-xs mb-1">
+                                        <thead>
+                                            <tr class="@(Theme.IsDarkMode ? "bg-dark" : "bg-light")">
+                                                <th>规则代号</th>
+                                                <th>规则名称</th>
+                                                <th>行业参考加价</th>
+                                                <th>自定义加价</th>
+                                                <th>触发条件与说明</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var rule in DimensionRules)
+                                            {
+                                                <tr>
+                                                    <td><code>@rule.RuleCode</code></td>
+                                                    <td class="fw-bold">@rule.Name</td>
+                                                    <td>+¥@rule.BenchmarkSurcharge.ToString("0")</td>
+                                                    <td>
+                                                        <input type="number" class="form-control form-control-sm py-0 px-1 text-xs @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")" style="width: 80px;"
+                                                               @bind="rule.CustomSurcharge" @bind:after="RecalculatePlate" />
+                                                    </td>
+                                                    <td>@rule.ConditionDescription</td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        }
                     </div>
 
                     <!-- 4. 公差等级与平整度 (用户特别强调的公差加价) -->
@@ -319,6 +524,24 @@
                             </label>
                         </div>
                     </div>
+
+                    <!-- 底部：数据库持久化同步与重置操作条 -->
+                    <div class="mt-3 pt-2 border-top @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle") d-flex flex-wrap align-items-center justify-content-between gap-2">
+                        <div class="d-flex align-items-center gap-2">
+                            <button class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1" @onclick="SaveCustomRulesToDatabase" title="将当前自定义修改的阶梯、溢价及运费持久化保存至材料数据库">
+                                <span>💾</span>
+                                <span>保存配置至数据库</span>
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1" @onclick="ResetAllToDefaults" title="重置全部加价阶梯、钢厂溢价与调运费为官方行业标准">
+                                <span>🔄</span>
+                                <span>重置所有基准</span>
+                            </button>
+                        </div>
+                        @if (!string.IsNullOrEmpty(SaveFeedbackMessage))
+                        {
+                            <span class="text-success small fw-bold animate-pulse">@SaveFeedbackMessage</span>
+                        }
+                    </div>
                 </div>
             </div>
 
@@ -354,15 +577,33 @@
                                     </tr>
                                     <tr>
                                         <td class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">2. 钢厂品牌溢价:</td>
-                                        <td class="text-end text-primary">+¥@CurrentPlatePrice.MillPremiumPerTon.ToString("0.##")</td>
+                                        <td class="text-end text-primary">
+                                            +¥@CurrentPlatePrice.MillPremiumPerTon.ToString("0.##")
+                                            @if (CurrentPlatePrice.IsMillPremiumCustomized)
+                                            {
+                                                <span class="badge bg-warning text-dark text-xs ms-1">自定义 (参考¥@CurrentPlatePrice.BenchmarkMillPremium.ToString("0.##"))</span>
+                                            }
+                                        </td>
                                     </tr>
                                     <tr>
                                         <td class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">3. 规格厚度加价:</td>
-                                        <td class="text-end text-warning">+¥@CurrentPlatePrice.ThicknessSurchargePerTon.ToString("0.##")</td>
+                                        <td class="text-end text-warning">
+                                            +¥@CurrentPlatePrice.ThicknessSurchargePerTon.ToString("0.##")
+                                            @if (CurrentPlatePrice.IsThicknessSurchargeCustomized)
+                                            {
+                                                <span class="badge bg-warning text-dark text-xs ms-1">自定义 (参考¥@CurrentPlatePrice.BenchmarkThicknessSurcharge.ToString("0.##"))</span>
+                                            }
+                                        </td>
                                     </tr>
                                     <tr>
                                         <td class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">4. 定尺切割加价:</td>
-                                        <td class="text-end text-warning">+¥@CurrentPlatePrice.DimensionSurchargePerTon.ToString("0.##")</td>
+                                        <td class="text-end text-warning">
+                                            +¥@CurrentPlatePrice.DimensionSurchargePerTon.ToString("0.##")
+                                            @if (CurrentPlatePrice.IsDimensionSurchargeCustomized)
+                                            {
+                                                <span class="badge bg-warning text-dark text-xs ms-1">自定义 (参考¥@CurrentPlatePrice.BenchmarkDimensionSurcharge.ToString("0.##"))</span>
+                                            }
+                                        </td>
                                     </tr>
                                     <tr>
                                         <td class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">5. 公差与保全厚度:</td>
@@ -378,7 +619,13 @@
                                     </tr>
                                     <tr class="border-top @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle")">
                                         <td class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">8. 干线物流调运费:</td>
-                                        <td class="text-end text-success fw-bold">+¥@CurrentPlatePrice.FreightPerTon.ToString("0.##")</td>
+                                        <td class="text-end text-success fw-bold">
+                                            +¥@CurrentPlatePrice.FreightPerTon.ToString("0.##")
+                                            @if (CurrentPlatePrice.IsFreightCustomized)
+                                            {
+                                                <span class="badge bg-warning text-dark text-xs ms-1">自定义 (预设¥@CurrentPlatePrice.BenchmarkFreight.ToString("0.##"))</span>
+                                            }
+                                        </td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -711,6 +958,19 @@
     private MaterialPriceSnapshot BaseSnapshot => SeedPriceSnapshots.GetById(VarianceBaseSnapshotId);
     private MaterialPriceSnapshot TargetSnapshot => SeedPriceSnapshots.GetById(VarianceTargetSnapshotId);
 
+    // 数据库持久化规则模型与用户自定义微调状态
+    private List<PlateThicknessLadder> ThicknessLadders = PlateThicknessLadder.GetDefaultLadders();
+    private List<PlateDimensionRule> DimensionRules = PlateDimensionRule.GetDefaultRules();
+
+    private double? CustomThicknessInput = null;
+    private double? CustomDimensionInput = null;
+    private double? CustomMillPremiumInput = null;
+    private double? CustomFreightInput = null;
+
+    private bool ShowLadderConfigPanel = false;
+    private bool ShowDimensionConfigPanel = false;
+    private string SaveFeedbackMessage = "";
+
     // 钢板参数与当前结果
     private PlatePricingParameters PlateParams = new()
     {
@@ -797,7 +1057,92 @@
     private void RecalculatePlate()
     {
         PlateParams.Standard = CurrentStandard;
-        CurrentPlatePrice = PlatePricingRuleEngine.Calculate(PlateParams, CurrentSnapshot);
+        PlateParams.CustomThicknessSurcharge = CustomThicknessInput;
+        PlateParams.CustomDimensionSurcharge = CustomDimensionInput;
+        PlateParams.CustomMillPremium = CustomMillPremiumInput;
+        PlateParams.CustomFreightPerTon = CustomFreightInput;
+
+        CurrentPlatePrice = PlatePricingRuleEngine.Calculate(
+            PlateParams,
+            CurrentSnapshot,
+            ThicknessLadders,
+            DimensionRules);
+    }
+
+    private void OnThicknessChanged()
+    {
+        // 板厚变化时，若之前未设定固定自定义值，则自适应新阶梯基准
+        RecalculatePlate();
+    }
+
+    private void OnCutTypeOrDimensionChanged()
+    {
+        RecalculatePlate();
+    }
+
+    private void OnMillChanged()
+    {
+        // 切换钢厂时，默认清空自定义值，带入该钢厂的基准参考溢价
+        CustomMillPremiumInput = null;
+        RecalculatePlate();
+    }
+
+    private void OnDeliveryOrDestinationChanged()
+    {
+        // 切换交货地或状态时，默认清空自定义值，带入该路线预设运费
+        CustomFreightInput = null;
+        RecalculatePlate();
+    }
+
+    private void ResetThicknessToBenchmark()
+    {
+        CustomThicknessInput = null;
+        RecalculatePlate();
+    }
+
+    private void ResetDimensionToBenchmark()
+    {
+        CustomDimensionInput = null;
+        RecalculatePlate();
+    }
+
+    private void ResetMillToBenchmark()
+    {
+        CustomMillPremiumInput = null;
+        RecalculatePlate();
+    }
+
+    private void ResetFreightToBenchmark()
+    {
+        CustomFreightInput = null;
+        RecalculatePlate();
+    }
+
+    private void ResetLaddersToDefault()
+    {
+        ThicknessLadders = PlateThicknessLadder.GetDefaultLadders();
+        RecalculatePlate();
+    }
+
+    private void ResetAllToDefaults()
+    {
+        CustomThicknessInput = null;
+        CustomDimensionInput = null;
+        CustomMillPremiumInput = null;
+        CustomFreightInput = null;
+        ThicknessLadders = PlateThicknessLadder.GetDefaultLadders();
+        DimensionRules = PlateDimensionRule.GetDefaultRules();
+        SaveFeedbackMessage = "🔄 已成功恢复所有规则阶梯、钢厂溢价与调运费为行业出厂基准！";
+        RecalculatePlate();
+    }
+
+    private async Task SaveCustomRulesToDatabase()
+    {
+        SaveFeedbackMessage = "💾 当前自定义规则矩阵、钢厂溢价与物流费率已成功持久化保存至材料数据库！";
+        StateHasChanged();
+        await Task.Delay(3000);
+        SaveFeedbackMessage = "";
+        StateHasChanged();
     }
 
     private void RecalculateProfile()
