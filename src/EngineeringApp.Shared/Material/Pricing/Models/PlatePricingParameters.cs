@@ -134,4 +134,10 @@ public class PlatePricingParameters
     public MetallurgyProcess Metallurgy { get; set; } = MetallurgyProcess.AsRolled;
     public UltrasonicInspection UT { get; set; } = UltrasonicInspection.None;
     public InspectionCertificateType Certificate { get; set; } = InspectionCertificateType.StandardMTC;
+
+    // 用户自主设定与微调覆盖 (若设定则优先采用用户自定义数值，为空则按行业阶梯/基准计算)
+    public double? CustomThicknessSurcharge { get; set; }
+    public double? CustomDimensionSurcharge { get; set; }
+    public double? CustomMillPremium { get; set; }
+    public double? CustomFreightPerTon { get; set; }
 }

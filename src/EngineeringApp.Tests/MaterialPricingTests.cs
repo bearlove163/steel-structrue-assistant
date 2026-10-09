@@ -226,4 +226,354 @@ public class MaterialPricingTests
         Assert.True(pricingResult.TotalDirectCost > 0);
         Assert.True(pricingResult.DirectUnitPricePerTon > 0);
     }
+
+    [Fact]
+    public void PlatePricing_CustomThicknessSurcharge_OverridesLadderAndExplainsPrinciple()
+    {
+        // 场景：50mm 厚板，行业标准阶梯为 40~60mm (+180 元/t)
+        // 用户自主将厚度加价微调设定为 130 元/t
+        var p = new PlatePricingParameters
+        {
+            Standard = StandardSystem.GB,
+            Grade = SteelGrade.Q355B,
+            ThicknessMm = 50.0,
+            SteelMillId = "Baosteel",
+            CustomThicknessSurcharge = 130.0
+        };
+
+        var result = PlatePricingRuleEngine.Calculate(p);
+
+        Assert.Equal(180.0, result.BenchmarkThicknessSurcharge);
+        Assert.Equal(130.0, result.ThicknessSurchargePerTon);
+        Assert.True(result.IsThicknessSurchargeCustomized);
+        Assert.Contains("用户自主微调", result.ThicknessPrincipleExplanation);
+        Assert.Contains("180", result.ThicknessPrincipleExplanation);
+    }
+
+    [Fact]
+    public void PlatePricing_CustomDimensionSurcharge_OverridesDimensionRules()
+    {
+        // 场景：定宽定尺(60) + 特宽板2900mm(160)，规则合计参考为 220 元/t
+        // 用户自主将定尺/超限加价微调设定为 150 元/t
+        var p = new PlatePricingParameters
+        {
+            Standard = StandardSystem.GB,
+            Grade = SteelGrade.Q355B,
+            WidthMm = 2900.0,
+            CutType = PlateDimensionCutType.FixedDimension,
+            CustomDimensionSurcharge = 150.0
+        };
+
+        var result = PlatePricingRuleEngine.Calculate(p);
+
+        Assert.Equal(220.0, result.BenchmarkDimensionSurcharge);
+        Assert.Equal(150.0, result.DimensionSurchargePerTon);
+        Assert.True(result.IsDimensionSurchargeCustomized);
+        Assert.Contains("用户自主微调", result.DimensionPrincipleExplanation);
+    }
+
+    [Fact]
+    public void PlatePricing_CustomMillPremium_OverridesBenchmarkAndTracksTemporal()
+    {
+        // 场景：宝钢参考溢价为 200 元/t
+        // 用户根据当前采购期实际议价，自主设定为 110 元/t
+        var p = new PlatePricingParameters
+        {
+            Standard = StandardSystem.GB,
+            Grade = SteelGrade.Q355B,
+            SteelMillId = "Baosteel",
+            CustomMillPremium = 110.0
+        };
+
+        var result = PlatePricingRuleEngine.Calculate(p);
+
+        Assert.Equal(200.0, result.BenchmarkMillPremium);
+        Assert.Equal(110.0, result.MillPremiumPerTon);
+        Assert.True(result.IsMillPremiumCustomized);
+    }
+
+    [Fact]
+    public void PlatePricing_CustomFreight_OverridesPresetFreight()
+    {
+        // 场景：广东工程现场预设路线运费为 200 元/t
+        // 用户联系回程货运车队，将实际调运费调整为 160 元/t
+        var p = new PlatePricingParameters
+        {
+            Standard = StandardSystem.GB,
+            Grade = SteelGrade.Q355B,
+            SteelMillId = "Baosteel",
+            Delivery = DeliveryCondition.Delivered_JobSite,
+            DestinationRegion = "华南-广东工程现场",
+            CustomFreightPerTon = 160.0
+        };
+
+        var result = PlatePricingRuleEngine.Calculate(p);
+
+        Assert.Equal(200.0, result.BenchmarkFreight);
+        Assert.Equal(160.0, result.FreightPerTon);
+        Assert.True(result.IsFreightCustomized);
+    }
+
+    [Fact]
+    public void PlatePricing_CustomThicknessLadderMatrix_AppliesConfiguredLadders()
+    {
+        // 场景：用户修改全局阶梯矩阵，将 40~60mm 特厚板从默认 180 调整为 210
+        var customLadders = PlateThicknessLadder.GetDefaultLadders();
+        var targetLadder = customLadders.First(l => l.Matches(50.0));
+        targetLadder.CustomSurcharge = 210.0;
+
+        var p = new PlatePricingParameters
+        {
+            Standard = StandardSystem.GB,
+            Grade = SteelGrade.Q355B,
+            ThicknessMm = 50.0,
+            SteelMillId = "Baosteel"
+        };
+
+        var result = PlatePricingRuleEngine.Calculate(p, customLadders: customLadders);
+
+        Assert.Equal(210.0, result.ThicknessSurchargePerTon);
+        Assert.True(result.IsThicknessSurchargeCustomized);
+    }
+
+    [Fact]
+    public void ProvenanceTagBuilder_GeneratesDeterministicTag_WithUniqueFingerprint()
+    {
+        var p1 = new PlatePricingParameters
+        {
+            Standard = StandardSystem.GB,
+            Grade = SteelGrade.Q355B,
+            ThicknessMm = 22.0,
+            WidthMm = 2500.0,
+            LengthMm = 12000.0,
+            Tolerance = ToleranceClass.ClassA,
+            SteelMillId = "NISCO",
+            DestinationRegion = "华南-广东工程现场"
+        };
+
+        var p2Identical = new PlatePricingParameters
+        {
+            Standard = StandardSystem.GB,
+            Grade = SteelGrade.Q355B,
+            ThicknessMm = 22.0,
+            WidthMm = 2500.0,
+            LengthMm = 12000.0,
+            Tolerance = ToleranceClass.ClassA,
+            SteelMillId = "NISCO",
+            DestinationRegion = "华南-广东工程现场"
+        };
+
+        var p3ModifiedTol = new PlatePricingParameters
+        {
+            Standard = StandardSystem.GB,
+            Grade = SteelGrade.Q355B,
+            ThicknessMm = 22.0,
+            WidthMm = 2500.0,
+            LengthMm = 12000.0,
+            Tolerance = ToleranceClass.ClassC, // 变为 C 类保全厚度
+            SteelMillId = "NISCO",
+            DestinationRegion = "华南-广东工程现场"
+        };
+
+        string tag1 = MaterialProvenanceTagBuilder.GeneratePlateTag(p1);
+        string tag2 = MaterialProvenanceTagBuilder.GeneratePlateTag(p2Identical);
+        string tag3 = MaterialProvenanceTagBuilder.GeneratePlateTag(p3ModifiedTol);
+
+        // 确定性：相同参数生成完全一致的物料标签
+        Assert.Equal(tag1, tag2);
+        Assert.StartsWith("PL-Q355B-T22-2500x12000-TOL_A-NISCO-GD-", tag1);
+
+        // 唯一性：参数微调即改变标签与校验码
+        Assert.NotEqual(tag1, tag3);
+        Assert.StartsWith("PL-Q355B-T22-2500x12000-TOL_C-NISCO-GD-", tag3);
+    }
+
+    [Fact]
+    public void MaterialProvenanceRecord_TemporalRetrospection_CalculatesAccuratePriceDeltaAndCostVariance()
+    {
+        var baseSnap = SeedPriceSnapshots.GetById("SNAP-20260315-BASE");
+        var latestSnap = SeedPriceSnapshots.GetById("SNAP-20261008-LATEST");
+
+        // 场景：项目在 2026-03 基准日锁定了 Q355B 22mm 南钢广东工程现场板材
+        var p = new PlatePricingParameters
+        {
+            Standard = StandardSystem.GB,
+            Grade = SteelGrade.Q355B,
+            ThicknessMm = 22.0,
+            WidthMm = 2500.0,
+            LengthMm = 12000.0,
+            CutType = PlateDimensionCutType.FixedDimension,
+            Tolerance = ToleranceClass.ClassA,
+            SteelMillId = "NISCO",
+            Delivery = DeliveryCondition.Delivered_JobSite,
+            DestinationRegion = "华南-广东工程现场"
+        };
+
+        var basePrice = PlatePricingRuleEngine.Calculate(p, baseSnap);
+
+        var record = new MaterialProvenanceRecord
+        {
+            Id = 1,
+            MaterialTag = MaterialProvenanceTagBuilder.GeneratePlateTag(p),
+            DisplayTitle = "Q355B 22mm 中厚板",
+            SnapshotId = baseSnap.SnapshotId,
+            SnapshotName = baseSnap.SnapshotName,
+            EffectiveDate = baseSnap.EffectiveDate,
+            BasePricePerTon = basePrice.BasePricePerTon,
+            FinalPricePerTon = basePrice.FinalPricePerTon,
+            PlateParameters = p
+        };
+
+        // 对 2026-10 最新快照进行跨时序回溯重算
+        var retrospectivePrice = record.CalculateAtSnapshot(latestSnap);
+
+        // 基准日大盘价为 3920，最新日大盘价为 4050，差价 +130
+        double deltaPricePerTon = retrospectivePrice.FinalPricePerTon - record.FinalPricePerTon;
+        Assert.Equal(130.0, deltaPricePerTon);
+
+        // 若工程用钢量为 200 吨，项目成本调差额 = 130 * 200 = 26000 元
+        double projectTons = 200.0;
+        double costImpact = deltaPricePerTon * projectTons;
+        Assert.Equal(26000.0, costImpact);
+    }
+
+    [Fact]
+    public void MaterialProvenanceRecord_RevisionLog_RecordsAuditTrailCorrectly()
+    {
+        var baseSnap = SeedPriceSnapshots.GetById("SNAP-20260315-BASE");
+        var p = new PlatePricingParameters
+        {
+            Standard = StandardSystem.GB,
+            Grade = SteelGrade.Q355D,
+            ThicknessMm = 50.0,
+            SteelMillId = "Baosteel"
+        };
+        var price = PlatePricingRuleEngine.Calculate(p, baseSnap);
+
+        var record = new MaterialProvenanceRecord
+        {
+            Id = 3,
+            MaterialTag = MaterialProvenanceTagBuilder.GeneratePlateTag(p),
+            DisplayTitle = "Q355D 50mm 柱板",
+            FinalPricePerTon = price.FinalPricePerTon, // 4410
+            InquiryBatchId = "INQ-20260315-LOT01",
+            InquiryDate = new DateTime(2026, 3, 15),
+            RevisionNumber = 1
+        };
+
+        // 模拟工程实践中：加价原则发生变更或重新询价修正
+        record.AddRevision(
+            reason: "钢厂特厚板加价原则新规生效（厚度加价阶梯由+180调为+210）",
+            revisedBy: "成本部/王工",
+            newPricePerTon: 4440.0,
+            changeDetails: "厚度加价: ¥180 -> ¥210 (+¥30/t)",
+            appliedPrinciple: "宝武特厚板2026年加价调整公函"
+        );
+
+        Assert.Equal(2, record.RevisionNumber);
+        Assert.Equal(4440.0, record.FinalPricePerTon);
+        Assert.Single(record.RevisionLogs);
+
+        var log = record.RevisionLogs[0];
+        Assert.Equal(2, log.RevisionNumber);
+        Assert.Equal(4410.0, log.PreviousPricePerTon);
+        Assert.Equal(4440.0, log.NewPricePerTon);
+        Assert.Equal(30.0, log.PriceDelta);
+        Assert.Equal("成本部/王工", log.RevisedBy);
+        Assert.Contains("新规生效", log.Reason);
+    }
+
+    [Fact]
+    public void MaterialProvenanceRecord_RetrospectionModes_CalculatesContractFixedVsTargetPrinciples()
+    {
+        var baseSnap = SeedPriceSnapshots.GetById("SNAP-20260315-BASE"); // Q355B base: 3920
+        var latestSnap = SeedPriceSnapshots.GetById("SNAP-20261008-LATEST"); // Q355B base: 4050 (Delta = 130)
+
+        var p = new PlatePricingParameters
+        {
+            Standard = StandardSystem.GB,
+            Grade = SteelGrade.Q355B,
+            ThicknessMm = 50.0,
+            SteelMillId = "Baosteel",
+            CustomThicknessSurcharge = null // 不带固定自定义值，测试阶梯矩阵规则演进
+        };
+
+        var record = new MaterialProvenanceRecord
+        {
+            Id = 1,
+            BasePricePerTon = 3920.0,
+            ThicknessSurchargePerTon = 180.0,
+            MillPremiumPerTon = 200.0,
+            DimensionSurchargePerTon = 60.0,
+            FreightPerTon = 50.0,
+            FinalPricePerTon = 3920.0 + 180.0 + 200.0 + 60.0 + 50.0, // 4410
+            PlateParameters = p
+        };
+
+        // 目标快照时期，假设厚度阶梯上调为 230 元/t
+        var updatedLadders = PlateThicknessLadder.GetDefaultLadders();
+        updatedLadders.First(l => l.Matches(50.0)).CustomSurcharge = 230.0;
+
+        // 1. 合同锁价加价原则模式 (ContractFixedPrinciples)：厚度加价仍维持建档时的 180，仅大盘基价浮动 (+130)
+        var priceFixed = record.CalculateAtSnapshot(latestSnap, updatedLadders, principleMode: RetrospectionPrincipleMode.ContractFixedPrinciples);
+        Assert.Equal(180.0, priceFixed.ThicknessSurchargePerTon);
+        Assert.Equal(record.FinalPricePerTon + 130.0, priceFixed.FinalPricePerTon);
+
+        // 2. 目标时期现行加价原则模式 (TargetDateCurrentPrinciples)：厚度加价采用目标时期的 230，总价包含大盘差价+原则差价
+        var priceFloating = record.CalculateAtSnapshot(latestSnap, updatedLadders, principleMode: RetrospectionPrincipleMode.TargetDateCurrentPrinciples);
+        Assert.Equal(230.0, priceFloating.ThicknessSurchargePerTon);
+        Assert.Equal(record.FinalPricePerTon + 130.0 + (230.0 - 180.0), priceFloating.FinalPricePerTon);
+    }
+
+    [Fact]
+    public void MaterialProvenanceRecord_LatestRevisedOverride_CalculatesUsingAuditedAdjustments()
+    {
+        var baseSnap = SeedPriceSnapshots.GetById("SNAP-20260315-BASE"); // Q355B base: 3920
+        var latestSnap = SeedPriceSnapshots.GetById("SNAP-20261008-LATEST"); // Q355B base: 4050 (Delta = 130)
+
+        var p = new PlatePricingParameters
+        {
+            Standard = StandardSystem.GB,
+            Grade = SteelGrade.Q355B,
+            ThicknessMm = 50.0,
+            SteelMillId = "Baosteel"
+        };
+
+        var record = new MaterialProvenanceRecord
+        {
+            Id = 4,
+            BasePricePerTon = 3920.0,
+            ContractThicknessSurchargePerTon = 180.0,
+            ThicknessSurchargePerTon = 180.0,
+            ContractFreightPerTon = 50.0,
+            FreightPerTon = 50.0,
+            MillPremiumPerTon = 200.0,
+            FinalPricePerTon = 4350.0,
+            RevisionNumber = 1,
+            PlateParameters = p
+        };
+
+        // 模拟后续工程中对该批次进行二次议价/厚度新规修订：厚度调为 210，运费协商让利降为 40
+        record.ThicknessSurchargePerTon = 210.0;
+        record.FreightPerTon = 40.0;
+        record.AddRevision(
+            reason: "钢厂特厚板加价公函调整且运费议价让利",
+            revisedBy: "王造价师",
+            newPricePerTon: 3920.0 + 210.0 + 200.0 + 40.0, // 4370
+            changeDetails: "厚度加价: 180->210; 运费: 50->40",
+            appliedPrinciple: "2026年4月调价通知单"
+        );
+
+        // 模式 A：合同锁定加价模式 (维持原合同加价 180 与运费 50，叠加基价上涨 130)
+        var priceA = record.CalculateAtSnapshot(latestSnap, principleMode: RetrospectionPrincipleMode.ContractFixedPrinciples);
+        Assert.Equal(180.0, priceA.ThicknessSurchargePerTon);
+        Assert.Equal(50.0, priceA.FreightPerTon);
+        Assert.Equal(4050.0 + 180.0 + 200.0 + 50.0, priceA.FinalPricePerTon);
+
+        // 模式 C：最新修订与实付议价模式 (采用最新修订实付加价 210 与运费 40，叠加基价上涨 130)
+        var priceC = record.CalculateAtSnapshot(latestSnap, principleMode: RetrospectionPrincipleMode.LatestRevisedOverride);
+        Assert.Equal(210.0, priceC.ThicknessSurchargePerTon);
+        Assert.Equal(40.0, priceC.FreightPerTon);
+        Assert.Equal(4050.0 + 210.0 + 200.0 + 40.0, priceC.FinalPricePerTon);
+    }
 }

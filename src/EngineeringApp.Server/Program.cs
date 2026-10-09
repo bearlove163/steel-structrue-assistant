@@ -128,16 +128,107 @@ app.MapGet("/api/pricing/snapshots", async (AppDbContext db) =>
     return Results.Ok(snapshots);
 });
 
-// 9. 获取全国及国际钢厂品牌字典
-app.MapGet("/api/pricing/mills", () =>
+// 9. 获取全国及国际钢厂品牌字典 (从数据库持久化层获取)
+app.MapGet("/api/pricing/mills", async (AppDbContext db) =>
 {
-    return Results.Ok(EngineeringApp.Shared.Material.Pricing.SeedSteelMills.AllMills);
+    var mills = await db.SteelMills.OrderBy(m => m.Tier).ThenBy(m => m.Id).ToListAsync();
+    return Results.Ok(mills);
 });
 
-// 10. 获取物流调运路线费率库
-app.MapGet("/api/pricing/routes", () =>
+// 9.1 更新钢厂自定义溢价
+app.MapPut("/api/pricing/mills/{millId}", async (string millId, double? customPremium, AppDbContext db) =>
 {
-    return Results.Ok(EngineeringApp.Shared.Material.Pricing.SeedFreightRoutes.AllRoutes);
+    var mill = await db.SteelMills.FirstOrDefaultAsync(m => m.MillId == millId);
+    if (mill == null) return Results.NotFound();
+    mill.CustomPremiumPerTon = customPremium;
+    await db.SaveChangesAsync();
+    return Results.Ok(mill);
+});
+
+// 10. 获取物流调运路线费率库 (从数据库持久化层获取)
+app.MapGet("/api/pricing/routes", async (AppDbContext db) =>
+{
+    var routes = await db.FreightRoutes.OrderBy(r => r.Id).ToListAsync();
+    return Results.Ok(routes);
+});
+
+// 10.1 更新物流路线调运费
+app.MapPut("/api/pricing/routes/{routeId}", async (string routeId, double? customFreight, AppDbContext db) =>
+{
+    var route = await db.FreightRoutes.FirstOrDefaultAsync(r => r.RouteId == routeId);
+    if (route == null) return Results.NotFound();
+    route.CustomFreightPerTon = customFreight;
+    await db.SaveChangesAsync();
+    return Results.Ok(route);
+});
+
+// 10.2 获取板厚加价阶梯表
+app.MapGet("/api/pricing/rules/thickness-ladders", async (AppDbContext db) =>
+{
+    var ladders = await db.PlateThicknessLadders.OrderBy(l => l.MinThicknessMm).ToListAsync();
+    return Results.Ok(ladders);
+});
+
+// 10.3 批量保存板厚加价阶梯
+app.MapPut("/api/pricing/rules/thickness-ladders", async (List<PlateThicknessLadderEntity> input, AppDbContext db) =>
+{
+    foreach (var item in input)
+    {
+        var existing = await db.PlateThicknessLadders.FindAsync(item.Id);
+        if (existing != null)
+        {
+            existing.CustomSurcharge = item.CustomSurcharge;
+            existing.Description = item.Description;
+        }
+    }
+    await db.SaveChangesAsync();
+    return Results.Ok(await db.PlateThicknessLadders.OrderBy(l => l.MinThicknessMm).ToListAsync());
+});
+
+// 10.4 获取定尺与尺寸加价规则表
+app.MapGet("/api/pricing/rules/dimension-rules", async (AppDbContext db) =>
+{
+    var rules = await db.PlateDimensionRules.OrderBy(r => r.Id).ToListAsync();
+    return Results.Ok(rules);
+});
+
+// 10.5 批量保存定尺与尺寸加价规则
+app.MapPut("/api/pricing/rules/dimension-rules", async (List<PlateDimensionRuleEntity> input, AppDbContext db) =>
+{
+    foreach (var item in input)
+    {
+        var existing = await db.PlateDimensionRules.FindAsync(item.Id);
+        if (existing != null)
+        {
+            existing.CustomSurcharge = item.CustomSurcharge;
+            existing.Name = item.Name;
+        }
+    }
+    await db.SaveChangesAsync();
+    return Results.Ok(await db.PlateDimensionRules.OrderBy(r => r.Id).ToListAsync());
+});
+
+// 10.6 恢复所有加价规则与运费为行业出厂基准
+app.MapPost("/api/pricing/rules/reset-defaults", async (AppDbContext db) =>
+{
+    // 重置厚度阶梯
+    var ladders = await db.PlateThicknessLadders.ToListAsync();
+    foreach (var l in ladders) l.CustomSurcharge = null;
+
+    // 重置尺寸规则
+    var dimRules = await db.PlateDimensionRules.ToListAsync();
+    foreach (var d in dimRules) d.CustomSurcharge = null;
+
+    // 重置钢厂溢价
+    var mills = await db.SteelMills.ToListAsync();
+    foreach (var m in mills) m.CustomPremiumPerTon = null;
+
+    // 重置路线运费
+    var routes = await db.FreightRoutes.ToListAsync();
+    foreach (var r in routes) r.CustomFreightPerTon = null;
+
+    await db.SaveChangesAsync();
+    return Results.Ok(new { Message = "All pricing rules and logistics routes have been reset to benchmark defaults." });
 });
 
 // 11. 钢板多维加价核算接口
@@ -160,6 +251,80 @@ app.MapPost("/api/pricing/calculate-profile", (EngineeringApp.Shared.Material.Pr
 
     var result = EngineeringApp.Shared.Material.Pricing.ProfilePricingRuleEngine.Calculate(input, snapshot);
     return Results.Ok(result);
+});
+
+// 13. 获取工程物料出处记录库列表
+app.MapGet("/api/pricing/provenance-records", async (AppDbContext db) =>
+{
+    var entities = await db.MaterialProvenanceRecords
+        .OrderByDescending(r => r.RecordedAt)
+        .ToListAsync();
+    var records = entities.Select(e => e.ToDomain()).ToList();
+    return Results.Ok(records);
+});
+
+// 14. 归档新增工程物料出处记录 (支持时间标签与特征指纹)
+app.MapPost("/api/pricing/provenance-records", async (EngineeringApp.Shared.Material.Pricing.MaterialProvenanceRecord input, AppDbContext db) =>
+{
+    if (string.IsNullOrEmpty(input.MaterialTag) && input.PlateParameters != null)
+    {
+        input.MaterialTag = EngineeringApp.Shared.Material.Pricing.MaterialProvenanceTagBuilder.GeneratePlateTag(input.PlateParameters);
+    }
+    if (input.RecordedAt == default)
+    {
+        input.RecordedAt = DateTime.Now;
+    }
+
+    var entity = MaterialProvenanceRecordEntity.FromDomain(input);
+    db.MaterialProvenanceRecords.Add(entity);
+    await db.SaveChangesAsync();
+
+    var saved = entity.ToDomain();
+    EngineeringApp.Shared.Material.Pricing.SeedProvenanceRecords.AddRecord(saved);
+    return Results.Created($"/api/pricing/provenance-records/{saved.Id}", saved);
+});
+
+// 14.1 更新/修订物料出处记录 (写入变更履历与新版本)
+app.MapPut("/api/pricing/provenance-records/{id:int}", async (int id, EngineeringApp.Shared.Material.Pricing.MaterialProvenanceRecord input, AppDbContext db) =>
+{
+    var existing = await db.MaterialProvenanceRecords.FindAsync(id);
+    if (existing == null) return Results.NotFound();
+
+    existing.DisplayTitle = input.DisplayTitle;
+    existing.ProjectReference = input.ProjectReference;
+    existing.InquiryBatchId = input.InquiryBatchId;
+    existing.InquiryDate = input.InquiryDate;
+    existing.InquiryVendor = input.InquiryVendor;
+    existing.RevisionNumber = input.RevisionNumber;
+    existing.PricingPrincipleNote = input.PricingPrincipleNote;
+    existing.BasePricePerTon = input.BasePricePerTon;
+    existing.MillPremiumPerTon = input.MillPremiumPerTon;
+    existing.ThicknessSurchargePerTon = input.ThicknessSurchargePerTon;
+    existing.ContractThicknessSurchargePerTon = input.ContractThicknessSurchargePerTon;
+    existing.DimensionSurchargePerTon = input.DimensionSurchargePerTon;
+    existing.ToleranceSurchargePerTon = input.ToleranceSurchargePerTon;
+    existing.PerformanceSurchargePerTon = input.PerformanceSurchargePerTon;
+    existing.InspectionSurchargePerTon = input.InspectionSurchargePerTon;
+    existing.FreightPerTon = input.FreightPerTon;
+    existing.ContractFreightPerTon = input.ContractFreightPerTon;
+    existing.FinalPricePerTon = input.FinalPricePerTon;
+    existing.FullDescription = input.FullDescription;
+    existing.RevisionLogsJson = System.Text.Json.JsonSerializer.Serialize(input.RevisionLogs ?? []);
+    existing.PlateParametersJson = System.Text.Json.JsonSerializer.Serialize(input.PlateParameters);
+
+    await db.SaveChangesAsync();
+    return Results.Ok(existing.ToDomain());
+});
+
+// 15. 删除指定物料出处记录
+app.MapDelete("/api/pricing/provenance-records/{id:int}", async (int id, AppDbContext db) =>
+{
+    var item = await db.MaterialProvenanceRecords.FindAsync(id);
+    if (item == null) return Results.NotFound();
+
+    db.MaterialProvenanceRecords.Remove(item);
+    await db.SaveChangesAsync();
+    return Results.Ok(new { Message = $"Material provenance record {id} removed." });
 });
 
 app.Run();

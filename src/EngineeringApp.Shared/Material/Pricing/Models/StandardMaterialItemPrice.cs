@@ -42,12 +42,20 @@ public class StandardMaterialItemPrice
 
     /// <summary>钢厂品牌溢价</summary>
     public double MillPremiumPerTon { get; set; }
+    public double BenchmarkMillPremium { get; set; }
+    public bool IsMillPremiumCustomized { get; set; }
 
     /// <summary>厚度/规格加价</summary>
     public double ThicknessSurchargePerTon { get; set; }
+    public double BenchmarkThicknessSurcharge { get; set; }
+    public bool IsThicknessSurchargeCustomized { get; set; }
+    public string ThicknessPrincipleExplanation { get; set; } = "";
 
     /// <summary>定尺/超长超宽加价</summary>
     public double DimensionSurchargePerTon { get; set; }
+    public double BenchmarkDimensionSurcharge { get; set; }
+    public bool IsDimensionSurchargeCustomized { get; set; }
+    public string DimensionPrincipleExplanation { get; set; } = "";
 
     /// <summary>公差精度与保证全厚度加价 (GB/T 709 / EN 10029 Class C)</summary>
     public double ToleranceSurchargePerTon { get; set; }
@@ -63,6 +71,8 @@ public class StandardMaterialItemPrice
 
     /// <summary>干线物流调运费 (产地至车间/现场)</summary>
     public double FreightPerTon { get; set; }
+    public double BenchmarkFreight { get; set; }
+    public bool IsFreightCustomized { get; set; }
 
     /// <summary>【核心】最终综合采购单价 (元/吨)</summary>
     public double FinalPricePerTon =>
