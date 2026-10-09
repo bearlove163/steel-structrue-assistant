@@ -142,6 +142,106 @@ public class FreightRouteEntity
 }
 
 /// <summary>
+/// 基础数据实体：物料出处记录持久化模型
+/// </summary>
+public class MaterialProvenanceRecordEntity
+{
+    public int Id { get; set; }
+    public string MaterialTag { get; set; } = "";
+    public string DisplayTitle { get; set; } = "";
+    public string Category { get; set; } = "Plate";
+    public string StandardSpecification { get; set; } = "";
+    public string DimensionText { get; set; } = "";
+    public string SnapshotId { get; set; } = "";
+    public string SnapshotName { get; set; } = "";
+    public DateTime EffectiveDate { get; set; }
+    public DateTime RecordedAt { get; set; }
+    public string ProjectReference { get; set; } = "";
+    public string MillName { get; set; } = "";
+    public string DeliveryAndFreightText { get; set; } = "";
+    public double BasePricePerTon { get; set; }
+    public double MillPremiumPerTon { get; set; }
+    public double ThicknessSurchargePerTon { get; set; }
+    public double DimensionSurchargePerTon { get; set; }
+    public double ToleranceSurchargePerTon { get; set; }
+    public double PerformanceSurchargePerTon { get; set; }
+    public double InspectionSurchargePerTon { get; set; }
+    public double FreightPerTon { get; set; }
+    public double FinalPricePerTon { get; set; }
+    public string FullDescription { get; set; } = "";
+    public string PlateParametersJson { get; set; } = "";
+
+    public MaterialProvenanceRecord ToDomain()
+    {
+        PlatePricingParameters p = new();
+        if (!string.IsNullOrEmpty(PlateParametersJson))
+        {
+            try
+            {
+                p = System.Text.Json.JsonSerializer.Deserialize<PlatePricingParameters>(PlateParametersJson) ?? new();
+            }
+            catch { }
+        }
+
+        return new MaterialProvenanceRecord
+        {
+            Id = Id,
+            MaterialTag = MaterialTag,
+            DisplayTitle = DisplayTitle,
+            Category = Category,
+            StandardSpecification = StandardSpecification,
+            DimensionText = DimensionText,
+            SnapshotId = SnapshotId,
+            SnapshotName = SnapshotName,
+            EffectiveDate = EffectiveDate,
+            RecordedAt = RecordedAt,
+            ProjectReference = ProjectReference,
+            MillName = MillName,
+            DeliveryAndFreightText = DeliveryAndFreightText,
+            BasePricePerTon = BasePricePerTon,
+            MillPremiumPerTon = MillPremiumPerTon,
+            ThicknessSurchargePerTon = ThicknessSurchargePerTon,
+            DimensionSurchargePerTon = DimensionSurchargePerTon,
+            ToleranceSurchargePerTon = ToleranceSurchargePerTon,
+            PerformanceSurchargePerTon = PerformanceSurchargePerTon,
+            InspectionSurchargePerTon = InspectionSurchargePerTon,
+            FreightPerTon = FreightPerTon,
+            FinalPricePerTon = FinalPricePerTon,
+            FullDescription = FullDescription,
+            PlateParameters = p
+        };
+    }
+
+    public static MaterialProvenanceRecordEntity FromDomain(MaterialProvenanceRecord r) => new()
+    {
+        Id = r.Id,
+        MaterialTag = r.MaterialTag,
+        DisplayTitle = r.DisplayTitle,
+        Category = r.Category,
+        StandardSpecification = r.StandardSpecification,
+        DimensionText = r.DimensionText,
+        SnapshotId = r.SnapshotId,
+        SnapshotName = r.SnapshotName,
+        EffectiveDate = r.EffectiveDate,
+        RecordedAt = r.RecordedAt == default ? DateTime.Now : r.RecordedAt,
+        ProjectReference = r.ProjectReference,
+        MillName = r.MillName,
+        DeliveryAndFreightText = r.DeliveryAndFreightText,
+        BasePricePerTon = r.BasePricePerTon,
+        MillPremiumPerTon = r.MillPremiumPerTon,
+        ThicknessSurchargePerTon = r.ThicknessSurchargePerTon,
+        DimensionSurchargePerTon = r.DimensionSurchargePerTon,
+        ToleranceSurchargePerTon = r.ToleranceSurchargePerTon,
+        PerformanceSurchargePerTon = r.PerformanceSurchargePerTon,
+        InspectionSurchargePerTon = r.InspectionSurchargePerTon,
+        FreightPerTon = r.FreightPerTon,
+        FinalPricePerTon = r.FinalPricePerTon,
+        FullDescription = r.FullDescription,
+        PlateParametersJson = System.Text.Json.JsonSerializer.Serialize(r.PlateParameters)
+    };
+}
+
+/// <summary>
 /// SQLite 数据库上下文
 /// </summary>
 public class AppDbContext : DbContext
@@ -158,6 +258,7 @@ public class AppDbContext : DbContext
     public DbSet<SteelMillEntity> SteelMills => Set<SteelMillEntity>();
     public DbSet<SteelMillSnapshotPremiumEntity> SteelMillSnapshotPremiums => Set<SteelMillSnapshotPremiumEntity>();
     public DbSet<FreightRouteEntity> FreightRoutes => Set<FreightRouteEntity>();
+    public DbSet<MaterialProvenanceRecordEntity> MaterialProvenanceRecords => Set<MaterialProvenanceRecordEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -211,6 +312,13 @@ public class AppDbContext : DbContext
         {
             e.HasKey(x => x.Id);
             e.HasIndex(x => x.RouteId);
+        });
+
+        modelBuilder.Entity<MaterialProvenanceRecordEntity>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.MaterialTag);
+            e.HasIndex(x => x.SnapshotId);
         });
     }
 
@@ -374,6 +482,42 @@ public class AppDbContext : DbContext
             }).ToList();
 
             db.FreightRoutes.AddRange(seedRoutes);
+            db.SaveChanges();
+        }
+
+        // 8. 填充物料出处记录库 (Seed Provenance Records)
+        if (!db.MaterialProvenanceRecords.Any())
+        {
+            int recId = 1;
+            var seedRecords = SeedProvenanceRecords.AllRecords.Select(r => new MaterialProvenanceRecordEntity
+            {
+                Id = recId++,
+                MaterialTag = r.MaterialTag,
+                DisplayTitle = r.DisplayTitle,
+                Category = r.Category,
+                StandardSpecification = r.StandardSpecification,
+                DimensionText = r.DimensionText,
+                SnapshotId = r.SnapshotId,
+                SnapshotName = r.SnapshotName,
+                EffectiveDate = r.EffectiveDate,
+                RecordedAt = r.RecordedAt,
+                ProjectReference = r.ProjectReference,
+                MillName = r.MillName,
+                DeliveryAndFreightText = r.DeliveryAndFreightText,
+                BasePricePerTon = r.BasePricePerTon,
+                MillPremiumPerTon = r.MillPremiumPerTon,
+                ThicknessSurchargePerTon = r.ThicknessSurchargePerTon,
+                DimensionSurchargePerTon = r.DimensionSurchargePerTon,
+                ToleranceSurchargePerTon = r.ToleranceSurchargePerTon,
+                PerformanceSurchargePerTon = r.PerformanceSurchargePerTon,
+                InspectionSurchargePerTon = r.InspectionSurchargePerTon,
+                FreightPerTon = r.FreightPerTon,
+                FinalPricePerTon = r.FinalPricePerTon,
+                FullDescription = r.FullDescription,
+                PlateParametersJson = System.Text.Json.JsonSerializer.Serialize(r.PlateParameters)
+            }).ToList();
+
+            db.MaterialProvenanceRecords.AddRange(seedRecords);
             db.SaveChanges();
         }
     }

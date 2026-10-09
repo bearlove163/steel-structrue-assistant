@@ -253,4 +253,46 @@ app.MapPost("/api/pricing/calculate-profile", (EngineeringApp.Shared.Material.Pr
     return Results.Ok(result);
 });
 
+// 13. 获取工程物料出处记录库列表
+app.MapGet("/api/pricing/provenance-records", async (AppDbContext db) =>
+{
+    var entities = await db.MaterialProvenanceRecords
+        .OrderByDescending(r => r.RecordedAt)
+        .ToListAsync();
+    var records = entities.Select(e => e.ToDomain()).ToList();
+    return Results.Ok(records);
+});
+
+// 14. 归档新增工程物料出处记录 (支持时间标签与特征指纹)
+app.MapPost("/api/pricing/provenance-records", async (EngineeringApp.Shared.Material.Pricing.MaterialProvenanceRecord input, AppDbContext db) =>
+{
+    if (string.IsNullOrEmpty(input.MaterialTag) && input.PlateParameters != null)
+    {
+        input.MaterialTag = EngineeringApp.Shared.Material.Pricing.MaterialProvenanceTagBuilder.GeneratePlateTag(input.PlateParameters);
+    }
+    if (input.RecordedAt == default)
+    {
+        input.RecordedAt = DateTime.Now;
+    }
+
+    var entity = MaterialProvenanceRecordEntity.FromDomain(input);
+    db.MaterialProvenanceRecords.Add(entity);
+    await db.SaveChangesAsync();
+
+    var saved = entity.ToDomain();
+    EngineeringApp.Shared.Material.Pricing.SeedProvenanceRecords.AddRecord(saved);
+    return Results.Created($"/api/pricing/provenance-records/{saved.Id}", saved);
+});
+
+// 15. 删除指定物料出处记录
+app.MapDelete("/api/pricing/provenance-records/{id:int}", async (int id, AppDbContext db) =>
+{
+    var item = await db.MaterialProvenanceRecords.FindAsync(id);
+    if (item == null) return Results.NotFound();
+
+    db.MaterialProvenanceRecords.Remove(item);
+    await db.SaveChangesAsync();
+    return Results.Ok(new { Message = $"Material provenance record {id} removed." });
+});
+
 app.Run();

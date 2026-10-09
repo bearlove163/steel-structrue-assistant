@@ -335,4 +335,105 @@ public class MaterialPricingTests
         Assert.Equal(210.0, result.ThicknessSurchargePerTon);
         Assert.True(result.IsThicknessSurchargeCustomized);
     }
+
+    [Fact]
+    public void ProvenanceTagBuilder_GeneratesDeterministicTag_WithUniqueFingerprint()
+    {
+        var p1 = new PlatePricingParameters
+        {
+            Standard = StandardSystem.GB,
+            Grade = SteelGrade.Q355B,
+            ThicknessMm = 22.0,
+            WidthMm = 2500.0,
+            LengthMm = 12000.0,
+            Tolerance = ToleranceClass.ClassA,
+            SteelMillId = "NISCO",
+            DestinationRegion = "华南-广东工程现场"
+        };
+
+        var p2Identical = new PlatePricingParameters
+        {
+            Standard = StandardSystem.GB,
+            Grade = SteelGrade.Q355B,
+            ThicknessMm = 22.0,
+            WidthMm = 2500.0,
+            LengthMm = 12000.0,
+            Tolerance = ToleranceClass.ClassA,
+            SteelMillId = "NISCO",
+            DestinationRegion = "华南-广东工程现场"
+        };
+
+        var p3ModifiedTol = new PlatePricingParameters
+        {
+            Standard = StandardSystem.GB,
+            Grade = SteelGrade.Q355B,
+            ThicknessMm = 22.0,
+            WidthMm = 2500.0,
+            LengthMm = 12000.0,
+            Tolerance = ToleranceClass.ClassC, // 变为 C 类保全厚度
+            SteelMillId = "NISCO",
+            DestinationRegion = "华南-广东工程现场"
+        };
+
+        string tag1 = MaterialProvenanceTagBuilder.GeneratePlateTag(p1);
+        string tag2 = MaterialProvenanceTagBuilder.GeneratePlateTag(p2Identical);
+        string tag3 = MaterialProvenanceTagBuilder.GeneratePlateTag(p3ModifiedTol);
+
+        // 确定性：相同参数生成完全一致的物料标签
+        Assert.Equal(tag1, tag2);
+        Assert.StartsWith("PL-Q355B-T22-2500x12000-TOL_A-NISCO-GD-", tag1);
+
+        // 唯一性：参数微调即改变标签与校验码
+        Assert.NotEqual(tag1, tag3);
+        Assert.StartsWith("PL-Q355B-T22-2500x12000-TOL_C-NISCO-GD-", tag3);
+    }
+
+    [Fact]
+    public void MaterialProvenanceRecord_TemporalRetrospection_CalculatesAccuratePriceDeltaAndCostVariance()
+    {
+        var baseSnap = SeedPriceSnapshots.GetById("SNAP-20260315-BASE");
+        var latestSnap = SeedPriceSnapshots.GetById("SNAP-20261008-LATEST");
+
+        // 场景：项目在 2026-03 基准日锁定了 Q355B 22mm 南钢广东工程现场板材
+        var p = new PlatePricingParameters
+        {
+            Standard = StandardSystem.GB,
+            Grade = SteelGrade.Q355B,
+            ThicknessMm = 22.0,
+            WidthMm = 2500.0,
+            LengthMm = 12000.0,
+            CutType = PlateDimensionCutType.FixedDimension,
+            Tolerance = ToleranceClass.ClassA,
+            SteelMillId = "NISCO",
+            Delivery = DeliveryCondition.Delivered_JobSite,
+            DestinationRegion = "华南-广东工程现场"
+        };
+
+        var basePrice = PlatePricingRuleEngine.Calculate(p, baseSnap);
+
+        var record = new MaterialProvenanceRecord
+        {
+            Id = 1,
+            MaterialTag = MaterialProvenanceTagBuilder.GeneratePlateTag(p),
+            DisplayTitle = "Q355B 22mm 中厚板",
+            SnapshotId = baseSnap.SnapshotId,
+            SnapshotName = baseSnap.SnapshotName,
+            EffectiveDate = baseSnap.EffectiveDate,
+            BasePricePerTon = basePrice.BasePricePerTon,
+            FinalPricePerTon = basePrice.FinalPricePerTon,
+            PlateParameters = p
+        };
+
+        // 对 2026-10 最新快照进行跨时序回溯重算
+        var retrospectivePrice = record.CalculateAtSnapshot(latestSnap);
+
+        // 基准日大盘价为 3920，最新日大盘价为 4050，差价 +130
+        double deltaPricePerTon = retrospectivePrice.FinalPricePerTon - record.FinalPricePerTon;
+        Assert.Equal(130.0, deltaPricePerTon);
+
+        // 若工程用钢量为 200 吨，项目成本调差额 = 130 * 200 = 26000 元
+        double projectTons = 200.0;
+        double costImpact = deltaPricePerTon * projectTons;
+        Assert.Equal(26000.0, costImpact);
+    }
 }

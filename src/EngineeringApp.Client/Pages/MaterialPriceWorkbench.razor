@@ -2,9 +2,11 @@
 @using EngineeringApp.Shared.Material
 @using EngineeringApp.Shared.Material.Pricing
 @using EngineeringApp.Client.Services
+@using System.Net.Http.Json
 @inject NavigationManager Nav
 @inject ThemeState Theme
 @inject IJSRuntime JS
+@inject HttpClient Http
 @implements IDisposable
 
 <PageTitle>材料价格与供应链智能查询工作台</PageTitle>
@@ -116,7 +118,14 @@
         <li class="nav-item">
             <button class="nav-link py-2 px-3 @(ActiveTab == 3 ? (Theme.IsDarkMode ? "active bg-dark text-warning border-warning border-bottom-0 fw-bold" : "active bg-white text-warning border-warning border-bottom-0 fw-bold shadow-sm") : (Theme.IsDarkMode ? "text-white-50" : "text-secondary"))"
                     @onclick="() => ActiveTab = 3">
-                📈 时间序列历史调差模拟器 (Price Variance)
+                📈 大盘基准调差模拟器 (Base Price Variance)
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link py-2 px-3 @(ActiveTab == 4 ? (Theme.IsDarkMode ? "active bg-dark text-success border-success border-bottom-0 fw-bold" : "active bg-white text-success border-success border-bottom-0 fw-bold shadow-sm") : (Theme.IsDarkMode ? "text-white-50" : "text-secondary"))"
+                    @onclick="() => ActiveTab = 4">
+                📚 工程物料出处库与跨时序价格回溯 (Provenance & Retrospection)
+                <span class="badge bg-success ms-1">@ProvenanceRecords.Count</span>
             </button>
         </li>
     </ul>
@@ -125,95 +134,24 @@
     @if (ActiveTab == 1)
     {
         <div class="row g-3 flex-grow-1">
-            <!-- 左侧：参数输入控制器 -->
+            <!-- 左侧：参数输入控制器 (按工程逻辑：①材质尺寸 -> ②质量性能 -> ③钢厂物流) -->
             <div class="col-lg-7">
                 <div class="card @(Theme.IsDarkMode ? "bg-black bg-opacity-30 border-secondary" : "bg-white border-light-subtle shadow-sm") p-3 h-100">
-                    <h6 class="fw-bold text-primary mb-3 d-flex align-items-center gap-2">
-                        <span>🛠️ 钢板参数与加价维度配置</span>
-                        <span class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted") small fw-normal">(根据实际工程下料清单进行配置)</span>
-                    </h6>
-
-                    <!-- 1. 钢厂品牌与物流调运 (支持基准参考与用户直接修改/时序关联) -->
-                    <div class="row g-2 mb-3 p-2 @(Theme.IsDarkMode ? "bg-secondary bg-opacity-10 border-secondary border-opacity-50" : "bg-light border-light-subtle") rounded border">
-                        <div class="col-md-6">
-                            <div class="d-flex justify-content-between align-items-center mb-1">
-                                <label class="form-label small @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-0">钢厂品牌与产地 (Mill & Origin):</label>
-                                <span class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">
-                                    参考基准: +¥@CurrentPlatePrice.BenchmarkMillPremium.ToString("0.##")/t
-                                </span>
-                            </div>
-                            <select class="form-select form-select-sm mb-1 @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-secondary-subtle")"
-                                    @bind="PlateParams.SteelMillId" @bind:after="OnMillChanged">
-                                @foreach (var mill in AllMills)
-                                {
-                                    <option value="@mill.Id">
-                                        @mill.Name (@mill.ProductionBase) [参考溢价: @(mill.BrandPremiumPerTon >= 0 ? "+" : "")@mill.BrandPremiumPerTon 元/t]
-                                    </option>
-                                }
-                            </select>
-                            <div class="d-flex align-items-center gap-1">
-                                <span class="small @(Theme.IsDarkMode ? "text-white-50" : "text-muted") text-nowrap">实付溢价:</span>
-                                <div class="input-group input-group-sm">
-                                    <span class="input-group-text @(Theme.IsDarkMode ? "bg-dark text-white-50 border-secondary" : "bg-light text-muted") py-0">¥</span>
-                                    <input type="number" class="form-control form-control-sm @(CurrentPlatePrice.IsMillPremiumCustomized ? "border-warning fw-bold text-warning bg-warning bg-opacity-10" : (Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-secondary-subtle"))"
-                                           placeholder="@CurrentPlatePrice.BenchmarkMillPremium.ToString("0.##")"
-                                           @bind="CustomMillPremiumInput" @bind:after="RecalculatePlate" />
-                                    <span class="input-group-text @(Theme.IsDarkMode ? "bg-dark text-white-50 border-secondary" : "bg-light text-muted") py-0">/t</span>
-                                </div>
-                                @if (CurrentPlatePrice.IsMillPremiumCustomized)
-                                {
-                                    <button class="btn btn-xs btn-outline-warning text-nowrap py-1" @onclick="ResetMillToBenchmark" title="恢复钢厂参考基准溢价">
-                                        ↺ 恢复参考
-                                    </button>
-                                }
-                            </div>
-                        </div>
-
-                        <div class="col-md-6">
-                            <div class="d-flex justify-content-between align-items-center mb-1">
-                                <label class="form-label small @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-0">交货状态与物流调运 (Delivery & Freight):</label>
-                                <span class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">
-                                    预设运费: ¥@CurrentPlatePrice.BenchmarkFreight.ToString("0.##")/t
-                                </span>
-                            </div>
-                            <div class="input-group input-group-sm mb-1">
-                                <select class="form-select @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-secondary-subtle")"
-                                        @bind="PlateParams.Delivery" @bind:after="OnDeliveryOrDestinationChanged">
-                                    <option value="@DeliveryCondition.Delivered_FabricationPlant">制造车间落地价</option>
-                                    <option value="@DeliveryCondition.Delivered_JobSite">施工现场直达价</option>
-                                    <option value="@DeliveryCondition.ExWorks_Mill">钢厂车板出厂价 (自提)</option>
-                                    <option value="@DeliveryCondition.FOB_ChinesePort">出口港口集港价 (FOB)</option>
-                                </select>
-                                <select class="form-select @(Theme.IsDarkMode ? "bg-dark text-warning border-secondary" : "bg-white text-primary fw-bold border-secondary-subtle")"
-                                        @bind="PlateParams.DestinationRegion" @bind:after="OnDeliveryOrDestinationChanged"
-                                        disabled="@(PlateParams.Delivery == DeliveryCondition.ExWorks_Mill)">
-                                    <option value="华东-浙江制造车间">华东-浙江车间 (预设¥50)</option>
-                                    <option value="华南-广东工程现场">华南-广东现场 (预设¥200)</option>
-                                    <option value="上海港国际集港码头 (FOB)">上海港码头 (预设¥220)</option>
-                                    <option value="京津冀鲁本地项目">京津冀鲁本地 (预设¥50)</option>
-                                </select>
-                            </div>
-                            <div class="d-flex align-items-center gap-1">
-                                <span class="small @(Theme.IsDarkMode ? "text-white-50" : "text-muted") text-nowrap">实际调运:</span>
-                                <div class="input-group input-group-sm">
-                                    <span class="input-group-text @(Theme.IsDarkMode ? "bg-dark text-white-50 border-secondary" : "bg-light text-muted") py-0">¥</span>
-                                    <input type="number" class="form-control form-control-sm @(CurrentPlatePrice.IsFreightCustomized ? "border-warning fw-bold text-warning bg-warning bg-opacity-10" : (Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-secondary-subtle"))"
-                                           placeholder="@CurrentPlatePrice.BenchmarkFreight.ToString("0.##")"
-                                           @bind="CustomFreightInput" @bind:after="RecalculatePlate"
-                                           disabled="@(PlateParams.Delivery == DeliveryCondition.ExWorks_Mill)" />
-                                    <span class="input-group-text @(Theme.IsDarkMode ? "bg-dark text-white-50 border-secondary" : "bg-light text-muted") py-0">/t</span>
-                                </div>
-                                @if (CurrentPlatePrice.IsFreightCustomized && PlateParams.Delivery != DeliveryCondition.ExWorks_Mill)
-                                {
-                                    <button class="btn btn-xs btn-outline-warning text-nowrap py-1" @onclick="ResetFreightToBenchmark" title="恢复预设调运运费">
-                                        ↺ 恢复预设
-                                    </button>
-                                }
-                            </div>
-                        </div>
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="fw-bold text-primary mb-0 d-flex align-items-center gap-2">
+                            <span>🛠️ 钢板工程特性与加价配置</span>
+                            <span class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted") small fw-normal">(材质尺寸 $\to$ 技术质量 $\to$ 采购交付)</span>
+                        </h6>
+                        <span class="badge @(Theme.IsDarkMode ? "bg-secondary text-white-50" : "bg-light text-muted border") text-xs">工程正向逻辑</span>
                     </div>
 
-                    <!-- 2. 材质牌号与公称板厚 (加价原则透明说明 + 用户自主设置加价 + 阶梯配置) -->
+                    <!-- ================= 第一阶段：物理材质与几何尺寸 (Material & Dimensions) ================= -->
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <span class="badge bg-primary text-xs">阶段一</span>
+                        <span class="small fw-bold @(Theme.IsDarkMode ? "text-white" : "text-dark")">物理材质牌号与公称板厚尺寸 (Material & Geometry)</span>
+                    </div>
+
+                    <!-- 1.1 材质牌号与公称板厚 (加价原则透明说明 + 用户自主设置加价 + 阶梯配置) -->
                     <div class="row g-3 mb-2">
                         <div class="col-md-4">
                             <label class="form-label small @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1">材质牌号 (Steel Grade):</label>
@@ -359,7 +297,7 @@
                         }
                     </div>
 
-                    <!-- 3. 定尺尺寸与超限 (原则透明 + 用户自主微调 + 规则配置) -->
+                    <!-- 1.2 定尺尺寸与超限 (原则透明 + 用户自主微调 + 规则配置) -->
                     <div class="row g-2 mb-2">
                         <div class="col-md-4">
                             <label class="form-label small @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1">定尺切割状态:</label>
@@ -449,7 +387,13 @@
                         }
                     </div>
 
-                    <!-- 4. 公差等级与平整度 (用户特别强调的公差加价) -->
+                    <!-- ================= 第二阶段：技术质量与特种冶金性能 (Technical & Metallurgy Specs) ================= -->
+                    <div class="d-flex align-items-center gap-2 mb-2 mt-3">
+                        <span class="badge bg-info text-dark text-xs">阶段二</span>
+                        <span class="small fw-bold @(Theme.IsDarkMode ? "text-white" : "text-dark")">技术质量等级与特种冶金性能 (Technical & Metallurgy Specs)</span>
+                    </div>
+
+                    <!-- 2.1 公差等级与平整度 (用户特别强调的公差加价) -->
                     <div class="row g-2 mb-3 p-2 @(Theme.IsDarkMode ? "bg-primary bg-opacity-10 border-primary border-opacity-25" : "bg-primary-subtle border-primary-subtle") rounded border">
                         <div class="col-md-6">
                             <label class="form-label small text-primary fw-bold mb-1">★ 厚度公差等级 (GB/T 709 / EN 10029):</label>
@@ -470,7 +414,7 @@
                         </div>
                     </div>
 
-                    <!-- 5. 性能、冶金工艺与探伤认证 -->
+                    <!-- 2.2 性能、冶金工艺与探伤认证 -->
                     <div class="row g-2">
                         <div class="col-md-3">
                             <label class="form-label small @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1">冲击功等级:</label>
@@ -525,6 +469,92 @@
                         </div>
                     </div>
 
+                    <!-- ================= 第三阶段：供应链采购与商务物流交付 (Supply Chain & Logistics) ================= -->
+                    <div class="d-flex align-items-center gap-2 mb-2 mt-3">
+                        <span class="badge bg-warning text-dark text-xs">阶段三</span>
+                        <span class="small fw-bold @(Theme.IsDarkMode ? "text-white" : "text-dark")">供应链采购钢厂与物流调运交付 (Supply Chain & Logistics)</span>
+                    </div>
+
+                    <!-- 3.1 钢厂品牌与产地 + 3.2 交货状态与物流调运 (支持基准参考与用户直接修改/时序关联) -->
+                    <div class="row g-2 mb-3 p-2 @(Theme.IsDarkMode ? "bg-secondary bg-opacity-10 border-secondary border-opacity-50" : "bg-light border-light-subtle") rounded border">
+                        <div class="col-md-6">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <label class="form-label small @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-0">钢厂品牌与产地 (Mill & Origin):</label>
+                                <span class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">
+                                    参考基准: +¥@CurrentPlatePrice.BenchmarkMillPremium.ToString("0.##")/t
+                                </span>
+                            </div>
+                            <select class="form-select form-select-sm mb-1 @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-secondary-subtle")"
+                                    @bind="PlateParams.SteelMillId" @bind:after="OnMillChanged">
+                                @foreach (var mill in AllMills)
+                                {
+                                    <option value="@mill.Id">
+                                        @mill.Name (@mill.ProductionBase) [参考溢价: @(mill.BrandPremiumPerTon >= 0 ? "+" : "")@mill.BrandPremiumPerTon 元/t]
+                                    </option>
+                                }
+                            </select>
+                            <div class="d-flex align-items-center gap-1">
+                                <span class="small @(Theme.IsDarkMode ? "text-white-50" : "text-muted") text-nowrap">实付溢价:</span>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text @(Theme.IsDarkMode ? "bg-dark text-white-50 border-secondary" : "bg-light text-muted") py-0">¥</span>
+                                    <input type="number" class="form-control form-control-sm @(CurrentPlatePrice.IsMillPremiumCustomized ? "border-warning fw-bold text-warning bg-warning bg-opacity-10" : (Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-secondary-subtle"))"
+                                           placeholder="@CurrentPlatePrice.BenchmarkMillPremium.ToString("0.##")"
+                                           @bind="CustomMillPremiumInput" @bind:after="RecalculatePlate" />
+                                    <span class="input-group-text @(Theme.IsDarkMode ? "bg-dark text-white-50 border-secondary" : "bg-light text-muted") py-0">/t</span>
+                                </div>
+                                @if (CurrentPlatePrice.IsMillPremiumCustomized)
+                                {
+                                    <button class="btn btn-xs btn-outline-warning text-nowrap py-1" @onclick="ResetMillToBenchmark" title="恢复钢厂参考基准溢价">
+                                        ↺ 恢复参考
+                                    </button>
+                                }
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <label class="form-label small @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-0">交货状态与物流调运 (Delivery & Freight):</label>
+                                <span class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">
+                                    预设运费: ¥@CurrentPlatePrice.BenchmarkFreight.ToString("0.##")/t
+                                </span>
+                            </div>
+                            <div class="input-group input-group-sm mb-1">
+                                <select class="form-select @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-secondary-subtle")"
+                                        @bind="PlateParams.Delivery" @bind:after="OnDeliveryOrDestinationChanged">
+                                    <option value="@DeliveryCondition.Delivered_FabricationPlant">制造车间落地价</option>
+                                    <option value="@DeliveryCondition.Delivered_JobSite">施工现场直达价</option>
+                                    <option value="@DeliveryCondition.ExWorks_Mill">钢厂车板出厂价 (自提)</option>
+                                    <option value="@DeliveryCondition.FOB_ChinesePort">出口港口集港价 (FOB)</option>
+                                </select>
+                                <select class="form-select @(Theme.IsDarkMode ? "bg-dark text-warning border-secondary" : "bg-white text-primary fw-bold border-secondary-subtle")"
+                                        @bind="PlateParams.DestinationRegion" @bind:after="OnDeliveryOrDestinationChanged"
+                                        disabled="@(PlateParams.Delivery == DeliveryCondition.ExWorks_Mill)">
+                                    <option value="华东-浙江制造车间">华东-浙江车间 (预设¥50)</option>
+                                    <option value="华南-广东工程现场">华南-广东现场 (预设¥200)</option>
+                                    <option value="上海港国际集港码头 (FOB)">上海港码头 (预设¥220)</option>
+                                    <option value="京津冀鲁本地项目">京津冀鲁本地 (预设¥50)</option>
+                                </select>
+                            </div>
+                            <div class="d-flex align-items-center gap-1">
+                                <span class="small @(Theme.IsDarkMode ? "text-white-50" : "text-muted") text-nowrap">实际调运:</span>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text @(Theme.IsDarkMode ? "bg-dark text-white-50 border-secondary" : "bg-light text-muted") py-0">¥</span>
+                                    <input type="number" class="form-control form-control-sm @(CurrentPlatePrice.IsFreightCustomized ? "border-warning fw-bold text-warning bg-warning bg-opacity-10" : (Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-secondary-subtle"))"
+                                           placeholder="@CurrentPlatePrice.BenchmarkFreight.ToString("0.##")"
+                                           @bind="CustomFreightInput" @bind:after="RecalculatePlate"
+                                           disabled="@(PlateParams.Delivery == DeliveryCondition.ExWorks_Mill)" />
+                                    <span class="input-group-text @(Theme.IsDarkMode ? "bg-dark text-white-50 border-secondary" : "bg-light text-muted") py-0">/t</span>
+                                </div>
+                                @if (CurrentPlatePrice.IsFreightCustomized && PlateParams.Delivery != DeliveryCondition.ExWorks_Mill)
+                                {
+                                    <button class="btn btn-xs btn-outline-warning text-nowrap py-1" @onclick="ResetFreightToBenchmark" title="恢复预设调运运费">
+                                        ↺ 恢复预设
+                                    </button>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- 底部：数据库持久化同步与重置操作条 -->
                     <div class="mt-3 pt-2 border-top @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle") d-flex flex-wrap align-items-center justify-content-between gap-2">
                         <div class="d-flex align-items-center gap-2">
@@ -554,7 +584,7 @@
                     </div>
 
                     <!-- 最终综合吨单价巨大徽章 -->
-                    <div class="@(Theme.IsDarkMode ? "bg-primary bg-opacity-10 border-primary border-opacity-50" : "bg-primary-subtle border-primary") p-3 rounded-3 border text-center mb-3">
+                    <div class="@(Theme.IsDarkMode ? "bg-primary bg-opacity-10 border-primary border-opacity-50" : "bg-primary-subtle border-primary") p-3 rounded-3 border text-center mb-2">
                         <div class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted") small mb-1">最终综合采购到货单价</div>
                         <div class="display-6 fw-bold text-success tracking-tight">
                             ¥ @CurrentPlatePrice.FinalPricePerTon.ToString("N2")
@@ -563,6 +593,38 @@
                         <div class="text-primary small mt-1">
                             包含钢厂出厂基价 + 各项加价 + 调运物流费
                         </div>
+                    </div>
+
+                    <!-- 物料出处唯一特征标签与入库记录卡片 -->
+                    <div class="p-2 mb-3 rounded border @(Theme.IsDarkMode ? "bg-dark bg-opacity-60 border-info border-opacity-50" : "bg-light border-info-subtle")">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="badge bg-info text-dark text-xs">🏷️ 物料出处特征标签 (唯一指纹)</span>
+                            <button class="btn btn-xs btn-outline-info py-0 px-2" @onclick="CopyTagToClipboard" title="复制唯一标签">
+                                📋 复制标签
+                            </button>
+                        </div>
+                        <div class="font-monospace text-xs p-1 rounded border @(Theme.IsDarkMode ? "bg-black text-info border-secondary" : "bg-white text-primary border-light-subtle") text-truncate user-select-all" title="@CurrentPlateTag">
+                            @CurrentPlateTag
+                        </div>
+                        <div class="d-flex align-items-center gap-1 mt-2">
+                            <input type="text" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-secondary-subtle")"
+                                   placeholder="项目/批次 (如: 广东制造厂-主厂房)"
+                                   @bind="ProvenanceArchiveProjectInput" />
+                            <button class="btn btn-sm btn-success text-nowrap d-flex align-items-center gap-1 py-1"
+                                    @onclick="ArchiveCurrentPlateToProvenance" title="将当前配置钢板归档入库，记录时间与成本出处">
+                                <span>📌</span>
+                                <span>登记出处</span>
+                            </button>
+                        </div>
+                        @if (!string.IsNullOrEmpty(ProvenanceSaveFeedbackMessage))
+                        {
+                            <div class="text-success text-xs mt-1 d-flex align-items-center justify-content-between">
+                                <span>@ProvenanceSaveFeedbackMessage</span>
+                                <button class="btn btn-link text-info text-xs p-0 text-decoration-none" @onclick="() => ActiveTab = 4">
+                                    前往出处库回溯 →
+                                </button>
+                            </div>
+                        }
                     </div>
 
                     <!-- 瀑布分解明细卡片 -->
@@ -940,6 +1002,206 @@
         </div>
     }
 
+    <!-- ======================= 选项卡 4：工程物料出处库与跨时序价格回溯 ======================= -->
+    @if (ActiveTab == 4)
+    {
+        <div class="card @(Theme.IsDarkMode ? "bg-black bg-opacity-30 border-secondary" : "bg-white border-light-subtle shadow-sm") p-3 flex-grow-1">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3 pb-2 border-bottom @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle")">
+                <div>
+                    <h6 class="fw-bold text-success mb-1 d-flex align-items-center gap-2">
+                        <span>📚 工程物料出处记录库与跨时序价格回溯 (Material Provenance & Retrospection)</span>
+                        <span class="badge bg-success text-xs">唯一特征指纹存档</span>
+                    </h6>
+                    <div class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted") text-xs">
+                        记录每张特定参数钢板的完整特征标签、建档价格出处与时间戳。随大盘与时序演进，支持对全项目用钢进行任意快照重算与调差索赔核算。
+                    </div>
+                </div>
+
+                <!-- 目标回溯价格快照选择器 -->
+                <div class="d-flex align-items-center gap-2">
+                    <span class="small fw-bold @(Theme.IsDarkMode ? "text-warning" : "text-dark") text-nowrap">目标回溯快照 (Target Date):</span>
+                    <select class="form-select form-select-sm @(Theme.IsDarkMode ? "bg-black text-warning border-secondary" : "bg-white text-dark border-secondary-subtle") w-auto"
+                            @bind="RetrospectionTargetSnapshotId" @bind:after="RecalculateRetrospection">
+                        @foreach (var snap in AllSnapshots)
+                        {
+                            <option value="@snap.SnapshotId">
+                                📅 @snap.EffectiveDate.ToString("yyyy-MM-dd") | @snap.SnapshotName @(snap.IsLocked ? "🔒[锁价基期]" : "")
+                            </option>
+                        }
+                    </select>
+                    <button class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1" @onclick="() => ActiveTab = 1" title="返回钢板核算矩阵配置新规格">
+                        <span>➕ 配置新钢板</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 全项目调差与成本聚合看板 -->
+            <div class="row g-2 mb-3">
+                <div class="col-sm-6 col-lg-3">
+                    <div class="p-2 rounded border @(Theme.IsDarkMode ? "bg-secondary bg-opacity-10 border-secondary" : "bg-light border-light-subtle")">
+                        <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1">归档物料品种数</div>
+                        <div class="fs-5 fw-bold text-primary">@ProvenanceRecords.Count <span class="text-xs fw-normal @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">种独立特征</span></div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-lg-3">
+                    <div class="p-2 rounded border @(Theme.IsDarkMode ? "bg-secondary bg-opacity-10 border-secondary" : "bg-light border-light-subtle")">
+                        <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1">关联工程用钢总量</div>
+                        <div class="fs-5 fw-bold text-info">@GetTotalProjectTons().ToString("N1") <span class="text-xs fw-normal @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">吨 (t)</span></div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-lg-3">
+                    <div class="p-2 rounded border @(Theme.IsDarkMode ? "bg-secondary bg-opacity-10 border-secondary" : "bg-light border-light-subtle")">
+                        <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1">原建档采购基准总额</div>
+                        <div class="fs-5 fw-bold @(Theme.IsDarkMode ? "text-white" : "text-dark")">¥ @GetTotalBaseRecordedCost().ToString("N0")</div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-lg-3">
+                    <div class="p-2 rounded border @(GetTotalCostVariance() >= 0 ? (Theme.IsDarkMode ? "bg-danger bg-opacity-10 border-danger border-opacity-50" : "bg-danger-subtle border-danger-subtle") : (Theme.IsDarkMode ? "bg-success bg-opacity-10 border-success border-opacity-50" : "bg-success-subtle border-success-subtle"))">
+                        <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1">项目时序调差差额 (ΔCost)</div>
+                        <div class="fs-5 fw-bold @(GetTotalCostVariance() >= 0 ? "text-danger" : "text-success")">
+                            @(GetTotalCostVariance() >= 0 ? "+" : "")¥ @GetTotalCostVariance().ToString("N0")
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 物料出处记录与跨时序回溯表格 -->
+            <div class="table-responsive flex-grow-1 mb-3">
+                <table class="table table-sm @(Theme.IsDarkMode ? "table-dark table-hover table-bordered border-secondary" : "table-hover table-bordered bg-white shadow-sm border-light-subtle") small align-middle mb-0">
+                    <thead class="@(Theme.IsDarkMode ? "table-secondary text-white" : "table-light text-dark")">
+                        <tr>
+                            <th style="width: 40px;">#</th>
+                            <th style="min-width: 200px;">物料唯一出处特征标签 (Tag)</th>
+                            <th style="min-width: 140px;">物料名称与工程引用</th>
+                            <th style="min-width: 130px;">规格与尺寸参数</th>
+                            <th style="min-width: 110px;">技术与公差等级</th>
+                            <th style="min-width: 110px;">钢厂与交付地</th>
+                            <th class="text-end" style="min-width: 110px;">建档单价 (出处)</th>
+                            <th class="text-end" style="min-width: 110px;">回溯单价 (@RetrospectionTargetSnapshot.EffectiveDate.ToString("MM-dd"))</th>
+                            <th class="text-end" style="min-width: 95px;">吨钢差价 (ΔP)</th>
+                            <th style="width: 90px;">用量 (吨)</th>
+                            <th class="text-end" style="min-width: 110px;">调差金额 (ΔCost)</th>
+                            <th class="text-center" style="width: 80px;">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (ProvenanceRecords.Count == 0)
+                        {
+                            <tr>
+                                <td colspan="12" class="text-center py-4 @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">
+                                    暂无物料出处记录。请前往【钢板五维加价核算矩阵】配置钢板并点击“📌 登记出处”按钮添加。
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var rec in ProvenanceRecords)
+                            {
+                                var retroPrice = rec.CalculateAtSnapshot(RetrospectionTargetSnapshot, ThicknessLadders, DimensionRules);
+                                double deltaP = retroPrice.FinalPricePerTon - rec.FinalPricePerTon;
+                                double tons = GetRecordTons(rec.Id);
+                                double deltaCost = deltaP * tons;
+
+                                <tr>
+                                    <td>@rec.Id</td>
+                                    <td>
+                                        <div class="d-flex align-items-center gap-1">
+                                            <span class="badge @(Theme.IsDarkMode ? "bg-dark text-info border border-secondary" : "bg-light text-primary border") font-monospace text-xs text-truncate" style="max-width: 190px;" title="@rec.MaterialTag">
+                                                @rec.MaterialTag
+                                            </span>
+                                            <button class="btn btn-xs btn-outline-secondary p-0 px-1" @onclick="() => CopyTagText(rec.MaterialTag)" title="复制物料标签">
+                                                📋
+                                            </button>
+                                        </div>
+                                        <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mt-1">
+                                            建档: @rec.RecordedAt.ToString("yyyy-MM-dd HH:mm")
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="fw-bold @(Theme.IsDarkMode ? "text-white" : "text-dark")">@rec.DisplayTitle</div>
+                                        <div class="text-xs text-primary">@rec.ProjectReference</div>
+                                    </td>
+                                    <td>
+                                        <div class="fw-bold">@rec.DimensionText</div>
+                                        <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">@rec.StandardSpecification</div>
+                                    </td>
+                                    <td>
+                                        <div class="badge @(rec.PlateParameters.Tolerance == ToleranceClass.ClassC ? "bg-primary" : "bg-secondary") text-xs">
+                                            @(rec.PlateParameters.Tolerance == ToleranceClass.ClassC ? "C类保全厚度" : (rec.PlateParameters.Tolerance == ToleranceClass.ClassB ? "B类公差" : "A类公差"))
+                                        </div>
+                                        @if (rec.PlateParameters.ZDirection != ZDirectionQuality.None)
+                                        {
+                                            <span class="badge bg-info text-dark text-xs ms-1">@rec.PlateParameters.ZDirection</span>
+                                        }
+                                        @if (rec.PlateParameters.UT != UltrasonicInspection.None)
+                                        {
+                                            <span class="badge bg-warning text-dark text-xs ms-1">@(rec.PlateParameters.UT == UltrasonicInspection.ClassI ? "UT-I" : "UT-II")</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        <div>@rec.MillName</div>
+                                        <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">@rec.DeliveryAndFreightText</div>
+                                    </td>
+                                    <td class="text-end">
+                                        <div class="fw-bold">¥@rec.FinalPricePerTon.ToString("0.##")</div>
+                                        <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">@rec.EffectiveDate.ToString("yy-MM-dd") 基准</div>
+                                    </td>
+                                    <td class="text-end">
+                                        <div class="fw-bold text-primary">¥@retroPrice.FinalPricePerTon.ToString("0.##")</div>
+                                        <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">@RetrospectionTargetSnapshot.SnapshotName</div>
+                                    </td>
+                                    <td class="text-end">
+                                        <span class="badge @(deltaP >= 0 ? "bg-danger" : "bg-success")">
+                                            @(deltaP >= 0 ? "+" : "")@deltaP.ToString("0.##") 元/t
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <input type="number" class="form-control form-control-sm text-center py-0 px-1 @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                               value="@tons"
+                                               @onchange="(e) => SetRecordTons(rec.Id, e.Value)"
+                                               style="width: 75px;" />
+                                    </td>
+                                    <td class="text-end fw-bold @(deltaCost >= 0 ? "text-danger" : "text-success")">
+                                        @(deltaCost >= 0 ? "+" : "")¥@deltaCost.ToString("N0")
+                                    </td>
+                                    <td class="text-center">
+                                        <div class="d-flex align-items-center justify-content-center gap-1">
+                                            <button class="btn btn-xs btn-outline-info p-1" @onclick="() => CopyTagText(rec.FullDescription)" title="复制完整 Describe 规范">
+                                                📋
+                                            </button>
+                                            <button class="btn btn-xs btn-outline-danger p-1" @onclick="() => RemoveProvenanceRecord(rec.Id)" title="删除此物料记录">
+                                                🗑️
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 底部结论与索赔调差指引 -->
+            <div class="p-3 rounded border @(Theme.IsDarkMode ? "bg-dark bg-opacity-50 border-secondary" : "bg-light border-light-subtle") d-flex flex-wrap align-items-center justify-content-between gap-2">
+                <div class="small">
+                    <b>💡 工程成本回溯结论:</b>
+                    当前针对目标快照 <span class="text-primary fw-bold">@RetrospectionTargetSnapshot.SnapshotName</span>，
+                    全项目 @ProvenanceRecords.Count 种物料构件共计 <span class="fw-bold">@GetTotalProjectTons().ToString("N1")</span> 吨钢，
+                    产生的物料总调差额为
+                    <b class="@(GetTotalCostVariance() >= 0 ? "text-danger fs-6" : "text-success fs-6")">
+                        @(GetTotalCostVariance() >= 0 ? "+" : "")¥ @GetTotalCostVariance().ToString("N0") 元
+                    </b>。
+                    具备完整的规格与时序出处链条，可直接导出作为工程结算签证附件。
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="ResetRecordTons">
+                        ↺ 重置用量
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+
 </div>
 
 @code {
@@ -970,6 +1232,15 @@
     private bool ShowLadderConfigPanel = false;
     private bool ShowDimensionConfigPanel = false;
     private string SaveFeedbackMessage = "";
+
+    // 物料出处记录库与跨时序价格回溯
+    private List<MaterialProvenanceRecord> ProvenanceRecords = [];
+    private string RetrospectionTargetSnapshotId = "SNAP-20261008-LATEST";
+    private MaterialPriceSnapshot RetrospectionTargetSnapshot => SeedPriceSnapshots.GetById(RetrospectionTargetSnapshotId);
+    private Dictionary<int, double> RecordTons = new();
+    private string CurrentPlateTag => MaterialProvenanceTagBuilder.GeneratePlateTag(PlateParams);
+    private string ProvenanceArchiveProjectInput = "粤港澳大湾区钢构主厂房项目";
+    private string ProvenanceSaveFeedbackMessage = "";
 
     // 钢板参数与当前结果
     private PlatePricingParameters PlateParams = new()
@@ -1015,8 +1286,17 @@
         SelectedSnapshotId = AllSnapshots[0].SnapshotId;
         CurrentSnapshot = AllSnapshots[0];
 
+        ProvenanceRecords = [.. SeedProvenanceRecords.AllRecords];
+        if (ProvenanceRecords.Count > 0)
+        {
+            RecordTons[ProvenanceRecords[0].Id] = 150.0;
+            if (ProvenanceRecords.Count > 1) RecordTons[ProvenanceRecords[1].Id] = 80.0;
+        }
+
         RecalculatePlate();
         RecalculateProfile();
+
+        _ = LoadProvenanceRecordsFromApi();
     }
 
     public void Dispose()
@@ -1071,7 +1351,6 @@
 
     private void OnThicknessChanged()
     {
-        // 板厚变化时，若之前未设定固定自定义值，则自适应新阶梯基准
         RecalculatePlate();
     }
 
@@ -1082,14 +1361,12 @@
 
     private void OnMillChanged()
     {
-        // 切换钢厂时，默认清空自定义值，带入该钢厂的基准参考溢价
         CustomMillPremiumInput = null;
         RecalculatePlate();
     }
 
     private void OnDeliveryOrDestinationChanged()
     {
-        // 切换交货地或状态时，默认清空自定义值，带入该路线预设运费
         CustomFreightInput = null;
         RecalculatePlate();
     }
@@ -1185,6 +1462,169 @@
     private void RecalculateVariance()
     {
         StateHasChanged();
+    }
+
+    // ======================== 物料出处记录库与时序价格回溯逻辑 ========================
+
+    private double GetRecordTons(int id) => RecordTons.TryGetValue(id, out var t) ? t : 100.0;
+
+    private void SetRecordTons(int id, object? val)
+    {
+        if (double.TryParse(val?.ToString(), out var parsed) && parsed >= 0)
+        {
+            RecordTons[id] = parsed;
+            StateHasChanged();
+        }
+    }
+
+    private void ResetRecordTons()
+    {
+        RecordTons.Clear();
+        foreach (var r in ProvenanceRecords) RecordTons[r.Id] = 100.0;
+        StateHasChanged();
+    }
+
+    private double GetTotalProjectTons() => ProvenanceRecords.Sum(r => GetRecordTons(r.Id));
+
+    private double GetTotalBaseRecordedCost() => ProvenanceRecords.Sum(r => r.FinalPricePerTon * GetRecordTons(r.Id));
+
+    private double GetTotalRetrospectiveCost() => ProvenanceRecords.Sum(r => r.CalculateAtSnapshot(RetrospectionTargetSnapshot, ThicknessLadders, DimensionRules).FinalPricePerTon * GetRecordTons(r.Id));
+
+    private double GetTotalCostVariance() => GetTotalRetrospectiveCost() - GetTotalBaseRecordedCost();
+
+    private void RecalculateRetrospection() => StateHasChanged();
+
+    private async Task ArchiveCurrentPlateToProvenance()
+    {
+        var pCopy = new PlatePricingParameters
+        {
+            Standard = PlateParams.Standard,
+            Grade = PlateParams.Grade,
+            ThicknessMm = PlateParams.ThicknessMm,
+            WidthMm = PlateParams.WidthMm,
+            LengthMm = PlateParams.LengthMm,
+            CutType = PlateParams.CutType,
+            Tolerance = PlateParams.Tolerance,
+            Flatness = PlateParams.Flatness,
+            Impact = PlateParams.Impact,
+            ZDirection = PlateParams.ZDirection,
+            Metallurgy = PlateParams.Metallurgy,
+            UT = PlateParams.UT,
+            Certificate = PlateParams.Certificate,
+            SteelMillId = PlateParams.SteelMillId,
+            Delivery = PlateParams.Delivery,
+            DestinationRegion = PlateParams.DestinationRegion,
+            CustomThicknessSurcharge = PlateParams.CustomThicknessSurcharge,
+            CustomDimensionSurcharge = PlateParams.CustomDimensionSurcharge,
+            CustomMillPremium = PlateParams.CustomMillPremium,
+            CustomFreightPerTon = PlateParams.CustomFreightPerTon
+        };
+
+        int nextId = ProvenanceRecords.Count > 0 ? ProvenanceRecords.Max(r => r.Id) + 1 : 1;
+        var newRecord = new MaterialProvenanceRecord
+        {
+            Id = nextId,
+            MaterialTag = MaterialProvenanceTagBuilder.GeneratePlateTag(pCopy),
+            DisplayTitle = $"{PlateParams.Grade} 钢板 t={PlateParams.ThicknessMm:0.##}mm ({CurrentPlatePrice.MillName})",
+            Category = "Plate",
+            StandardSpecification = CurrentPlatePrice.StandardSpecification,
+            DimensionText = CurrentPlatePrice.DimensionText,
+            SnapshotId = CurrentSnapshot.SnapshotId,
+            SnapshotName = CurrentSnapshot.SnapshotName,
+            EffectiveDate = CurrentSnapshot.EffectiveDate,
+            RecordedAt = DateTime.Now,
+            ProjectReference = string.IsNullOrWhiteSpace(ProvenanceArchiveProjectInput) ? "默认钢结构工程项目" : ProvenanceArchiveProjectInput,
+            MillName = CurrentPlatePrice.MillName,
+            DeliveryAndFreightText = CurrentPlatePrice.DeliveryAndFreightText,
+            BasePricePerTon = CurrentPlatePrice.BasePricePerTon,
+            MillPremiumPerTon = CurrentPlatePrice.MillPremiumPerTon,
+            ThicknessSurchargePerTon = CurrentPlatePrice.ThicknessSurchargePerTon,
+            DimensionSurchargePerTon = CurrentPlatePrice.DimensionSurchargePerTon,
+            ToleranceSurchargePerTon = CurrentPlatePrice.ToleranceSurchargePerTon,
+            PerformanceSurchargePerTon = CurrentPlatePrice.PerformanceSurchargePerTon,
+            InspectionSurchargePerTon = CurrentPlatePrice.InspectionSurchargePerTon,
+            FreightPerTon = CurrentPlatePrice.FreightPerTon,
+            FinalPricePerTon = CurrentPlatePrice.FinalPricePerTon,
+            FullDescription = CurrentPlatePrice.FullDescription,
+            PlateParameters = pCopy
+        };
+
+        ProvenanceRecords.Insert(0, newRecord);
+        SeedProvenanceRecords.AddRecord(newRecord);
+        RecordTons[newRecord.Id] = 100.0;
+
+        try
+        {
+            await Http.PostAsJsonAsync("/api/pricing/provenance-records", newRecord);
+        }
+        catch { }
+
+        ProvenanceSaveFeedbackMessage = $"✓ 钢板物料已登记入库！标签: {newRecord.MaterialTag}";
+        StateHasChanged();
+
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(4000);
+            ProvenanceSaveFeedbackMessage = "";
+            await InvokeAsync(StateHasChanged);
+        });
+    }
+
+    private async Task RemoveProvenanceRecord(int id)
+    {
+        var item = ProvenanceRecords.FirstOrDefault(r => r.Id == id);
+        if (item != null)
+        {
+            ProvenanceRecords.Remove(item);
+            RecordTons.Remove(id);
+            try
+            {
+                await Http.DeleteAsync($"/api/pricing/provenance-records/{id}");
+            }
+            catch { }
+            StateHasChanged();
+        }
+    }
+
+    private async Task CopyTagToClipboard()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", CurrentPlateTag);
+            ProvenanceSaveFeedbackMessage = "✓ 唯一物料特征标签已复制到剪贴板！";
+        }
+        catch
+        {
+            ProvenanceSaveFeedbackMessage = "请选中标签文本进行复制";
+        }
+        StateHasChanged();
+    }
+
+    private async Task CopyTagText(string text)
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", text);
+        }
+        catch { }
+    }
+
+    private async Task LoadProvenanceRecordsFromApi()
+    {
+        try
+        {
+            var records = await Http.GetFromJsonAsync<List<MaterialProvenanceRecord>>("/api/pricing/provenance-records");
+            if (records != null && records.Count > 0)
+            {
+                ProvenanceRecords = records;
+                foreach (var r in ProvenanceRecords)
+                {
+                    if (!RecordTons.ContainsKey(r.Id)) RecordTons[r.Id] = 100.0;
+                }
+                StateHasChanged();
+            }
+        }
+        catch { }
     }
 
     private async Task CopyDescribeToClipboard()
