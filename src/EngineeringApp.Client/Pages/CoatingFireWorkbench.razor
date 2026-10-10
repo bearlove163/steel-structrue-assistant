@@ -1,0 +1,1190 @@
+@page "/coating-fire-calculation"
+@page "/painting-calculation"
+@using EngineeringApp.Shared.Models
+@using EngineeringApp.Shared.Algorithms
+@using EngineeringApp.Shared.Data
+@using EngineeringApp.Client.Services
+@using EngineeringApp.Client.Shared.Components
+@inject NavigationManager Nav
+@inject ThemeState Theme
+@inject IJSRuntime JS
+@implements IDisposable
+
+<PageTitle>防腐涂装、防火算量与热浸镀锌工程工作台</PageTitle>
+
+<div class="container-fluid py-2 px-3 workstation-root d-flex flex-column min-vh-100 @(Theme.IsDarkMode ? "bg-dark text-white" : "bg-light text-dark")"
+     data-theme="@(Theme.IsDarkMode ? "dark" : "light")">
+
+    <!-- ======================= 顶部导航与控制器 ======================= -->
+    <header class="d-flex flex-wrap align-items-center justify-content-between pb-2 mb-2 border-bottom @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle bg-white rounded p-2 shadow-sm")">
+        <div class="d-flex align-items-center gap-3">
+            <button class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1" @onclick='() => Nav.NavigateTo("/portal")' title="返回统一门户">
+                <span>←</span>
+                <span>门户中心</span>
+            </button>
+            <div class="p-2 bg-warning rounded-3 text-dark fw-bold d-flex align-items-center justify-content-center shadow-sm" style="width: 38px; height: 38px; font-size: 20px;">
+                🎨
+            </div>
+            <div>
+                <h5 class="mb-0 fw-bold tracking-tight d-flex align-items-center gap-2 @(Theme.IsDarkMode ? "text-white" : "text-dark")">
+                    <span>模块 3：防腐涂装、防火算量与热浸镀锌工程工作台</span>
+                    <span class="badge bg-warning text-dark text-xs">COATING & FIRE PRO</span>
+                </h5>
+                <div class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted") text-xs">
+                    截面自重与表面积参照 · 形状系数 F/V · 喷涂/滚涂工艺与断面损耗 · 输变电塔与重构件热浸锌 (HDG) · 全球名牌涂料图鉴
+                </div>
+            </div>
+        </div>
+
+        <!-- 顶部工具栏：暗黑/亮色、多国标准、跨模块快捷跳转 -->
+        <div class="d-flex align-items-center gap-2 mt-2 mt-md-0">
+            <!-- 暗黑/亮色主题切换按钮 -->
+            <button class="btn btn-sm d-flex align-items-center gap-1 @(Theme.IsDarkMode ? "btn-outline-warning" : "btn-outline-dark")"
+                    @onclick="Theme.ToggleTheme" title="切换暗黑/亮色主题">
+                <span>@(Theme.IsDarkMode ? "☀️ 亮色" : "🌙 暗黑")</span>
+            </button>
+
+            <!-- 标准体系切换器 -->
+            <div class="btn-group btn-group-sm">
+                <button class="btn @(CurrentStandard == "GB" ? "btn-primary fw-bold" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary"))"
+                        @onclick='() => ChangeStandard("GB")'>
+                    🇨🇳 国标 GB
+                </button>
+                <button class="btn @(CurrentStandard == "EN" ? "btn-primary fw-bold" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary"))"
+                        @onclick='() => ChangeStandard("EN")'>
+                    🇪🇺 欧标 EN
+                </button>
+                <button class="btn @(CurrentStandard == "AISC" ? "btn-primary fw-bold" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary"))"
+                        @onclick='() => ChangeStandard("AISC")'>
+                    🇺🇸 美标 AISC
+                </button>
+            </div>
+
+            <button class="btn btn-outline-primary btn-sm" @onclick='() => Nav.NavigateTo("/material-pricing")' title="进入材料价格工作台">
+                🧱 材料价格
+            </button>
+            <button class="btn btn-outline-info btn-sm" @onclick='() => Nav.NavigateTo("/sections")' title="进入截面力学视窗">
+                📐 截面力学
+            </button>
+        </div>
+    </header>
+
+    <!-- ======================= 截面物性全局指标横幅 ======================= -->
+    <div class="@(Theme.IsDarkMode ? "bg-black bg-opacity-40 border-secondary" : "bg-white border-light-subtle shadow-sm") p-2 rounded border mb-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <div class="d-flex align-items-center gap-3 flex-wrap">
+            <span class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted") small">当前参照截面:</span>
+            <div class="badge bg-primary fs-6 fw-bold">
+                @(CurrentParams.StandardProfileName ?? $"{CurrentParams.Type} 自定义截面")
+            </div>
+            <div class="badge @(Theme.IsDarkMode ? "bg-secondary text-white" : "bg-light text-dark border")">
+                理论米重 (自重): <b class="text-warning">@CurrentResult.LinearMass.ToString("F1")</b> kg/m
+            </div>
+            <div class="badge @(Theme.IsDarkMode ? "bg-secondary text-white" : "bg-light text-dark border")">
+                全外表面积: <b class="text-info">@CurrentResult.GrossPaintingAreaPerMeter.ToString("F3")</b> m²/m
+            </div>
+            <div class="badge @(Theme.IsDarkMode ? "bg-secondary text-white" : "bg-light text-dark border")">
+                楼板扣除净面积: <b class="text-success">@CurrentResult.PaintingAreaExcludingTop.ToString("F3")</b> m²/m
+            </div>
+            <div class="badge @(Theme.IsDarkMode ? "bg-secondary text-white" : "bg-light text-dark border")">
+                吨钢比表面积: <b class="text-danger">@CurrentResult.AreaPerTon.ToString("F1")</b> m²/t
+            </div>
+            <div class="badge @(Theme.IsDarkMode ? "bg-secondary text-white" : "bg-light text-dark border")" title="截面形状系数 F/V = P/A * 1000，防火涂料升温与厚度设计核心物理量">
+                形状系数 F/V: <b class="text-primary">@CurrentPaintResult.SectionFactorFOverV.ToString("F1")</b> m⁻¹
+            </div>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <button class="btn btn-xs @(Theme.IsDarkMode ? "btn-outline-light" : "btn-outline-secondary")" @onclick="() => IsSteelModalOpen = true">
+                📖 检索全球型钢库
+            </button>
+        </div>
+    </div>
+
+    <!-- ======================= 四大专属模块选项卡 ======================= -->
+    <ul class="nav nav-tabs @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle") mb-3">
+        <li class="nav-item">
+            <button class="nav-link py-2 px-3 @(ActiveTab == 1 ? (Theme.IsDarkMode ? "active bg-dark text-warning border-warning border-bottom-0 fw-bold" : "active bg-white text-dark border-warning border-bottom-0 fw-bold shadow-sm") : (Theme.IsDarkMode ? "text-white-50" : "text-secondary"))"
+                    @onclick="() => ActiveTab = 1">
+                🎨 选项卡 1：油漆涂装与防火涂料核心算量
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link py-2 px-3 @(ActiveTab == 2 ? (Theme.IsDarkMode ? "active bg-dark text-info border-info border-bottom-0 fw-bold" : "active bg-white text-primary border-info border-bottom-0 fw-bold shadow-sm") : (Theme.IsDarkMode ? "text-white-50" : "text-secondary"))"
+                    @onclick="() => ActiveTab = 2">
+                ⚡ 选项卡 2：钢结构热浸镀锌 (HDG) 专项计算台
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link py-2 px-3 @(ActiveTab == 3 ? (Theme.IsDarkMode ? "active bg-dark text-success border-success border-bottom-0 fw-bold" : "active bg-white text-success border-success border-bottom-0 fw-bold shadow-sm") : (Theme.IsDarkMode ? "text-white-50" : "text-secondary"))"
+                    @onclick="() => ActiveTab = 3">
+                📐 选项卡 3：详细推导计算过程与工艺断面损耗分析
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link py-2 px-3 @(ActiveTab == 4 ? (Theme.IsDarkMode ? "active bg-dark text-danger border-danger border-bottom-0 fw-bold" : "active bg-white text-danger border-danger border-bottom-0 fw-bold shadow-sm") : (Theme.IsDarkMode ? "text-white-50" : "text-secondary"))"
+                    @onclick="() => ActiveTab = 4">
+                🏛️ 选项卡 4：全球名牌涂料与标准型号图鉴
+            </button>
+        </li>
+    </ul>
+
+    <!-- ======================= TAB 1: 涂装与防火核心算量 ======================= -->
+    @if (ActiveTab == 1)
+    {
+        <div class="row g-3 flex-grow-1">
+            <!-- 左侧：截面选型与特性参照视窗 -->
+            <div class="col-lg-4">
+                <div class="card @(Theme.IsDarkMode ? "bg-black bg-opacity-30 border-secondary" : "bg-white border-light-subtle shadow-sm") p-3 h-100 d-flex flex-column">
+                    <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle")">
+                        <span class="fw-bold small text-primary">📐 截面选型与特性参照视窗</span>
+                        <span class="badge @(Theme.IsDarkMode ? "bg-secondary" : "bg-light text-dark border") text-xs">实时参数化</span>
+                    </div>
+
+                    <!-- 截面类型选择按钮组 -->
+                    <div class="mb-3">
+                        <label class="form-label text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1">截面几何形态分类:</label>
+                        <div class="row g-1">
+                            <div class="col-4">
+                                <button class="btn btn-xs w-100 @(CurrentParams.Type == SectionType.HBeam ? "btn-primary fw-bold" : "btn-outline-secondary")"
+                                        @onclick="() => ChangeSectionType(SectionType.HBeam)">H型钢</button>
+                            </div>
+                            <div class="col-4">
+                                <button class="btn btn-xs w-100 @(CurrentParams.Type == SectionType.RHS ? "btn-primary fw-bold" : "btn-outline-secondary")"
+                                        @onclick="() => ChangeSectionType(SectionType.RHS)">箱型/方管</button>
+                            </div>
+                            <div class="col-4">
+                                <button class="btn btn-xs w-100 @(CurrentParams.Type == SectionType.CHS ? "btn-primary fw-bold" : "btn-outline-secondary")"
+                                        @onclick="() => ChangeSectionType(SectionType.CHS)">圆管 (CHS)</button>
+                            </div>
+                            <div class="col-4">
+                                <button class="btn btn-xs w-100 @(CurrentParams.Type == SectionType.Channel ? "btn-primary fw-bold" : "btn-outline-secondary")"
+                                        @onclick="() => ChangeSectionType(SectionType.Channel)">槽钢</button>
+                            </div>
+                            <div class="col-4">
+                                <button class="btn btn-xs w-100 @(CurrentParams.Type == SectionType.Angle ? "btn-primary fw-bold" : "btn-outline-secondary")"
+                                        @onclick="() => ChangeSectionType(SectionType.Angle)">角钢</button>
+                            </div>
+                            <div class="col-4">
+                                <button class="btn btn-xs w-100 @(CurrentParams.Type == SectionType.Cruciform ? "btn-primary fw-bold" : "btn-outline-secondary")"
+                                        @onclick="() => ChangeSectionType(SectionType.Cruciform)">十字形柱</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 关键几何尺寸调节 -->
+                    <div class="p-2 rounded border mb-3 @(Theme.IsDarkMode ? "bg-dark bg-opacity-50 border-secondary" : "bg-light border-light-subtle")">
+                        <div class="text-xs fw-bold text-warning mb-2">📏 截面尺寸微调 (mm)</div>
+                        @if (CurrentParams.Type == SectionType.HBeam || CurrentParams.Type == SectionType.Channel)
+                        {
+                            <div class="row g-2 text-xs mb-2">
+                                <div class="col-6">
+                                    <label class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">截面高度 H</label>
+                                    <input type="number" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                           @bind="CurrentParams.Height" @bind:after="RecalculateAll" step="10" />
+                                </div>
+                                <div class="col-6">
+                                    <label class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">翼缘宽度 B</label>
+                                    <input type="number" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                           @bind="CurrentParams.Width" @bind:after="RecalculateAll" step="10" />
+                                </div>
+                                <div class="col-6">
+                                    <label class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">腹板厚 tw</label>
+                                    <input type="number" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                           @bind="CurrentParams.WebThickness" @bind:after="RecalculateAll" step="1" />
+                                </div>
+                                <div class="col-6">
+                                    <label class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">翼缘厚 tf</label>
+                                    <input type="number" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                           @bind="CurrentParams.FlangeThickness" @bind:after="RecalculateAll" step="1" />
+                                </div>
+                            </div>
+                        }
+                        else if (CurrentParams.Type == SectionType.RHS)
+                        {
+                            <div class="row g-2 text-xs mb-2">
+                                <div class="col-4">
+                                    <label class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">高度 H</label>
+                                    <input type="number" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                           @bind="CurrentParams.Height" @bind:after="RecalculateAll" step="10" />
+                                </div>
+                                <div class="col-4">
+                                    <label class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">宽度 B</label>
+                                    <input type="number" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                           @bind="CurrentParams.Width" @bind:after="RecalculateAll" step="10" />
+                                </div>
+                                <div class="col-4">
+                                    <label class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">壁厚 t</label>
+                                    <input type="number" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                           @bind="CurrentParams.WallThickness" @bind:after="RecalculateAll" step="1" />
+                                </div>
+                            </div>
+                        }
+                        else if (CurrentParams.Type == SectionType.CHS || CurrentParams.Type == SectionType.Circle)
+                        {
+                            <div class="row g-2 text-xs mb-2">
+                                <div class="col-6">
+                                    <label class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">外径 D (mm)</label>
+                                    <input type="number" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                           @bind="CurrentParams.OuterDiameter" @bind:after="RecalculateAll" step="10" />
+                                </div>
+                                <div class="col-6">
+                                    <label class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">壁厚 t (mm)</label>
+                                    <input type="number" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                           @bind="CurrentParams.WallThickness" @bind:after="RecalculateAll" step="1" />
+                                </div>
+                            </div>
+                        }
+                        else if (CurrentParams.Type == SectionType.Angle)
+                        {
+                            <div class="row g-2 text-xs mb-2">
+                                <div class="col-4">
+                                    <label class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">肢宽 b1</label>
+                                    <input type="number" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                           @bind="CurrentParams.LegWidth1" @bind:after="RecalculateAll" step="5" />
+                                </div>
+                                <div class="col-4">
+                                    <label class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">肢宽 b2</label>
+                                    <input type="number" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                           @bind="CurrentParams.LegWidth2" @bind:after="RecalculateAll" step="5" />
+                                </div>
+                                <div class="col-4">
+                                    <label class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">厚度 t</label>
+                                    <input type="number" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                           @bind="CurrentParams.LegThickness" @bind:after="RecalculateAll" step="1" />
+                                </div>
+                            </div>
+                        }
+                    </div>
+
+                    <!-- 截面 2D SVG 可视化示意图 -->
+                    <div class="p-2 rounded border mb-3 flex-grow-1 d-flex flex-column @(Theme.IsDarkMode ? "bg-dark border-secondary" : "bg-light border-light-subtle")" style="min-height: 220px;">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="text-xs fw-bold text-info">👁️ 截面轮廓与受漆面形态</span>
+                            <span class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">
+                                橙色顶线: 楼板贴合免喷涂面
+                            </span>
+                        </div>
+                        <div class="flex-grow-1 d-flex align-items-center justify-content-center">
+                            @if (CurrentResult.OuterContour.Count > 0 || CurrentResult.IsCircular)
+                            {
+                                <svg viewBox="-250 -250 500 500" class="w-100 h-100" style="max-height: 220px;">
+                                    <!-- 简易截面轮廓填充 -->
+                                    <rect x="-240" y="-240" width="480" height="480" fill="@(Theme.IsDarkMode ? "#111827" : "#f8fafc")" rx="8" />
+                                    @if (CurrentResult.IsCircular)
+                                    {
+                                        <circle cx="0" cy="0" r="140" fill="#3b82f6" fill-opacity="0.3" stroke="#3b82f6" stroke-width="6" />
+                                        @if (CurrentResult.CircleInnerRadius > 0)
+                                        {
+                                            <circle cx="0" cy="0" r="@(140.0 * (CurrentResult.CircleInnerRadius / CurrentResult.CircleOuterRadius))" fill="@(Theme.IsDarkMode ? "#111827" : "#f8fafc")" stroke="#3b82f6" stroke-width="4" />
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <!-- 多边形外轮廓 -->
+                                        <polygon points="@GetSvgPointsString(CurrentResult.OuterContour)" fill="#3b82f6" fill-opacity="0.35" stroke="#3b82f6" stroke-width="4" />
+                                        @if (CurrentResult.InnerContours.Count > 0)
+                                        {
+                                            @foreach (var inner in CurrentResult.InnerContours)
+                                            {
+                                                <polygon points="@GetSvgPointsString(inner)" fill="@(Theme.IsDarkMode ? "#111827" : "#f8fafc")" stroke="#3b82f6" stroke-width="3" />
+                                            }
+                                        }
+                                    }
+                                    <!-- 顶部楼板贴合指示橙色高亮线 -->
+                                    @if (ExcludeTopSurface)
+                                    {
+                                        <line x1="-120" y1="-145" x2="120" y2="-145" stroke="#f97316" stroke-width="8" stroke-dasharray="8,4" />
+                                        @((MarkupString)"<text x='0' y='-160' fill='#f97316' font-size='16' text-anchor='middle' font-weight='bold'>楼板密贴面 (已扣除)</text>")
+                                    }
+                                </svg>
+                            }
+                        </div>
+                    </div>
+
+                    <!-- 截面特性参数卡片 -->
+                    <div class="table-responsive text-xs">
+                        <table class="table table-sm @(Theme.IsDarkMode ? "table-dark table-borderless" : "table-light table-borderless") mb-0">
+                            <tbody>
+                                <tr>
+                                    <td class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">截面面积 A:</td>
+                                    <td class="text-end fw-bold">@CurrentResult.AreaCm2.ToString("F1") cm²</td>
+                                </tr>
+                                <tr>
+                                    <td class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">展开外周长 P:</td>
+                                    <td class="text-end fw-bold">@CurrentResult.OuterPerimeter.ToString("F0") mm</td>
+                                </tr>
+                                <tr>
+                                    <td class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">上表面宽度 b_top:</td>
+                                    <td class="text-end text-warning fw-bold">@CurrentResult.TopSurfaceWidth.ToString("F0") mm</td>
+                                </tr>
+                                <tr>
+                                    <td class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">截面形状系数 F/V:</td>
+                                    <td class="text-end text-primary fw-bold">@CurrentPaintResult.SectionFactorFOverV.ToString("F1") m⁻¹</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右侧：涂层配套方案设计、工艺选择与造价大盘 -->
+            <div class="col-lg-8">
+                <div class="card @(Theme.IsDarkMode ? "bg-black bg-opacity-30 border-secondary" : "bg-white border-light-subtle shadow-sm") p-3 h-100 d-flex flex-column">
+                    <!-- 顶部工法选择与预设配套方案按钮组 -->
+                    <div class="p-2 mb-3 rounded border @(Theme.IsDarkMode ? "bg-secondary bg-opacity-10 border-secondary" : "bg-light border-light-subtle")">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                            <!-- 施工工法单选组 -->
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="fw-bold text-xs text-primary">🛠️ 施工工法:</span>
+                                <div class="btn-group btn-group-sm">
+                                    <button class="btn btn-xs @(CurrentMethod == CoatingApplicationMethod.AirlessSpraying ? "btn-primary fw-bold" : "btn-outline-secondary")"
+                                            @onclick="() => ChangeApplicationMethod(CoatingApplicationMethod.AirlessSpraying)">
+                                        高压无气喷涂 (主流高效)
+                                    </button>
+                                    <button class="btn btn-xs @(CurrentMethod == CoatingApplicationMethod.AirSpraying ? "btn-primary fw-bold" : "btn-outline-secondary")"
+                                            @onclick="() => ChangeApplicationMethod(CoatingApplicationMethod.AirSpraying)">
+                                        空气喷涂 (细腻飞散大)
+                                    </button>
+                                    <button class="btn btn-xs @(CurrentMethod == CoatingApplicationMethod.BrushOrRoller ? "btn-primary fw-bold" : "btn-outline-secondary")"
+                                            @onclick="() => ChangeApplicationMethod(CoatingApplicationMethod.BrushOrRoller)">
+                                        手工刷滚涂 (零飞散工费高)
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- 扣除楼板与批量工程量 -->
+                            <div class="d-flex align-items-center gap-3 text-xs">
+                                <div class="form-check form-switch m-0 d-flex align-items-center gap-1">
+                                    <input class="form-check-input" type="checkbox" id="checkExcludeTop"
+                                           @bind="ExcludeTopSurface" @bind:after="RecalculateAll" />
+                                    <label class="form-check-label @(Theme.IsDarkMode ? "text-white-50" : "text-muted")" for="checkExcludeTop">
+                                        扣除楼板贴合面 (@CurrentResult.TopSurfaceWidth.ToString("F0")mm)
+                                    </label>
+                                </div>
+                                <div class="d-flex align-items-center gap-1">
+                                    <span>工程总长:</span>
+                                    <input type="number" class="form-control form-control-sm text-end p-1 @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                           style="width: 75px;" @bind="ProjectTotalLengthM" @bind:after="RecalculateAll" min="1" step="10" />
+                                    <span>m</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 行业推荐施工配套预设方案 -->
+                        <div class="d-flex align-items-center gap-2 flex-wrap pt-1 border-top @(Theme.IsDarkMode ? "border-secondary border-opacity-50" : "border-light-subtle")">
+                            <span class="text-xs fw-bold text-success">📋 行业预设配套:</span>
+                            <button class="btn btn-xs @(CurrentPresetName == "轻钢厂房常温防腐" ? "btn-success" : "btn-outline-secondary")"
+                                    @onclick='() => ApplyPreset("轻钢厂房常温防腐")'>轻钢厂房常温 (底+面)</button>
+                            <button class="btn btn-xs @(CurrentPresetName == "标准工业厂房重防腐" ? "btn-success" : "btn-outline-secondary")"
+                                    @onclick='() => ApplyPreset("标准工业厂房重防腐")'>标准工业重防腐 (底+中+面)</button>
+                            <button class="btn btn-xs @(CurrentPresetName == "沿海高腐蚀 C4/C5 氟碳体系" ? "btn-success" : "btn-outline-secondary")"
+                                    @onclick='() => ApplyPreset("沿海高腐蚀 C4/C5 氟碳体系")'>C4/C5 氟碳超耐候体系</button>
+                            <button class="btn btn-xs @(CurrentPresetName == "商业建筑室内 2.0h 膨胀防火体系" ? "btn-success" : "btn-outline-secondary")"
+                                    @onclick='() => ApplyPreset("商业建筑室内 2.0h 膨胀防火体系")'>室内 2.0h 薄型防火体系</button>
+                            <button class="btn btn-xs @(CurrentPresetName == "超高层钢柱 3.0h 厚型非膨胀防火体系" ? "btn-success" : "btn-outline-secondary")"
+                                    @onclick='() => ApplyPreset("超高层钢柱 3.0h 厚型非膨胀防火体系")'>超高层 3.0h 厚型防火体系</button>
+                        </div>
+                    </div>
+
+                    <!-- 涂层分层表格 -->
+                    <div class="table-responsive rounded border mb-3 flex-grow-1 @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle")">
+                        <table class="table table-sm @(Theme.IsDarkMode ? "table-dark table-hover" : "table-hover") align-middle mb-0 text-xs">
+                            <thead class="@(Theme.IsDarkMode ? "table-secondary table-opacity-25" : "table-light") text-center">
+                                <tr>
+                                    <th style="width: 45px;">启用</th>
+                                    <th style="width: 110px;">层次分类</th>
+                                    <th>规格名称 / 品牌型号联动</th>
+                                    <th style="width: 95px;">膜厚 (DFT)</th>
+                                    <th style="width: 75px;">固含%</th>
+                                    <th style="width: 75px;">比重</th>
+                                    <th style="width: 80px;" title="根据截面形状(圆管>箱型)与工法自动修正">损耗%</th>
+                                    <th style="width: 85px;">漆价(元/kg)</th>
+                                    <th style="width: 85px;">工费(元/m²)</th>
+                                    <th style="width: 95px;">单耗(kg/m²)</th>
+                                    <th style="width: 95px;">小计(元/m²)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var layer in CurrentLayers)
+                                {
+                                    <tr class="@(layer.IsEnabled ? "" : (Theme.IsDarkMode ? "opacity-50" : "text-muted opacity-50"))">
+                                        <td class="text-center">
+                                            <input class="form-check-input" type="checkbox" @bind="layer.IsEnabled" @bind:after="RecalculateAll" />
+                                        </td>
+                                        <td>
+                                            <span class="badge @GetLayerBadgeClass(layer.LayerType)">@layer.GetDisplayName()</span>
+                                        </td>
+                                        <td>
+                                            <div class="d-flex flex-column gap-1">
+                                                <select class="form-select form-select-sm py-0 @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark")"
+                                                        style="font-size: 11px; height: 26px;"
+                                                        @onchange="(e) => OnSelectProductItem(layer, e)">
+                                                    <option value="">-- 选择全球/国内一线产品库 --</option>
+                                                    @foreach (var prod in PaintProductDatabase.GetByType(layer.LayerType))
+                                                    {
+                                                        <option value="@prod.Name" selected="@(prod.Name == layer.ProductName)">
+                                                            @prod.Name (@prod.Brand) - ¥@prod.MaterialUnitPricePerKg/kg
+                                                        </option>
+                                                    }
+                                                </select>
+                                                <input type="text" class="form-control form-control-sm py-0 @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                                       style="font-size: 11px; height: 24px;"
+                                                       placeholder="自定义名称 / 品牌"
+                                                       @bind="layer.ProductName" @bind:after="RecalculateAll" />
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="input-group input-group-sm">
+                                                <input type="number" class="form-control form-control-sm text-end p-1 @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                                       @bind="layer.Dft" @bind:after="RecalculateAll" step="@(layer.LayerType == CoatingLayerType.Fireproof ? 0.2 : 5)" />
+                                                <span class="input-group-text px-1 @(Theme.IsDarkMode ? "bg-secondary bg-opacity-25 text-white-50 border-secondary" : "bg-light")">
+                                                    @(layer.LayerType == CoatingLayerType.Fireproof ? "mm" : "μm")
+                                                </span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <input type="number" class="form-control form-control-sm text-end p-1 @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                                   @bind="layer.VolumeSolids" @bind:after="RecalculateAll" step="1" />
+                                        </td>
+                                        <td>
+                                            <input type="number" class="form-control form-control-sm text-end p-1 @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                                   @bind="layer.Density" @bind:after="RecalculateAll" step="0.05" />
+                                        </td>
+                                        <td>
+                                            <div class="text-end">
+                                                <input type="number" class="form-control form-control-sm text-end p-1 @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                                       @bind="layer.LossRate" @bind:after="RecalculateAll" step="5" />
+                                                <span class="text-muted" style="font-size: 10px;">
+                                                    实际: @(CurrentPaintResult.Layers.FirstOrDefault(x => x.LayerType == layer.LayerType)?.EffectiveLossRatePercent.ToString("F0") ?? "-")%
+                                                </span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <input type="number" class="form-control form-control-sm text-end p-1 @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                                   @bind="layer.MaterialPrice" @bind:after="RecalculateAll" step="1" />
+                                        </td>
+                                        <td>
+                                            <input type="number" class="form-control form-control-sm text-end p-1 @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                                   @bind="layer.LaborPrice" @bind:after="RecalculateAll" step="1" />
+                                        </td>
+                                        <td class="text-end font-monospace">
+                                            @(CurrentPaintResult.Layers.FirstOrDefault(x => x.LayerType == layer.LayerType)?.ActualUsageKgPerM2.ToString("F3") ?? "-")
+                                        </td>
+                                        <td class="text-end pe-2 fw-bold font-monospace @(layer.IsEnabled ? "text-success" : "")">
+                                            @(CurrentPaintResult.Layers.FirstOrDefault(x => x.LayerType == layer.LayerType) != null ? $"¥{CurrentPaintResult.Layers.First(x => x.LayerType == layer.LayerType).TotalCostPerM2:F2}" : "-")
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- 综合造价四大指标横幅 -->
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-3">
+                            <div class="p-2 rounded border text-center @(Theme.IsDarkMode ? "bg-dark border-secondary" : "bg-light border-light-subtle")">
+                                <div class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted") text-xs">每平方米综合造价</div>
+                                <div class="fs-5 fw-bold text-primary font-monospace">
+                                    ¥ @CurrentPaintResult.TotalCostPerM2.ToString("F2") <span class="fs-6 fw-normal">元/m²</span>
+                                </div>
+                                <div class="text-xs text-muted" style="font-size: 10px;">
+                                    (料: ¥@CurrentPaintResult.TotalMaterialCostPerM2.ToString("F1") + 工: ¥@CurrentPaintResult.TotalLaborCostPerM2.ToString("F1"))
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="p-2 rounded border text-center @(Theme.IsDarkMode ? "bg-dark border-secondary" : "bg-light border-light-subtle")">
+                                <div class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted") text-xs">延米综合涂装造价</div>
+                                <div class="fs-5 fw-bold text-warning font-monospace">
+                                    ¥ @CurrentPaintResult.TotalCostPerMeter.ToString("F2") <span class="fs-6 fw-normal">元/m</span>
+                                </div>
+                                <div class="text-xs text-muted" style="font-size: 10px;">
+                                    延米耗漆: @CurrentPaintResult.TotalUsageKgPerMeter.ToString("F2") kg/m
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="p-2 rounded border text-center @(Theme.IsDarkMode ? "bg-dark border-secondary" : "bg-light border-light-subtle")">
+                                <div class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted") text-xs">吨钢涂装综合造价</div>
+                                <div class="fs-5 fw-bold text-success font-monospace">
+                                    ¥ @CurrentPaintResult.TotalCostPerTon.ToString("F0") <span class="fs-6 fw-normal">元/t</span>
+                                </div>
+                                <div class="text-xs text-muted" style="font-size: 10px;">
+                                    吨钢耗漆: @CurrentPaintResult.TotalUsageKgPerTon.ToString("F1") kg/t
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="p-2 rounded border text-center @(Theme.IsDarkMode ? "bg-primary bg-opacity-10 border-primary" : "bg-primary-subtle border-primary-subtle")">
+                                <div class="text-primary text-xs fw-bold">工程总造价预算 (@ProjectTotalLengthM.ToString("F0")m)</div>
+                                <div class="fs-5 fw-bold text-danger font-monospace">
+                                    ¥ @CurrentPaintResult.ProjectTotalCostYuan.ToString("N2")
+                                </div>
+                                <div class="text-xs text-dark" style="font-size: 10px;">
+                                    总油漆采购量: @CurrentPaintResult.ProjectTotalPaintKg.ToString("F1") kg
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 标准化 Describe 输出框 -->
+                    <div class="@(Theme.IsDarkMode ? "bg-black border-secondary" : "bg-light border-light-subtle") p-3 rounded border">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="badge @(Theme.IsDarkMode ? "bg-secondary" : "bg-secondary-subtle text-dark border") text-xs">标准化 Describe 技术规格输出</span>
+                            <button class="btn btn-xs btn-outline-success py-0 px-2" @onclick="CopyDescribeToClipboard">
+                                📋 一键复制
+                            </button>
+                        </div>
+                        <div class="font-monospace small @(Theme.IsDarkMode ? "text-warning bg-dark border-secondary" : "text-dark bg-white border-secondary-subtle") p-2 rounded border text-break user-select-all" style="font-size: 11px; line-height: 1.5;">
+                            @CurrentPaintResult.FullTechnicalDescribe
+                        </div>
+                        @if (!string.IsNullOrEmpty(CopyAlertMessage))
+                        {
+                            <div class="text-success small mt-1 animate-pulse">@CopyAlertMessage</div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- ======================= TAB 2: 钢结构热浸镀锌 (HDG) 专项计算台 ======================= -->
+    @if (ActiveTab == 2)
+    {
+        <div class="row g-3 flex-grow-1">
+            <div class="col-lg-5">
+                <div class="card @(Theme.IsDarkMode ? "bg-black bg-opacity-30 border-secondary" : "bg-white border-light-subtle shadow-sm") p-3 h-100">
+                    <h6 class="fw-bold text-info mb-2 d-flex align-items-center gap-2">
+                        <span>⚡ 热浸镀锌 (HDG) 工艺参数配置</span>
+                        <span class="badge bg-info text-dark text-xs">GB/T 13912-2020</span>
+                    </h6>
+                    <p class="small @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-3">
+                        热浸镀锌在商业上按<b>“元/吨”</b>报价结算，但物理成本核心由<b>“截面比表面积 (m²/t) 与锌层附着增重”</b>决定。
+                    </p>
+
+                    <!-- 国标锌锭纯度等级 -->
+                    <div class="mb-3">
+                        <label class="form-label small @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1">国标锌锭纯度等级 (GB/T 470):</label>
+                        <select class="form-select form-select-sm @(Theme.IsDarkMode ? "bg-dark text-warning border-secondary" : "bg-white text-dark") fw-bold"
+                                @bind="HdgOptions.ZincGrade" @bind:after="RecalculateHdg">
+                            <option value="@ZincIngotGrade.Grade0_HighPurity_99995">★ 0# 特级高纯锌 (Zn ≥ 99.995%, 特高压/外贸特级, +¥500/t)</option>
+                            <option value="@ZincIngotGrade.Grade1_Standard_9999">1# 优质结构纯锌 (Zn ≥ 99.99%, 工业重防腐基准价)</option>
+                            <option value="@ZincIngotGrade.Secondary_CrudeZinc">再生粗锌 / 次级配比 (Zn 98.5%~99.5%, -¥800/t)</option>
+                        </select>
+                    </div>
+
+                    <!-- 锌锭基准现货大盘网价 -->
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label small @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1">锌锭现货网价 (元/吨锌):</label>
+                            <input type="number" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                   @bind="HdgOptions.ZincPricePerTon" @bind:after="RecalculateHdg" step="500" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1">设计镀锌层厚度 (μm):</label>
+                            <select class="form-select form-select-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                    @bind="HdgOptions.DftMicrons" @bind:after="RecalculateHdg">
+                                <option value="55">55 μm (轻薄件，约 390 g/m²)</option>
+                                <option value="70">70 μm (普通件，约 500 g/m²)</option>
+                                <option value="85">85 μm (国标6mm以上标配，约 610 g/m²)</option>
+                                <option value="100">100 μm (高耐蚀加重型，约 714 g/m²)</option>
+                                <option value="120">120 μm (沿海特重防腐，约 857 g/m²)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- 工艺选项开关 -->
+                    <div class="p-3 rounded border mb-3 @(Theme.IsDarkMode ? "bg-dark bg-opacity-50 border-secondary" : "bg-light border-light-subtle")">
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="checkBothSides"
+                                   @bind="HdgOptions.IsBothSidesGalvanized" @bind:after="RecalculateHdg" />
+                            <label class="form-check-label small" for="checkBothSides">
+                                内外表面双面全浸锌 (角钢、开孔钢管内外全浸)
+                            </label>
+                        </div>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="checkDoubleDip"
+                                   @bind="HdgOptions.IsDoubleDipOverlength" @bind:after="RecalculateHdg" />
+                            <label class="form-check-label small text-warning fw-bold" for="checkDoubleDip">
+                                单根长度超限 (&gt;12.5m) 需倒头进行二次双浸 (+25% 工艺费)
+                            </label>
+                        </div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="checkCavity"
+                                   @bind="HdgOptions.HasComplexCavities" @bind:after="RecalculateHdg" />
+                            <label class="form-check-label small" for="checkCavity">
+                                复杂闭腔构件 (需开设工艺排气防爆孔 +15% 难度费)
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- 批量工程总长 -->
+                    <div class="mb-3">
+                        <label class="form-label small @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1">工程批量构件总长度 (m):</label>
+                        <input type="number" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                               @bind="HdgOptions.ProjectLengthM" @bind:after="RecalculateHdg" min="1" step="50" />
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右侧：热浸锌综合造价大盘与行业物理机理解析 -->
+            <div class="col-lg-7">
+                <div class="card @(Theme.IsDarkMode ? "bg-black bg-opacity-40 border-info" : "bg-white border-info shadow") p-3 h-100 d-flex flex-column">
+                    <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle")">
+                        <span class="small @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">热浸锌核算模式：吨单价 + 延米造价双轨联动</span>
+                        <span class="badge bg-info text-dark">即时精确计算</span>
+                    </div>
+
+                    <!-- 最终吨加工费大徽章 -->
+                    <div class="@(Theme.IsDarkMode ? "bg-info bg-opacity-10 border-info border-opacity-50" : "bg-info-subtle border-info") p-3 rounded-3 border text-center mb-3">
+                        <div class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted") small mb-1">热浸镀锌综合加工到厂单价</div>
+                        <div class="display-6 fw-bold text-primary tracking-tight">
+                            ¥ @CurrentHdgResult.TotalPricePerTon.ToString("N0")
+                            <span class="fs-6 fw-normal @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">元/吨钢</span>
+                        </div>
+                        <div class="d-flex justify-content-center gap-3 small mt-2">
+                            <span>折合延米价: <b class="text-warning">¥@CurrentHdgResult.LinearPricePerMeter.ToString("F2")</b> 元/m</span>
+                            <span>折合平米表面积: <b class="text-success">¥@CurrentHdgResult.PricePerM2.ToString("F2")</b> 元/m²</span>
+                        </div>
+                    </div>
+
+                    <!-- 成本构成瀑布明细 -->
+                    <div class="table-responsive mb-3">
+                        <table class="table table-sm @(Theme.IsDarkMode ? "table-dark table-borderless" : "table-light table-borderless") small mb-0">
+                            <tbody>
+                                <tr>
+                                    <td class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">1. 截面吨钢比表面积 S_ton:</td>
+                                    <td class="text-end fw-bold">@CurrentHdgResult.SpecificSurfaceAreaTon.ToString("F1") m²/t</td>
+                                </tr>
+                                <tr>
+                                    <td class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">2. 每吨钢耗锌量 (含18%损耗):</td>
+                                    <td class="text-end text-warning fw-bold">@CurrentHdgResult.ZincConsumptionKgPerTon.ToString("F1") kg/t (增重 +@CurrentHdgResult.WeightIncreasePercent.ToString("F1")%)</td>
+                                </tr>
+                                <tr>
+                                    <td class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">3. 纯锌材料消耗费用贡献:</td>
+                                    <td class="text-end text-danger fw-bold">+¥@CurrentHdgResult.ZincMaterialCostPerTon.ToString("F0") /吨</td>
+                                </tr>
+                                <tr>
+                                    <td class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">4. 基础酸洗助镀与天然气能耗工费:</td>
+                                    <td class="text-end fw-bold">+¥@CurrentHdgResult.BaseProcessingCostPerTon.ToString("F0") /吨</td>
+                                </tr>
+                                @if (CurrentHdgResult.OverlengthSurchargePerTon > 0)
+                                {
+                                    <tr>
+                                        <td class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">5. 超长双浸倒头与工艺难度溢价:</td>
+                                        <td class="text-end text-warning fw-bold">+¥@CurrentHdgResult.OverlengthSurchargePerTon.ToString("F0") /吨</td>
+                                    </tr>
+                                }
+                                <tr class="border-top @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle")">
+                                    <td class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">工程批量总造价 (@HdgOptions.ProjectLengthM.ToString("F0")m, @CurrentHdgResult.ProjectTotalTons.ToString("F1")吨钢):</td>
+                                    <td class="text-end text-success fw-bold fs-6">¥@CurrentHdgResult.ProjectTotalCostYuan.ToString("N2")</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- 行业机理与数据对比卡片 -->
+                    <div class="p-3 rounded border mb-3 @(Theme.IsDarkMode ? "bg-dark bg-opacity-75 border-secondary" : "bg-light border-light-subtle")">
+                        <div class="fw-bold text-info small mb-1">💡 输变电轻构件 vs 重型构件机理剖析:</div>
+                        <p class="small @(Theme.IsDarkMode ? "text-white-75" : "text-muted") mb-0" style="line-height: 1.6;">
+                            @CurrentHdgResult.MechanismExplanation
+                        </p>
+                    </div>
+
+                    <!-- Describe 输出 -->
+                    <div class="mt-auto @(Theme.IsDarkMode ? "bg-black border-secondary" : "bg-light border-light-subtle") p-2 rounded border">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="badge @(Theme.IsDarkMode ? "bg-secondary" : "bg-secondary-subtle text-dark border") text-xs">热浸镀锌 Describe 契约接口</span>
+                            <button class="btn btn-xs btn-outline-success py-0 px-2" @onclick="() => CopyText(CurrentHdgResult.FullDescribeText)">
+                                📋 复制
+                            </button>
+                        </div>
+                        <div class="font-monospace small @(Theme.IsDarkMode ? "text-info bg-dark border-secondary" : "text-dark bg-white border-secondary-subtle") p-2 rounded border text-break" style="font-size: 11px;">
+                            @CurrentHdgResult.FullDescribeText
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- ======================= TAB 3: 详细推导计算过程与工艺断面损耗分析 ======================= -->
+    @if (ActiveTab == 3)
+    {
+        <div class="row g-3 flex-grow-1">
+            <div class="col-lg-6">
+                <!-- 详细推导公式与当前代入过程 -->
+                <div class="card @(Theme.IsDarkMode ? "bg-black bg-opacity-30 border-secondary" : "bg-white border-light-subtle shadow-sm") p-3 h-100">
+                    <h6 class="fw-bold text-success mb-2 d-flex align-items-center gap-2">
+                        <span>📐 涂装算量数学推导步骤全景</span>
+                        <span class="badge bg-success text-xs">公式透明化</span>
+                    </h6>
+                    <p class="small @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-3">
+                        基于国际 SSPC/NACE 理论涂布率标准与中国《钢结构涂装工程工艺规范》，每道涂层的严格推导过程：
+                    </p>
+
+                    @if (CurrentPaintResult.ProcessTrace != null)
+                    {
+                        <div class="d-flex flex-column gap-2 overflow-auto" style="max-height: 520px;">
+                            @foreach (var step in CurrentPaintResult.ProcessTrace.Steps)
+                            {
+                                <div class="p-2 rounded border @(Theme.IsDarkMode ? "bg-dark bg-opacity-60 border-secondary" : "bg-light border-light-subtle")">
+                                    <div class="fw-bold text-primary small mb-1">@step.Title</div>
+                                    <div class="font-monospace text-xs text-muted mb-1">公式: @step.Formula</div>
+                                    <div class="font-monospace text-xs text-warning mb-1">代入: @step.ValueSubstitution</div>
+                                    <div class="font-monospace text-xs text-success fw-bold">成果: @step.Conclusion</div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="col-lg-6">
+                <!-- 断面几何形状影响与工法对比剖析 -->
+                <div class="card @(Theme.IsDarkMode ? "bg-black bg-opacity-30 border-secondary" : "bg-white border-light-subtle shadow-sm") p-3 h-100">
+                    <h6 class="fw-bold text-warning mb-2 d-flex align-items-center gap-2">
+                        <span>🌀 为什么圆管喷涂损耗显著大于箱型？(断面机理解析)</span>
+                    </h6>
+
+                    <div class="p-3 rounded border mb-3 @(Theme.IsDarkMode ? "bg-warning bg-opacity-10 border-warning border-opacity-25" : "bg-warning-subtle border-warning-subtle")">
+                        <p class="small mb-2 fw-bold text-warning">
+                            @CurrentPaintResult.ProcessTrace?.SectionShapeExplanation
+                        </p>
+                        <div class="table-responsive">
+                            <table class="table table-sm @(Theme.IsDarkMode ? "table-dark" : "table-light") table-bordered text-xs mb-0 text-center">
+                                <thead>
+                                    <tr>
+                                        <th>断面类型</th>
+                                        <th>有效靶面特征</th>
+                                        <th>过喷 (Overspray) 机理</th>
+                                        <th>损耗修正系数 K</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td class="fw-bold">箱型 / 平板</td>
+                                        <td>平整垂直开阔</td>
+                                        <td>反弹极少，有效着漆率最高</td>
+                                        <td><span class="badge bg-success">1.00 (基准)</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="fw-bold">H型钢 / 工字钢</td>
+                                        <td>翼缘腹板内直角</td>
+                                        <td>内阴角气流涡流反弹</td>
+                                        <td><span class="badge bg-primary">1.15</span></td>
+                                    </tr>
+                                    <tr class="table-warning">
+                                        <td class="fw-bold text-danger">圆管 / 圆形 (CHS)</td>
+                                        <td>曲率表面无垂直靶面</td>
+                                        <td>切线边缘漆雾大量逸散落空</td>
+                                        <td><span class="badge bg-danger">1.38 (+38%)</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="fw-bold">角钢 / 细长桁架</td>
+                                        <td>肢件狭窄，密集网格</td>
+                                        <td>间隙大，喷雾大面积落空穿透</td>
+                                        <td><span class="badge bg-danger">1.60 (+60%)</span></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <h6 class="fw-bold text-primary mb-2">🛠️ 现场施工工法特性与工费影响对比:</h6>
+                    <div class="p-3 rounded border @(Theme.IsDarkMode ? "bg-info bg-opacity-10 border-info border-opacity-25" : "bg-info-subtle border-info-subtle")">
+                        <p class="small mb-2 fw-bold text-info">
+                            @CurrentPaintResult.ProcessTrace?.MethodExplanation
+                        </p>
+                        <div class="table-responsive">
+                            <table class="table table-sm @(Theme.IsDarkMode ? "table-dark" : "table-light") table-bordered text-xs mb-0 text-center">
+                                <thead>
+                                    <tr>
+                                        <th>施工工法</th>
+                                        <th>飞散损耗 K_loss</th>
+                                        <th>工效 (m²/人日)</th>
+                                        <th>人工单价倍数</th>
+                                        <th>优劣势评价</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td class="fw-bold">高压无气喷涂</td>
+                                        <td>1.00 (基准)</td>
+                                        <td>300 ~ 600</td>
+                                        <td>1.00</td>
+                                        <td>工业首选，膜厚快速建立，车间主力</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="fw-bold">常规空气喷涂</td>
+                                        <td>1.28 (+28%)</td>
+                                        <td>150 ~ 250</td>
+                                        <td>1.15</td>
+                                        <td>雾化极细腻，但气流飞散严重，耗漆大</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="fw-bold text-success">手工刷涂/滚涂</td>
+                                        <td>0.45 (-55%)</td>
+                                        <td>40 ~ 80</td>
+                                        <td>1.65 (+65%)</td>
+                                        <td>零飞溅极省料，但工效极低人工费昂贵</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- ======================= TAB 4: 全球名牌涂料与型号图鉴 ======================= -->
+    @if (ActiveTab == 4)
+    {
+        <div class="row g-3 flex-grow-1">
+            <!-- 品牌目录列表 -->
+            <div class="col-lg-4">
+                <div class="card @(Theme.IsDarkMode ? "bg-black bg-opacity-30 border-secondary" : "bg-white border-light-subtle shadow-sm") p-3 h-100">
+                    <h6 class="fw-bold text-danger mb-2 d-flex align-items-center gap-2">
+                        <span>🏛️ 全球与国内名牌涂料档案库</span>
+                        <span class="badge bg-danger text-xs">@PaintProductDatabase.AllBrands.Count 大巨头</span>
+                    </h6>
+                    <div class="d-flex flex-column gap-2 overflow-auto" style="max-height: 520px;">
+                        @foreach (var brand in PaintProductDatabase.AllBrands)
+                        {
+                            <div class="p-2 rounded border cursor-pointer @(SelectedBrandId == brand.BrandId ? (Theme.IsDarkMode ? "bg-primary bg-opacity-25 border-primary" : "bg-primary-subtle border-primary") : (Theme.IsDarkMode ? "bg-dark border-secondary" : "bg-light border-light-subtle"))"
+                                 style="cursor: pointer;"
+                                 @onclick="() => SelectedBrandId = brand.BrandId">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="fw-bold small @(SelectedBrandId == brand.BrandId ? "text-primary" : "")">
+                                        @brand.LogoEmoji @brand.NameCn (@brand.NameEn)
+                                    </span>
+                                    <span class="badge @(Theme.IsDarkMode ? "bg-secondary" : "bg-light text-dark border") text-xs">@brand.Country.Split(' ')[0]</span>
+                                </div>
+                                <div class="text-xs text-muted text-truncate" title="@brand.Specialty">
+                                    主打: @brand.Specialty
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- 选定品牌详情与旗下经典型号库 -->
+            <div class="col-lg-8">
+                @{
+                    var currentBrand = PaintProductDatabase.GetBrandById(SelectedBrandId) ?? PaintProductDatabase.AllBrands.First();
+                    var brandProducts = PaintProductDatabase.GetProductsByBrand(currentBrand.BrandId).ToList();
+                }
+                <div class="card @(Theme.IsDarkMode ? "bg-black bg-opacity-30 border-secondary" : "bg-white border-light-subtle shadow-sm") p-3 h-100 d-flex flex-column">
+                    <!-- 品牌头部概览 -->
+                    <div class="d-flex align-items-center gap-3 pb-3 mb-3 border-bottom @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle")">
+                        <div class="p-3 bg-danger bg-opacity-10 rounded-3 text-danger fs-2">
+                            @currentBrand.LogoEmoji
+                        </div>
+                        <div>
+                            <h5 class="fw-bold mb-1">@currentBrand.NameCn <span class="fs-6 fw-normal @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">(@currentBrand.NameEn)</span></h5>
+                            <div class="text-xs text-muted mb-1">总部基地: @currentBrand.Country | 特长领域: @currentBrand.Specialty</div>
+                            <p class="small @(Theme.IsDarkMode ? "text-white-75" : "text-dark") mb-0">
+                                @currentBrand.Description
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- 品牌世界级代表工程 -->
+                    <div class="mb-3">
+                        <span class="text-xs fw-bold text-warning">🏆 典型代表工程业绩:</span>
+                        <div class="d-flex flex-wrap gap-1 mt-1">
+                            @foreach (var proj in currentBrand.FamousProjects)
+                            {
+                                <span class="badge @(Theme.IsDarkMode ? "bg-secondary" : "bg-light text-dark border") text-xs">🏛️ @proj</span>
+                            }
+                        </div>
+                    </div>
+
+                    <!-- 旗下经典型号表格 -->
+                    <h6 class="fw-bold text-primary small mb-2">📦 旗下工业重防腐与防火主力型号库 (@brandProducts.Count 款):</h6>
+                    <div class="table-responsive rounded border flex-grow-1 @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle")">
+                        <table class="table table-sm @(Theme.IsDarkMode ? "table-dark table-hover" : "table-hover") align-middle mb-0 text-xs">
+                            <thead class="@(Theme.IsDarkMode ? "table-secondary table-opacity-25" : "table-light") text-center">
+                                <tr>
+                                    <th>型号代号</th>
+                                    <th>产品名称</th>
+                                    <th>类别</th>
+                                    <th>固含%</th>
+                                    <th>比重</th>
+                                    <th>推荐膜厚</th>
+                                    <th>基准价(元/kg)</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var prod in brandProducts)
+                                {
+                                    <tr>
+                                        <td class="fw-bold text-info">@prod.ModelCode</td>
+                                        <td class="fw-bold">
+                                            @prod.Name
+                                            <div class="text-muted text-xs fw-normal" style="font-size: 10px;">@prod.Features</div>
+                                        </td>
+                                        <td><span class="badge @GetLayerBadgeClass(prod.LayerType)">@prod.LayerType</span></td>
+                                        <td class="text-end">@prod.VolumeSolidsPercent%</td>
+                                        <td class="text-end">@prod.DensityKgL</td>
+                                        <td class="text-end">@prod.DefaultDft @(prod.LayerType == CoatingLayerType.Fireproof ? "mm" : "μm")</td>
+                                        <td class="text-end fw-bold text-success">¥@prod.MaterialUnitPricePerKg</td>
+                                        <td class="text-center">
+                                            <button class="btn btn-xs btn-outline-primary text-nowrap"
+                                                    @onclick="() => ApplyProductToCalculation(prod)">
+                                                ✨ 应用到算量
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- 全球标准型钢库检索弹窗 -->
+    <SteelProfileModal @bind-IsOpen="IsSteelModalOpen"
+                       OnSelectProfile="HandleStandardProfileSelected"
+                       IsDarkMode="@Theme.IsDarkMode" />
+
+</div>
+
+@code {
+    private int ActiveTab = 1;
+    private string CurrentStandard = "GB";
+    private string SelectedBrandId = "Jotun";
+    private bool IsSteelModalOpen = false;
+
+    // 截面与算量状态
+    private SectionParameters CurrentParams { get; set; } = new()
+    {
+        Type = SectionType.HBeam,
+        Height = 300,
+        Width = 300,
+        WebThickness = 10,
+        FlangeThickness = 15,
+        StandardProfileName = "HW 300×300×10×15"
+    };
+
+    private SectionPropertiesResult CurrentResult { get; set; } = new();
+    private ParametricSectionCalculator Calculator { get; } = new();
+
+    // 涂装方案状态
+    private CoatingApplicationMethod CurrentMethod = CoatingApplicationMethod.AirlessSpraying;
+    private string CurrentPresetName = "标准工业厂房重防腐";
+    private bool ExcludeTopSurface = false;
+    private double ProjectTotalLengthM = 100.0;
+    private List<CoatingLayerConfig> CurrentLayers = [];
+    private PaintSystemCalculationResult CurrentPaintResult = new();
+
+    // 热浸镀锌状态
+    private HotDipGalvanizingOptions HdgOptions = new();
+    private HotDipGalvanizingResult CurrentHdgResult = new();
+
+    private string? CopyAlertMessage;
+
+    protected override void OnInitialized()
+    {
+        Theme.OnChange += StateHasChanged;
+        CurrentLayers = PaintCoatingCalculator.CreatePreset(CurrentPresetName);
+        RecalculateAll();
+    }
+
+    public void Dispose()
+    {
+        Theme.OnChange -= StateHasChanged;
+    }
+
+    private void ChangeStandard(string standard)
+    {
+        CurrentStandard = standard;
+    }
+
+    private void ChangeSectionType(SectionType type)
+    {
+        CurrentParams.Type = type;
+        CurrentParams.StandardProfileName = null;
+
+        switch (type)
+        {
+            case SectionType.HBeam:
+                CurrentParams.Height = 300;
+                CurrentParams.Width = 300;
+                CurrentParams.WebThickness = 10;
+                CurrentParams.FlangeThickness = 15;
+                break;
+            case SectionType.RHS:
+                CurrentParams.Height = 250;
+                CurrentParams.Width = 250;
+                CurrentParams.WallThickness = 10;
+                break;
+            case SectionType.CHS:
+                CurrentParams.OuterDiameter = 219;
+                CurrentParams.WallThickness = 8;
+                break;
+            case SectionType.Channel:
+                CurrentParams.Height = 200;
+                CurrentParams.Width = 75;
+                CurrentParams.WebThickness = 7;
+                CurrentParams.FlangeThickness = 11;
+                break;
+            case SectionType.Angle:
+                CurrentParams.LegWidth1 = 100;
+                CurrentParams.LegWidth2 = 100;
+                CurrentParams.LegThickness = 10;
+                break;
+            case SectionType.Cruciform:
+                CurrentParams.Height = 300;
+                CurrentParams.Width = 300;
+                CurrentParams.WebThickness = 12;
+                CurrentParams.FlangeThickness = 12;
+                break;
+        }
+
+        RecalculateAll();
+    }
+
+    private void HandleStandardProfileSelected(StandardSteelItem item)
+    {
+        CurrentParams.Type = item.SectionType;
+        CurrentParams.StandardProfileName = item.Designation;
+        CurrentParams.Height = item.Height;
+        CurrentParams.Width = item.Width;
+        CurrentParams.WebThickness = item.WebThickness;
+        CurrentParams.FlangeThickness = item.FlangeThickness;
+        CurrentParams.LegWidth1 = item.LegWidth1;
+        CurrentParams.LegWidth2 = item.LegWidth2;
+        CurrentParams.LegThickness = item.LegThickness;
+        CurrentParams.OuterDiameter = item.OuterDiameter;
+        CurrentParams.WallThickness = item.WallThickness;
+
+        RecalculateAll();
+    }
+
+    private void ChangeApplicationMethod(CoatingApplicationMethod method)
+    {
+        CurrentMethod = method;
+        RecalculateAll();
+    }
+
+    private void ApplyPreset(string preset)
+    {
+        CurrentPresetName = preset;
+        CurrentLayers = PaintCoatingCalculator.CreatePreset(preset);
+        RecalculateAll();
+    }
+
+    private void OnSelectProductItem(CoatingLayerConfig layer, ChangeEventArgs e)
+    {
+        string? name = e.Value?.ToString();
+        if (string.IsNullOrWhiteSpace(name)) return;
+
+        var product = PaintProductDatabase.AllProducts.FirstOrDefault(p => p.Name == name);
+        if (product != null)
+        {
+            layer.BrandId = product.BrandId;
+            layer.ModelCode = product.ModelCode;
+            layer.ProductName = product.Name;
+            layer.Dft = product.DefaultDft;
+            layer.VolumeSolids = product.VolumeSolidsPercent;
+            layer.Density = product.DensityKgL;
+            layer.LossRate = product.LossRatePercent;
+            layer.MaterialPrice = product.MaterialUnitPricePerKg;
+            layer.LaborPrice = product.LaborUnitPricePerM2;
+            RecalculateAll();
+        }
+    }
+
+    private void ApplyProductToCalculation(PaintProductItem prod)
+    {
+        var targetLayer = CurrentLayers.FirstOrDefault(l => l.LayerType == prod.LayerType);
+        if (targetLayer != null)
+        {
+            targetLayer.IsEnabled = true;
+            targetLayer.BrandId = prod.BrandId;
+            targetLayer.ModelCode = prod.ModelCode;
+            targetLayer.ProductName = prod.Name;
+            targetLayer.Dft = prod.DefaultDft;
+            targetLayer.VolumeSolids = prod.VolumeSolidsPercent;
+            targetLayer.Density = prod.DensityKgL;
+            targetLayer.LossRate = prod.LossRatePercent;
+            targetLayer.MaterialPrice = prod.MaterialUnitPricePerKg;
+            targetLayer.LaborPrice = prod.LaborUnitPricePerM2;
+        }
+        ActiveTab = 1; // 切换回算量选项卡
+        RecalculateAll();
+    }
+
+    private void RecalculateAll()
+    {
+        // 1. 计算截面几何特性
+        CurrentResult = Calculator.Calculate(CurrentParams);
+
+        // 2. 算量涂装与防火
+        CurrentPaintResult = PaintCoatingCalculator.Calculate(
+            CurrentResult,
+            CurrentLayers,
+            excludeTopSurface: ExcludeTopSurface,
+            projectLengthM: ProjectTotalLengthM,
+            method: CurrentMethod,
+            sectionType: CurrentParams.Type);
+
+        // 3. 热浸镀锌同步算量
+        RecalculateHdg();
+    }
+
+    private void RecalculateHdg()
+    {
+        HdgOptions.ProjectLengthM = ProjectTotalLengthM;
+        CurrentHdgResult = PaintCoatingCalculator.CalculateHotDipGalvanizing(CurrentResult, HdgOptions);
+    }
+
+    private async Task CopyDescribeToClipboard()
+    {
+        await CopyText(CurrentPaintResult.FullTechnicalDescribe);
+    }
+
+    private async Task CopyText(string text)
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", text);
+            CopyAlertMessage = "✓ 已成功复制到系统剪贴板！";
+            _ = Task.Delay(3000).ContinueWith(_ =>
+            {
+                CopyAlertMessage = null;
+                InvokeAsync(StateHasChanged);
+            });
+        }
+        catch
+        {
+            CopyAlertMessage = "复制失败，请手工选中复制。";
+        }
+    }
+
+    private string GetSvgPointsString(List<Point2D> pts)
+    {
+        if (pts.Count == 0) return "";
+        // 缩放到大约 [-150, 150] 视口
+        double maxCoord = pts.SelectMany(p => new[] { Math.Abs(p.Y), Math.Abs(p.Z) }).DefaultIfEmpty(1).Max();
+        if (maxCoord < 1) maxCoord = 1;
+        double scale = 140.0 / maxCoord;
+
+        return string.Join(" ", pts.Select(p => $"{(p.Y * scale):F1},{( -p.Z * scale):F1}"));
+    }
+
+    private string GetLayerBadgeClass(CoatingLayerType type) => type switch
+    {
+        CoatingLayerType.Primer => "bg-primary",
+        CoatingLayerType.Intermediate => "bg-info text-dark",
+        CoatingLayerType.Sealer => "bg-secondary",
+        CoatingLayerType.Topcoat => "bg-success",
+        CoatingLayerType.Fireproof => "bg-danger",
+        _ => "bg-secondary"
+    };
+}

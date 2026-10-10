@@ -1,5 +1,6 @@
 using EngineeringApp.Shared.Algorithms;
 using EngineeringApp.Shared.Models;
+using EngineeringApp.Shared.Data;
 using Xunit;
 
 namespace EngineeringApp.Tests;
@@ -142,52 +143,184 @@ public class PaintingAndCommercialTests
     }
 
     [Fact]
-    public void SectionRegistry_AllowsDynamicRegistration_OfNewSectionProfile()
+    public void CircularPipe_SprayingLoss_IsHigherThan_BoxSection()
     {
-        // 模拟未来扩展一个“冷弯C型钢 (檩条)”算子
-        var customCProfile = new TestCustomCProfile();
-        SectionRegistry.Register(customCProfile);
+        // 验证物理规律：圆管曲率切线导致过喷飞散，其损耗修正系数应显著高于平整箱型截面
+        double boxFactor = SectionShapeLossConfig.GetSectionShapeFactor(SectionType.RHS);
+        double pipeFactor = SectionShapeLossConfig.GetSectionShapeFactor(SectionType.CHS);
+        double angleFactor = SectionShapeLossConfig.GetSectionShapeFactor(SectionType.Angle);
 
-        // 商务软件通过注册中心动态获取
-        var foundProfile = SectionRegistry.GetByKey("ColdFormedC");
-        Assert.NotNull(foundProfile);
-        Assert.Equal("冷弯C型钢 (檩条)", foundProfile.DisplayName);
-
-        // 验证计算
-        var p = new SectionParameters { Height = 200, Width = 70, WebThickness = 20, WallThickness = 2.5 };
-        var calcResult = foundProfile.Calculate(p);
-        Assert.True(calcResult.OuterPerimeter > 0);
-        Assert.True(calcResult.LinearMass > 0);
+        Assert.Equal(1.0, boxFactor);
+        Assert.True(pipeFactor > boxFactor, "圆管喷涂损耗率应当大于箱型截面");
+        Assert.True(angleFactor > pipeFactor, "角钢狭窄肢件格构喷涂损耗率应当大于圆管");
     }
 
-    private sealed class TestCustomCProfile : ISectionProfile
+    [Fact]
+    public void ApplicationMethods_LossFactor_And_LaborPrice_Verification()
     {
-        public string TypeKey => "ColdFormedC";
-        public string DisplayName => "冷弯C型钢 (檩条)";
-        public string Category => "冷弯薄壁";
-        public SectionType? SectionType => null;
+        // 高压无气喷涂 (基准)、空气喷涂 (飞散大)、刷滚涂 (零飞散但工效慢)
+        double airlessLoss = SectionShapeLossConfig.GetMethodLossFactor(CoatingApplicationMethod.AirlessSpraying);
+        double airLoss = SectionShapeLossConfig.GetMethodLossFactor(CoatingApplicationMethod.AirSpraying);
+        double brushLoss = SectionShapeLossConfig.GetMethodLossFactor(CoatingApplicationMethod.BrushOrRoller);
 
-        public SectionPropertiesResult Calculate(SectionParameters parameters)
+        Assert.Equal(1.0, airlessLoss);
+        Assert.True(airLoss > airlessLoss, "常规空气喷涂漆雾飞散损耗应当高于高压无气喷涂");
+        Assert.True(brushLoss < airlessLoss, "手工刷滚涂几乎无飞散，损耗系数应当显著低于无气喷涂");
+
+        // 人工工费单价倍数
+        double brushLaborMult = SectionShapeLossConfig.GetMethodLaborMultiplier(CoatingApplicationMethod.BrushOrRoller);
+        Assert.True(brushLaborMult > 1.4, "手工刷滚涂工效低，人工工费单价倍数应当提高");
+    }
+
+    [Fact]
+    public void HotDipGalvanizing_LightAngle_Vs_HeavyHBeam_TonnagePricing_Verification()
+    {
+        // 1. 输变电铁塔轻型角钢 L50x5
+        var angleSection = new SectionPropertiesResult
         {
-            // 简单化演示模型：h=200, b=70, c=20, t=2.5
-            double h = parameters.Height;
-            double b = parameters.Width;
-            double c = parameters.WebThickness; // 卷边宽
-            double t = parameters.WallThickness; // 壁厚
+            Area = 480.0,
+            OuterPerimeter = 200.0,
+            LinearMass = 3.77
+        };
 
-            // 展开板宽 = h + 2*b + 2*c
-            double flatWidth = h + 2 * b + 2 * c;
-            double area = flatWidth * t;
-            double mass = (area / 1e6) * 7850.0;
+        // 2. 重型大截面 H型钢 HW 350x350x12x19
+        var heavyHSection = new SectionPropertiesResult
+        {
+            Area = 17190.0,
+            OuterPerimeter = 2050.0,
+            LinearMass = 135.0
+        };
 
-            return new SectionPropertiesResult
-            {
-                Area = area,
-                OuterPerimeter = 2.0 * flatWidth, // 薄壁双面全表面积，或外表面 flatWidth
-                TopSurfaceWidth = b,
-                BottomSurfaceWidth = b,
-                LinearMass = mass
-            };
-        }
+        var options = new HotDipGalvanizingOptions
+        {
+            ZincGrade = ZincIngotGrade.Grade1_Standard_9999,
+            ZincPricePerTon = 23000.0,
+            DftMicrons = 85.0
+        };
+
+        var angleHdg = PaintCoatingCalculator.CalculateHotDipGalvanizing(angleSection, options);
+        var heavyHdg = PaintCoatingCalculator.CalculateHotDipGalvanizing(heavyHSection, options);
+
+        // 验证：轻角钢比表面积远大于重型H型钢
+        Assert.True(angleHdg.SpecificSurfaceAreaTon > heavyHdg.SpecificSurfaceAreaTon * 3.0,
+            $"角钢比表面积 ({angleHdg.SpecificSurfaceAreaTon:F1}) 应当是重型H型钢 ({heavyHdg.SpecificSurfaceAreaTon:F1}) 的3倍以上");
+
+        // 验证：轻角钢每吨耗锌量远大于重型H型钢
+        Assert.True(angleHdg.ZincConsumptionKgPerTon > heavyHdg.ZincConsumptionKgPerTon * 2.5,
+            $"角钢每吨耗锌 ({angleHdg.ZincConsumptionKgPerTon:F1}kg) 远大于重型H型钢 ({heavyHdg.ZincConsumptionKgPerTon:F1}kg)");
+
+        // 验证：轻角钢吨报价显著昂贵于重型H型钢
+        Assert.True(angleHdg.TotalPricePerTon > heavyHdg.TotalPricePerTon,
+            $"输变电铁塔轻角钢吨加工费 ({angleHdg.TotalPricePerTon:F0}) 应当显著高于重型H型钢 ({heavyHdg.TotalPricePerTon:F0})");
+    }
+
+    [Fact]
+    public void ZincIngot_PurityGrades_PricingDifference_Verification()
+    {
+        var section = new SectionPropertiesResult { Area = 5000, OuterPerimeter = 1000, LinearMass = 39.25 };
+
+        var opt0 = new HotDipGalvanizingOptions { ZincGrade = ZincIngotGrade.Grade0_HighPurity_99995 };
+        var opt1 = new HotDipGalvanizingOptions { ZincGrade = ZincIngotGrade.Grade1_Standard_9999 };
+        var optSecondary = new HotDipGalvanizingOptions { ZincGrade = ZincIngotGrade.Secondary_CrudeZinc };
+
+        var res0 = PaintCoatingCalculator.CalculateHotDipGalvanizing(section, opt0);
+        var res1 = PaintCoatingCalculator.CalculateHotDipGalvanizing(section, opt1);
+        var resSec = PaintCoatingCalculator.CalculateHotDipGalvanizing(section, optSecondary);
+
+        Assert.True(res0.EffectiveZincPricePerTon > res1.EffectiveZincPricePerTon, "0# 特纯锌价格应当高于 1# 结构纯锌");
+        Assert.True(res1.EffectiveZincPricePerTon > resSec.EffectiveZincPricePerTon, "1# 纯锌价格应当高于再生粗锌");
+        Assert.True(res0.TotalPricePerTon > res1.TotalPricePerTon);
+    }
+
+    [Fact]
+    public void PaintBrandDatabase_Contains_GlobalAndDomesticGiants_And_QueriesWork()
+    {
+        var brands = PaintProductDatabase.AllBrands;
+        Assert.Contains(brands, b => b.BrandId == "Jotun");
+        Assert.Contains(brands, b => b.BrandId == "Hempel");
+        Assert.Contains(brands, b => b.BrandId == "AkzoNobel");
+        Assert.Contains(brands, b => b.BrandId == "SKK");
+        Assert.Contains(brands, b => b.BrandId == "BBMG");
+        Assert.Contains(brands, b => b.BrandId == "Lanling");
+
+        var jotunProducts = PaintProductDatabase.GetProductsByBrand("Jotun").ToList();
+        Assert.NotEmpty(jotunProducts);
+        Assert.Contains(jotunProducts, p => p.ModelCode.Contains("Penguard") || p.ModelCode.Contains("Barrier"));
+
+        var fireproofProducts = PaintProductDatabase.GetByType(CoatingLayerType.Fireproof).ToList();
+        Assert.NotEmpty(fireproofProducts);
+    }
+
+    [Fact]
+    public void PaintCoatingCalculator_Generates_ProcessTrace_And_Describe()
+    {
+        var section = new SectionPropertiesResult
+        {
+            Area = 11800,
+            OuterPerimeter = 1760,
+            LinearMass = 93.0
+        };
+
+        var layers = PaintCoatingCalculator.CreatePreset("标准工业厂房重防腐");
+        var res = PaintCoatingCalculator.Calculate(
+            section,
+            layers,
+            excludeTopSurface: true,
+            method: CoatingApplicationMethod.AirlessSpraying,
+            sectionType: SectionType.HBeam);
+
+        Assert.NotNull(res.ProcessTrace);
+        Assert.NotEmpty(res.ProcessTrace.Steps);
+        Assert.Contains("直角阴角", res.ProcessTrace.SectionShapeExplanation);
+        Assert.Contains("高压无气喷涂", res.ProcessTrace.MethodExplanation);
+        Assert.NotEmpty(res.FullTechnicalDescribe);
+        Assert.True(res.SectionFactorFOverV > 0);
+    }
+
+    [Fact]
+    public void HotDipGalvanizing_DoubleDip_And_ComplexCavity_Surcharges()
+    {
+        var section = new SectionPropertiesResult { Area = 12000, OuterPerimeter = 1800, LinearMass = 94.2 };
+
+        var optBase = new HotDipGalvanizingOptions { IsDoubleDipOverlength = false, HasComplexCavities = false };
+        var optDoubleDip = new HotDipGalvanizingOptions { IsDoubleDipOverlength = true, HasComplexCavities = false };
+        var optCavity = new HotDipGalvanizingOptions { IsDoubleDipOverlength = false, HasComplexCavities = true };
+
+        var resBase = PaintCoatingCalculator.CalculateHotDipGalvanizing(section, optBase);
+        var resDoubleDip = PaintCoatingCalculator.CalculateHotDipGalvanizing(section, optDoubleDip);
+        var resCavity = PaintCoatingCalculator.CalculateHotDipGalvanizing(section, optCavity);
+
+        Assert.True(resDoubleDip.TotalPricePerTon > resBase.TotalPricePerTon, "超长倒头双浸应当加收工艺溢价");
+        Assert.True(resDoubleDip.OverlengthSurchargePerTon > 0);
+        Assert.True(resCavity.TotalPricePerTon > resBase.TotalPricePerTon, "复杂闭腔开孔排气应当加收难度费");
+    }
+
+    [Fact]
+    public void PaintProductDatabase_Crud_And_Serialization()
+    {
+        int initialCount = PaintProductDatabase.AllProducts.Count;
+        Assert.True(initialCount > 20);
+
+        string json = PaintProductDatabase.ExportToJson();
+        Assert.NotEmpty(json);
+        Assert.Contains("佐敦", json);
+        Assert.Contains("海虹老人", json);
+        Assert.Contains("阿克苏", json);
+
+        var newItem = new PaintProductItem
+        {
+            BrandId = "TestBrand",
+            Name = "自动化测试特种涂料",
+            LayerType = CoatingLayerType.Primer,
+            MaterialUnitPricePerKg = 50.0
+        };
+
+        PaintProductDatabase.AddProduct(newItem);
+        Assert.Equal(initialCount + 1, PaintProductDatabase.AllProducts.Count);
+
+        bool removed = PaintProductDatabase.RemoveProduct(newItem.Id);
+        Assert.True(removed);
+        Assert.Equal(initialCount, PaintProductDatabase.AllProducts.Count);
     }
 }
+
