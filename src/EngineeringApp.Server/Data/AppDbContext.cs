@@ -175,6 +175,7 @@ public class MaterialProvenanceRecordEntity
     public double InspectionSurchargePerTon { get; set; }
     public double FreightPerTon { get; set; }
     public double ContractFreightPerTon { get; set; }
+    public double InitialRecordedPricePerTon { get; set; }
     public double FinalPricePerTon { get; set; }
     public string FullDescription { get; set; } = "";
     public string PlateParametersJson { get; set; } = "";
@@ -232,6 +233,7 @@ public class MaterialProvenanceRecordEntity
             InspectionSurchargePerTon = InspectionSurchargePerTon,
             FreightPerTon = FreightPerTon,
             ContractFreightPerTon = ContractFreightPerTon,
+            InitialRecordedPricePerTon = InitialRecordedPricePerTon,
             FinalPricePerTon = FinalPricePerTon,
             FullDescription = FullDescription,
             PlateParameters = p
@@ -269,6 +271,7 @@ public class MaterialProvenanceRecordEntity
         InspectionSurchargePerTon = r.InspectionSurchargePerTon,
         FreightPerTon = r.FreightPerTon,
         ContractFreightPerTon = r.ContractFreightPerTon,
+        InitialRecordedPricePerTon = r.ContractBaselinePrice,
         FinalPricePerTon = r.FinalPricePerTon,
         FullDescription = r.FullDescription,
         PlateParametersJson = System.Text.Json.JsonSerializer.Serialize(r.PlateParameters)

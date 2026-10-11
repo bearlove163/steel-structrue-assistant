@@ -576,4 +576,68 @@ public class MaterialPricingTests
         Assert.Equal(40.0, priceC.FreightPerTon);
         Assert.Equal(4050.0 + 210.0 + 200.0 + 40.0, priceC.FinalPricePerTon);
     }
+
+    [Fact]
+    public void MaterialProvenanceRecord_ContractBaselinePrice_RemainsImmutable_AcrossRevisions_AndDeltaPChanges()
+    {
+        var latestSnap = SeedPriceSnapshots.GetById("SNAP-20261008-LATEST"); // Q355B base: 4050 (Base price increase +130 from 3920)
+
+        var p = new PlatePricingParameters
+        {
+            Standard = StandardSystem.GB,
+            Grade = SteelGrade.Q355B,
+            ThicknessMm = 22.0,
+            SteelMillId = "NISCO"
+        };
+
+        var record = new MaterialProvenanceRecord
+        {
+            Id = 10,
+            BasePricePerTon = 3920.0,
+            ThicknessSurchargePerTon = 60.0,
+            ContractThicknessSurchargePerTon = 60.0,
+            DimensionSurchargePerTon = 60.0,
+            FreightPerTon = 200.0,
+            ContractFreightPerTon = 200.0,
+            InitialRecordedPricePerTon = 4240.0, // 初始建档合同基准价
+            FinalPricePerTon = 4240.0,
+            RevisionNumber = 1,
+            PlateParameters = p
+        };
+
+        // 初始状态下：合同基准价为 4240
+        Assert.Equal(4240.0, record.ContractBaselinePrice);
+        Assert.Equal(4240.0, record.FinalPricePerTon);
+
+        // 初始状态下回溯：模式 C 下回溯单价 4050 + 60 + 60 + 200 = 4370，调差 ΔP = 4370 - 4240 = +130
+        var retroInit = record.CalculateAtSnapshot(latestSnap, principleMode: RetrospectionPrincipleMode.LatestRevisedOverride);
+        Assert.Equal(4370.0, retroInit.FinalPricePerTon);
+        double deltaP_Init = retroInit.FinalPricePerTon - record.ContractBaselinePrice;
+        Assert.Equal(130.0, deltaP_Init);
+
+        // 模拟修订 Rev 2：钢厂厚度加价上调 30 元/t (60 -> 90)，运费让利 20 元/t (200 -> 180)
+        record.ThicknessSurchargePerTon = 90.0;
+        record.FreightPerTon = 180.0;
+        record.AddRevision(
+            reason: "厚度加价上调且运费协议优惠",
+            revisedBy: "造价师李工",
+            newPricePerTon: 3920.0 + 90.0 + 60.0 + 180.0, // 4250.0
+            changeDetails: "厚度: 60->90; 运费: 200->180 (净变动 +10)",
+            appliedPrinciple: "2026Q2修订规则"
+        );
+
+        // 验证：合同基期出处基准价严格保持 4240 恒定不变！
+        Assert.Equal(4240.0, record.ContractBaselinePrice);
+        // 当前修订单价更新为 Rev 2: 4250
+        Assert.Equal(4250.0, record.FinalPricePerTon);
+        Assert.Equal(2, record.RevisionNumber);
+
+        // 验证：模式 C 下回溯单价采用最新修订加价 (4050 + 90 + 60 + 180 = 4380)
+        var retroRev2 = record.CalculateAtSnapshot(latestSnap, principleMode: RetrospectionPrincipleMode.LatestRevisedOverride);
+        Assert.Equal(4380.0, retroRev2.FinalPricePerTon);
+
+        // 核心验证：吨差 ΔP = 4380 - 4240 = +140 (不再死死固定为 130，准确反映净调价 +10 元/t！)
+        double deltaP_Rev2 = retroRev2.FinalPricePerTon - record.ContractBaselinePrice;
+        Assert.Equal(140.0, deltaP_Rev2);
+    }
 }

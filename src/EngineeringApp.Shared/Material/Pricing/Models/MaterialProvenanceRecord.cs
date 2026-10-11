@@ -154,7 +154,15 @@ public class MaterialProvenanceRecord
     /// <summary>初始合同约定的调运费 (用于模式A合同锁定回溯)</summary>
     public double ContractFreightPerTon { get; set; }
 
-    /// <summary>建档综合采购单价 (元/吨)</summary>
+    /// <summary>初始建档/合同基准总单价 (元/吨，恒定锚点，不随后续修订改变)</summary>
+    public double InitialRecordedPricePerTon { get; set; }
+
+    /// <summary>获取合同基期出处基准总单价 (若未显式指定则取初次建档价)</summary>
+    public double ContractBaselinePrice => InitialRecordedPricePerTon > 0
+        ? InitialRecordedPricePerTon
+        : (RevisionLogs.Count > 0 ? RevisionLogs[0].NewPricePerTon : FinalPricePerTon);
+
+    /// <summary>当前执行采购单价 (元/吨，随最新修订版本更新)</summary>
     public double FinalPricePerTon { get; set; }
 
     /// <summary>标准 Describe 规范契约文本</summary>
@@ -234,6 +242,11 @@ public class MaterialProvenanceRecord
     /// </summary>
     public void AddRevision(string reason, string revisedBy, double newPricePerTon, string changeDetails, string appliedPrinciple)
     {
+        if (InitialRecordedPricePerTon <= 0)
+        {
+            InitialRecordedPricePerTon = RevisionLogs.Count > 0 ? RevisionLogs[0].NewPricePerTon : FinalPricePerTon;
+        }
+
         var log = new MaterialPriceRevisionLog
         {
             Id = RevisionLogs.Count + 1,
