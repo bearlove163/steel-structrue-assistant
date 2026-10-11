@@ -1,5 +1,6 @@
 @using EngineeringApp.Shared.Models
 @using EngineeringApp.Shared.Data
+@inject NavigationManager Nav
 
 @if (IsOpen)
 {
@@ -13,7 +14,7 @@
                         <div>
                             <h6 class="modal-title mb-0 fw-bold">工程后台基础数据库工作站</h6>
                             <span class="@(IsDarkMode ? "text-white-50" : "text-muted") text-xs">
-                                SQLite + EF Core 持久化支撑 · 欧标/美标/国标型钢库 · 涂料与防腐价格基准
+                                SQLite + EF Core 持久化支撑 · 欧标/美标/国标型钢库 · 涂料与防腐价格基准 · 供应链与供应商资质库
                             </span>
                         </div>
                     </div>
@@ -45,6 +46,12 @@
                             <button class="nav-link @(ActiveTab == "Paint" ? "active fw-bold" : "") @(IsDarkMode ? "text-white" : "text-dark")"
                                     @onclick='() => SetTab("Paint")'>
                                 🎨 油漆涂料价格与参数数据库
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link @(ActiveTab == "Suppliers" ? "active fw-bold" : "") @(IsDarkMode ? "text-white" : "text-dark")"
+                                    @onclick='() => SetTab("Suppliers")'>
+                                🏢 供应链与供应商资质库
                             </button>
                         </li>
                     </ul>
@@ -357,12 +364,91 @@
                             </table>
                         </div>
                     }
+                    else if (ActiveTab == "Suppliers")
+                    {
+                        <!-- 供应商库面板 -->
+                        <div class="row g-2 mb-3 align-items-center">
+                            <div class="col-md-4">
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-light border-light-subtle")">🔍</span>
+                                    <input type="text" class="form-control @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white border-light-subtle")"
+                                           placeholder="输入企业名称、代码、细分产品或城市..."
+                                           @bind="SupSearchKeyword" @bind:event="oninput" />
+                                </div>
+                            </div>
+                            <div class="col-md-5">
+                                <div class="d-flex gap-1 flex-wrap">
+                                    <button class="btn btn-xs @(SupCategoryFilter == null ? "btn-primary" : (IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary"))"
+                                            @onclick="() => SupCategoryFilter = null">全部</button>
+                                    <button class="btn btn-xs @(SupCategoryFilter == SupplierCategory.SteelMill ? "btn-primary" : (IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary"))"
+                                            @onclick="() => SupCategoryFilter = SupplierCategory.SteelMill">钢厂</button>
+                                    <button class="btn btn-xs @(SupCategoryFilter == SupplierCategory.SteelTrader ? "btn-primary" : (IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary"))"
+                                            @onclick="() => SupCategoryFilter = SupplierCategory.SteelTrader">贸易商</button>
+                                    <button class="btn btn-xs @(SupCategoryFilter == SupplierCategory.CraneRental ? "btn-primary" : (IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary"))"
+                                            @onclick="() => SupCategoryFilter = SupplierCategory.CraneRental">吊机租赁</button>
+                                    <button class="btn btn-xs @(SupCategoryFilter == SupplierCategory.FastenerBolt ? "btn-primary" : (IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary"))"
+                                            @onclick="() => SupCategoryFilter = SupplierCategory.FastenerBolt">紧固件</button>
+                                    <button class="btn btn-xs @(SupCategoryFilter == SupplierCategory.SpecialtyMaterial ? "btn-primary" : (IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary"))"
+                                            @onclick="() => SupCategoryFilter = SupplierCategory.SpecialtyMaterial">特种材料</button>
+                                    <button class="btn btn-xs @(SupCategoryFilter == SupplierCategory.PaintCoating ? "btn-primary" : (IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary"))"
+                                            @onclick="() => SupCategoryFilter = SupplierCategory.PaintCoating">涂装防腐</button>
+                                </div>
+                            </div>
+                            <div class="col-md-3 text-end">
+                                <button class="btn btn-xs btn-outline-success d-inline-flex align-items-center gap-1" @onclick="NavigateToFullSuppliersWorkbench">
+                                    <span>🚀 完整工作台</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="table-responsive rounded border @(IsDarkMode ? "border-secondary" : "border-light-subtle")" style="max-height: 440px;">
+                            <table class="table table-sm @(IsDarkMode ? "table-dark table-hover" : "table-hover") align-middle mb-0 text-xs">
+                                <thead class="@(IsDarkMode ? "table-secondary table-opacity-25" : "table-light") sticky-top">
+                                    <tr>
+                                        <th style="width: 100px;">编号代码</th>
+                                        <th>企业名称 (简称)</th>
+                                        <th style="width: 90px;">大类分类</th>
+                                        <th>细分产品 / 供应范围</th>
+                                        <th style="width: 130px;">生产基地 / 区域</th>
+                                        <th style="width: 140px;">商务对接人 / 电话</th>
+                                        <th style="width: 80px;" class="text-center">合作状态</th>
+                                        <th style="width: 60px;" class="text-center">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var s in GetModalFilteredSuppliers())
+                                    {
+                                        <tr>
+                                            <td class="font-monospace">@s.Code</td>
+                                            <td>
+                                                <strong>@s.Name</strong>
+                                                <div class="text-xs text-secondary">简称: @s.ShortName</div>
+                                            </td>
+                                            <td><span class="badge bg-secondary">@GetSupCategoryName(s.Category)</span></td>
+                                            <td><div class="text-truncate" style="max-width: 220px;" title="@s.SubCategory">@s.SubCategory</div></td>
+                                            <td><div class="text-truncate" style="max-width: 130px;" title="@s.CityRegion">📍 @s.CityRegion</div></td>
+                                            <td>
+                                                <div>@s.ContactPerson</div>
+                                                <div class="font-monospace text-muted">@s.ContactPhone</div>
+                                            </td>
+                                            <td class="text-center"><span class="badge bg-primary">@s.CooperationStatus</span></td>
+                                            <td class="text-center">
+                                                <button class="btn btn-link text-danger p-0 text-xs" @onclick="() => DeleteSupplierFromModal(s.Id)" title="删除供应商">
+                                                    🗑️
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
                 </div>
 
                 <!-- 弹窗底部 -->
                 <div class="modal-footer @(IsDarkMode ? "bg-black bg-opacity-50 border-secondary" : "bg-light border-light-subtle") py-2 px-3 d-flex justify-content-between">
                     <span class="text-xs @(IsDarkMode ? "text-white-50" : "text-muted")">
-                        ✅ 点击任意截面右侧「导入计算」，即可将精准几何尺寸自动映射至工作站视口并实时重算。
+                        ✅ 支持后台统一查看与维护欧标/美标/国标型钢、涂装产品及全产业链供应商资质档案。
                     </span>
                     <button type="button" class="btn btn-secondary btn-sm" @onclick="Close">关闭</button>
                 </div>
@@ -380,6 +466,9 @@
     private string ActiveTab { get; set; } = "Euro";
     private string SearchKeyword { get; set; } = "";
     private string SelectedCategory { get; set; } = "全部";
+
+    private SupplierCategory? SupCategoryFilter = null;
+    private string SupSearchKeyword = "";
 
     private List<PaintProductItem> PaintProducts { get; set; } = [];
 
@@ -563,4 +652,30 @@
         PaintProducts = PaintProductDatabase.AllProducts.ToList();
         SaveStatusMessage = "🔄 已恢复为国家与行业标准出厂默认涂料参考报价与工艺参数。";
     }
+
+    private IEnumerable<SupplierItem> GetModalFilteredSuppliers() =>
+        SupplierDatabase.Filter(SupCategoryFilter, null, SupSearchKeyword);
+
+    private void DeleteSupplierFromModal(int id)
+    {
+        SupplierDatabase.RemoveSupplier(id);
+    }
+
+    private async Task NavigateToFullSuppliersWorkbench()
+    {
+        await Close();
+        Nav.NavigateTo("/suppliers");
+    }
+
+    private string GetSupCategoryName(SupplierCategory cat) => cat switch
+    {
+        SupplierCategory.SteelMill => "钢厂",
+        SupplierCategory.SteelTrader => "贸易商",
+        SupplierCategory.CraneRental => "吊机",
+        SupplierCategory.FastenerBolt => "紧固件",
+        SupplierCategory.SpecialtyMaterial => "特种材料",
+        SupplierCategory.PaintCoating => "涂料",
+        SupplierCategory.OtherCustom => "自定义",
+        _ => "其他"
+    };
 }

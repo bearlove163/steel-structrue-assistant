@@ -110,6 +110,9 @@ public class MaterialProvenanceRecord
     /// <summary>询价渠道/报价供应商 (如 "宝武直供", "南钢现货仓", "华东分销商")</summary>
     public string InquiryVendor { get; set; } = "主流钢厂直供通道";
 
+    /// <summary>强关联供应商实体主键ID (外键映射供应商库)</summary>
+    public int? SupplierId { get; set; }
+
     /// <summary>当前修订版本号 (初始询价为 Rev 1，每次修改后累加递增)</summary>
     public int RevisionNumber { get; set; } = 1;
 

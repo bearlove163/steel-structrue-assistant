@@ -1868,13 +1868,22 @@
     {
         if (string.IsNullOrWhiteSpace(NewQuoteBrandName)) return;
 
+        string supName = string.IsNullOrWhiteSpace(NewQuoteSupplier) ? "自主实地询价录入" : NewQuoteSupplier.Trim();
+        var matchedPaintSup = SupplierDatabase.AllSuppliers.FirstOrDefault(s =>
+            s.Category == SupplierCategory.PaintCoating && (
+                s.ShortName.Contains(NewQuoteBrandName.Trim(), StringComparison.OrdinalIgnoreCase) ||
+                s.Name.Contains(NewQuoteBrandName.Trim(), StringComparison.OrdinalIgnoreCase) ||
+                s.Name.Contains(supName, StringComparison.OrdinalIgnoreCase) ||
+                s.ShortName.Contains(supName, StringComparison.OrdinalIgnoreCase)));
+
         var quote = new BrandQuoteItem
         {
             BrandName = NewQuoteBrandName.Trim(),
             MaterialCategory = NewQuoteCategory,
             ProductModel = string.IsNullOrWhiteSpace(NewQuoteModel) ? $"{NewQuoteBrandName} {NewQuoteCategory}" : NewQuoteModel.Trim(),
             UnitPrice = Math.Max(0.1, NewQuotePrice),
-            SupplierName = string.IsNullOrWhiteSpace(NewQuoteSupplier) ? "自主实地询价录入" : NewQuoteSupplier.Trim(),
+            SupplierName = supName,
+            SupplierId = matchedPaintSup?.Id,
             QuoteDate = DateTime.Today,
             Remarks = NewQuoteRemarks
         };
