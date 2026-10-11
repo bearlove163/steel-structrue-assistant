@@ -70,6 +70,9 @@
                 }
             </select>
 
+            <button class="btn @(Theme.IsDarkMode ? "btn-outline-warning" : "btn-warning text-dark") btn-sm" @onclick='() => Nav.NavigateTo("/coating-fire-calculation")' title="打开防腐与防火算量工作台">
+                🎨 防腐防火工作台
+            </button>
             <button class="btn @(Theme.IsDarkMode ? "btn-outline-info" : "btn-info text-white") btn-sm" @onclick='() => Nav.NavigateTo("/sections")' title="打开截面力学视窗">
                 📐 截面力学视窗
             </button>

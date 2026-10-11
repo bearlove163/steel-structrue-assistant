@@ -66,9 +66,9 @@
                 <span class="badge bg-info text-dark">欧/美/国/涂料</span>
             </button>
 
-            <!-- 油漆与防火算量工作台按钮 -->
-            <button class="btn btn-outline-warning btn-sm d-flex align-items-center gap-1" @onclick="OpenPaintingModal" title="打开油漆防腐与防火涂料多层配套算量工作台">
-                <span>🎨 油漆与防火算量</span>
+            <!-- 模块 3：防腐与防火工作台独立网页直达 -->
+            <button class="btn btn-outline-warning btn-sm d-flex align-items-center gap-1" @onclick='() => Nav.NavigateTo("/coating-fire-calculation")' title="进入独立全屏：防腐涂装、防火算量与热浸镀锌工作台">
+                <span>🎨 模块3：防腐与防火</span>
             </button>
 
             <button class="btn btn-outline-secondary btn-sm" @onclick="OpenStandardDatabase" title="打开常用型钢检索库">
