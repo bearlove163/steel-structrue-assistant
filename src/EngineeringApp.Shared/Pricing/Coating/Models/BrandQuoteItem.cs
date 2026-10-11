@@ -27,6 +27,9 @@ public class BrandQuoteItem
     /// <summary>报价供应商/代理商全称</summary>
     public string SupplierName { get; set; } = "";
 
+    /// <summary>强关联供应商实体主键ID (外键映射供应商库)</summary>
+    public int? SupplierId { get; set; }
+
     /// <summary>询价生效日期</summary>
     public DateTime QuoteDate { get; set; } = DateTime.Today;
 

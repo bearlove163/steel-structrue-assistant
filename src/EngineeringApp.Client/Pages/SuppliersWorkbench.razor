@@ -1,0 +1,867 @@
+@page "/suppliers"
+@page "/supplier-database"
+@using EngineeringApp.Shared.Models
+@using EngineeringApp.Shared.Data
+@using EngineeringApp.Client.Services
+@inject NavigationManager Nav
+@inject ThemeState Theme
+@implements IDisposable
+
+<PageTitle>工程供应链与供应商库工作台</PageTitle>
+
+<div class="container-fluid py-2 px-3 workstation-root d-flex flex-column min-vh-100 @(Theme.IsDarkMode ? "bg-dark text-white" : "bg-light text-dark")"
+     data-theme="@(Theme.IsDarkMode ? "dark" : "light")">
+
+    <!-- ======================= 顶部导航与控制器 ======================= -->
+    <header class="d-flex flex-wrap align-items-center justify-content-between pb-2 mb-3 border-bottom @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle bg-white rounded p-2 shadow-sm")">
+        <div class="d-flex align-items-center gap-3">
+            <button class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1" @onclick='() => Nav.NavigateTo("/portal")' title="返回统一门户">
+                <span>←</span>
+                <span>门户中心</span>
+            </button>
+            <div class="d-flex align-items-center gap-2">
+                <span class="fs-4">🏢</span>
+                <div>
+                    <div class="d-flex align-items-center gap-2">
+                        <h5 class="mb-0 fw-bold @(Theme.IsDarkMode ? "text-white" : "text-dark")">工程供应链与供应商库管理中心</h5>
+                        <span class="badge @(Theme.IsDarkMode ? "bg-primary-subtle text-primary border border-primary" : "bg-primary text-white") text-xs">
+                            模块4 · 供方资质中心
+                        </span>
+                        <span class="badge bg-success text-xs">动态品类扩展</span>
+                    </div>
+                    <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">
+                        贯通制造钢厂 · 现货贸易 · 吊装机械 · 紧固件螺栓 · 特种构件 (拉索/支座/楼承板) · 防腐防火涂料
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex align-items-center gap-2 mt-2 mt-md-0">
+            <!-- 视图模式切换 -->
+            <div class="btn-group btn-group-sm">
+                <button class="btn @(CurrentView == ViewMode.Grid ? "btn-primary" : "btn-outline-secondary")" @onclick="() => CurrentView = ViewMode.Grid" title="切换紧凑表格清单视图">
+                    📋 网格清单
+                </button>
+                <button class="btn @(CurrentView == ViewMode.Cards ? "btn-primary" : "btn-outline-secondary")" @onclick="() => CurrentView = ViewMode.Cards" title="切换企业名片磁贴视图">
+                    🗂️ 企业名片
+                </button>
+            </div>
+
+            <!-- 数据操作 -->
+            <button class="btn btn-sm btn-success d-flex align-items-center gap-1" @onclick="OpenAddModal" title="新增供应商档案">
+                <span>➕</span>
+                <span>录入供应商</span>
+            </button>
+            <button class="btn btn-sm btn-outline-info d-flex align-items-center gap-1" @onclick="OpenExportModal" title="导出 JSON 名录">
+                <span>📤</span>
+                <span>导出</span>
+            </button>
+            <button class="btn btn-sm btn-outline-warning d-flex align-items-center gap-1" @onclick="OpenImportModal" title="批量导入 JSON">
+                <span>📥</span>
+                <span>导入</span>
+            </button>
+            <button class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1" @onclick="ResetToBenchmarkData" title="恢复行业标杆数据库预设">
+                <span>🔄</span>
+                <span>重置基准</span>
+            </button>
+
+            <!-- 主题切换 -->
+            <button class="btn btn-sm @(Theme.IsDarkMode ? "btn-outline-warning" : "btn-outline-dark")" @onclick="Theme.ToggleTheme" title="切换暗黑/亮色主题">
+                @(Theme.IsDarkMode ? "☀️" : "🌙")
+            </button>
+        </div>
+    </header>
+
+    <!-- ======================= 顶部统计看板 (6 张核心指标卡片) ======================= -->
+    <div class="row g-2 mb-3">
+        <!-- 卡片 1: 供应商总库 -->
+        <div class="col-6 col-md-2">
+            <div class="card p-2 h-100 @(Theme.IsDarkMode ? "bg-secondary bg-opacity-25 border-secondary" : "bg-white border-light-subtle shadow-sm")">
+                <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1 d-flex justify-content-between">
+                    <span>🏢 在册总供方</span>
+                    <span class="badge bg-primary">合格率 100%</span>
+                </div>
+                <div class="h5 fw-bold mb-0 text-primary">@TotalSuppliersCount <span class="fs-6 fw-normal @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">家</span></div>
+                <div class="text-xs text-secondary mt-1">涵盖全国全产业链</div>
+            </div>
+        </div>
+
+        <!-- 卡片 2: 钢厂与贸易商 -->
+        <div class="col-6 col-md-2">
+            <div class="card p-2 h-100 @(Theme.IsDarkMode ? "bg-secondary bg-opacity-25 border-secondary" : "bg-white border-light-subtle shadow-sm")">
+                <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1 d-flex justify-content-between">
+                    <span>🏭 钢厂与贸易</span>
+                    <span class="badge bg-info text-dark">主材源头</span>
+                </div>
+                <div class="h5 fw-bold mb-0 text-info">@(GetCountByCategory(SupplierCategory.SteelMill) + GetCountByCategory(SupplierCategory.SteelTrader)) <span class="fs-6 fw-normal @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">家</span></div>
+                <div class="text-xs text-secondary mt-1">钢厂 @GetCountByCategory(SupplierCategory.SteelMill) · 贸易 @GetCountByCategory(SupplierCategory.SteelTrader)</div>
+            </div>
+        </div>
+
+        <!-- 卡片 3: 吊机租赁与施工机械 -->
+        <div class="col-6 col-md-2">
+            <div class="card p-2 h-100 @(Theme.IsDarkMode ? "bg-secondary bg-opacity-25 border-secondary" : "bg-white border-light-subtle shadow-sm")">
+                <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1 d-flex justify-content-between">
+                    <span>🏗️ 吊装设备机械</span>
+                    <span class="badge bg-warning text-dark">台班定额</span>
+                </div>
+                <div class="h5 fw-bold mb-0 text-warning">@GetCountByCategory(SupplierCategory.CraneRental) <span class="fs-6 fw-normal @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">家</span></div>
+                <div class="text-xs text-secondary mt-1">平头塔/动臂塔/履带吊</div>
+            </div>
+        </div>
+
+        <!-- 卡片 4: 紧固件与螺栓 -->
+        <div class="col-6 col-md-2">
+            <div class="card p-2 h-100 @(Theme.IsDarkMode ? "bg-secondary bg-opacity-25 border-secondary" : "bg-white border-light-subtle shadow-sm")">
+                <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1 d-flex justify-content-between">
+                    <span>🔩 连接紧固件</span>
+                    <span class="badge bg-success">高强抗剪</span>
+                </div>
+                <div class="h5 fw-bold mb-0 text-success">@GetCountByCategory(SupplierCategory.FastenerBolt) <span class="fs-6 fw-normal @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">家</span></div>
+                <div class="text-xs text-secondary mt-1">10.9S螺栓/地脚锚栓</div>
+            </div>
+        </div>
+
+        <!-- 卡片 5: 特种构件与材料 (拉索/支座/楼承板) -->
+        <div class="col-6 col-md-2">
+            <div class="card p-2 h-100 @(Theme.IsDarkMode ? "bg-secondary bg-opacity-25 border-secondary" : "bg-white border-light-subtle shadow-sm")">
+                <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1 d-flex justify-content-between">
+                    <span>🔗 特种构件材料</span>
+                    <span class="badge bg-danger">空间大跨</span>
+                </div>
+                <div class="h5 fw-bold mb-0 text-danger">@GetCountByCategory(SupplierCategory.SpecialtyMaterial) <span class="fs-6 fw-normal @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">家</span></div>
+                <div class="text-xs text-secondary mt-1">拉索/减隔震/楼承板</div>
+            </div>
+        </div>
+
+        <!-- 卡片 6: 防腐与防火涂料 -->
+        <div class="col-6 col-md-2">
+            <div class="card p-2 h-100 @(Theme.IsDarkMode ? "bg-secondary bg-opacity-25 border-secondary" : "bg-white border-light-subtle shadow-sm")">
+                <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1 d-flex justify-content-between">
+                    <span>🎨 防腐防火涂装</span>
+                    <span class="badge bg-primary">重防腐认证</span>
+                </div>
+                <div class="h5 fw-bold mb-0 text-primary">@GetCountByCategory(SupplierCategory.PaintCoating) <span class="fs-6 fw-normal @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">家</span></div>
+                <div class="text-xs text-secondary mt-1">环氧/氟碳/防火涂料</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ======================= 过滤与筛选控制器 ======================= -->
+    <div class="card p-2 mb-3 @(Theme.IsDarkMode ? "bg-secondary bg-opacity-10 border-secondary" : "bg-white border-light-subtle shadow-sm")">
+        <!-- 主分类筛选标签 -->
+        <div class="d-flex flex-wrap align-items-center gap-1 pb-2 border-bottom @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle")">
+            <span class="text-xs fw-bold @(Theme.IsDarkMode ? "text-white-50" : "text-muted") me-1">品类大类:</span>
+            <button class="btn btn-xs @(SelectedCategory == null ? "btn-primary fw-bold" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary"))"
+                    @onclick="() => SelectCategory(null)">
+                🌐 全部品类 (@TotalSuppliersCount)
+            </button>
+            <button class="btn btn-xs @(SelectedCategory == SupplierCategory.SteelMill ? "btn-primary fw-bold" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary"))"
+                    @onclick="() => SelectCategory(SupplierCategory.SteelMill)">
+                🏭 钢厂制造 (@GetCountByCategory(SupplierCategory.SteelMill))
+            </button>
+            <button class="btn btn-xs @(SelectedCategory == SupplierCategory.SteelTrader ? "btn-primary fw-bold" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary"))"
+                    @onclick="() => SelectCategory(SupplierCategory.SteelTrader)">
+                🏪 贸易现货 (@GetCountByCategory(SupplierCategory.SteelTrader))
+            </button>
+            <button class="btn btn-xs @(SelectedCategory == SupplierCategory.CraneRental ? "btn-primary fw-bold" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary"))"
+                    @onclick="() => SelectCategory(SupplierCategory.CraneRental)">
+                🏗️ 吊机租赁 (@GetCountByCategory(SupplierCategory.CraneRental))
+            </button>
+            <button class="btn btn-xs @(SelectedCategory == SupplierCategory.FastenerBolt ? "btn-primary fw-bold" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary"))"
+                    @onclick="() => SelectCategory(SupplierCategory.FastenerBolt)">
+                🔩 紧固件螺栓 (@GetCountByCategory(SupplierCategory.FastenerBolt))
+            </button>
+            <button class="btn btn-xs @(SelectedCategory == SupplierCategory.SpecialtyMaterial ? "btn-primary fw-bold" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary"))"
+                    @onclick="() => SelectCategory(SupplierCategory.SpecialtyMaterial)">
+                🔗 特种构件材料 (@GetCountByCategory(SupplierCategory.SpecialtyMaterial))
+            </button>
+            <button class="btn btn-xs @(SelectedCategory == SupplierCategory.PaintCoating ? "btn-primary fw-bold" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary"))"
+                    @onclick="() => SelectCategory(SupplierCategory.PaintCoating)">
+                🎨 防腐防火涂装 (@GetCountByCategory(SupplierCategory.PaintCoating))
+            </button>
+            <button class="btn btn-xs @(SelectedCategory == SupplierCategory.OtherCustom ? "btn-primary fw-bold" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary"))"
+                    @onclick="() => SelectCategory(SupplierCategory.OtherCustom)">
+                ➕ 自定义品类 (@GetCountByCategory(SupplierCategory.OtherCustom))
+            </button>
+        </div>
+
+        <!-- 细分子类标签 (根据当前大类动态提取所有现有产品子类，支持点击过滤) -->
+        <div class="d-flex flex-wrap align-items-center gap-1 pt-2 pb-2 border-bottom @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle")">
+            <span class="text-xs fw-bold @(Theme.IsDarkMode ? "text-white-50" : "text-muted") me-1">细分产品/子类:</span>
+            <button class="btn btn-xs @(SelectedSubCategory == "全部" ? "btn-dark fw-bold" : "btn-outline-secondary")"
+                    @onclick='() => SelectSubCategory("全部")'>
+                全部子类
+            </button>
+            @foreach (var subCat in AvailableSubCategories.Take(12))
+            {
+                <button class="btn btn-xs @(SelectedSubCategory == subCat ? "btn-info text-dark fw-bold" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary"))"
+                        @onclick="() => SelectSubCategory(subCat)">
+                    @subCat
+                </button>
+            }
+        </div>
+
+        <!-- 检索与状态组合筛选器 -->
+        <div class="row g-2 pt-2 align-items-center">
+            <div class="col-md-5">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-light border-light-subtle")">🔍</span>
+                    <input type="text" class="form-control @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white border-light-subtle")"
+                           placeholder="输入企业全称、简称代码、联系人、基地城市模糊检索..."
+                           @bind="SearchKeyword" @bind:event="oninput" />
+                    @if (!string.IsNullOrEmpty(SearchKeyword))
+                    {
+                        <button class="btn btn-outline-secondary" @onclick="() => SearchKeyword = string.Empty">✕</button>
+                    }
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted") text-nowrap">合作等级:</span>
+                    <select class="form-select form-select-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                            @bind="SelectedStatus">
+                        <option value="全部">全部合作状态</option>
+                        <option value="战略合作">⭐ 战略合作</option>
+                        <option value="优先推荐">👍 优先推荐</option>
+                        <option value="合格在册">✔️ 合格在册</option>
+                        <option value="考察备选">⏳ 考察备选</option>
+                        <option value="暂停合作">⛔ 暂停合作</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="col-md-3 text-end text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">
+                当前筛选匹配: <strong class="text-primary fs-6">@FilteredSuppliers.Count()</strong> 家供应商
+            </div>
+        </div>
+    </div>
+
+    <!-- ======================= 主工作台展示区 (双视窗切换) ======================= -->
+    @if (CurrentView == ViewMode.Grid)
+    {
+        <!-- 视图 1：紧凑工程网格清单 (Table Grid) -->
+        <div class="table-responsive rounded border @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle bg-white shadow-sm") flex-grow-1" style="max-height: 600px;">
+            <table class="table table-sm table-striped @(Theme.IsDarkMode ? "table-dark table-hover" : "table-hover") align-middle mb-0 text-xs">
+                <thead class="@(Theme.IsDarkMode ? "table-secondary table-opacity-25" : "table-light") sticky-top">
+                    <tr>
+                        <th style="width: 50px;" class="text-center">#</th>
+                        <th style="width: 120px;">编号/代码</th>
+                        <th style="min-width: 180px;">企业工商全称 (品牌简称)</th>
+                        <th style="width: 120px;">大类归属</th>
+                        <th style="min-width: 190px;">细分供应产品 / 业务特长</th>
+                        <th style="width: 140px;">生产基地 / 辐射区域</th>
+                        <th style="width: 150px;">商务对接人 / 电话</th>
+                        <th style="width: 90px;" class="text-center">合作状态</th>
+                        <th style="min-width: 200px;">资质与业务特征说明</th>
+                        <th style="width: 110px;" class="text-center">操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!FilteredSuppliers.Any())
+                    {
+                        <tr>
+                            <td colspan="10" class="text-center py-4 text-muted">
+                                📭 没有找到匹配的供应商记录，请尝试调整筛选条件或点击上方「录入供应商」新增档案。
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        int idx = 1;
+                        @foreach (var sup in FilteredSuppliers)
+                        {
+                            <tr>
+                                <td class="text-center @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">@(idx++)</td>
+                                <td>
+                                    <span class="badge @(Theme.IsDarkMode ? "bg-dark border border-secondary text-light" : "bg-light text-dark border") font-monospace">
+                                        @sup.Code
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="fw-bold @(Theme.IsDarkMode ? "text-white" : "text-dark")">@sup.Name</div>
+                                    <div class="text-xs text-secondary d-flex align-items-center gap-1">
+                                        <span>简称: <strong class="text-primary">@sup.ShortName</strong></span>
+                                        @if (sup.Category == SupplierCategory.SteelMill)
+                                        {
+                                            <span class="badge @(sup.BenchmarkPremiumPerTon > 0 ? "bg-warning text-dark" : (sup.BenchmarkPremiumPerTon < 0 ? "bg-success" : "bg-secondary")) px-1 py-0">
+                                                基准溢价: @(sup.BenchmarkPremiumPerTon >= 0 ? "+" : "")@sup.BenchmarkPremiumPerTon 元/t
+                                            </span>
+                                        }
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="badge @GetCategoryBadgeClass(sup.Category)">
+                                        @GetCategoryName(sup.Category)
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="text-truncate d-inline-block" style="max-width: 240px;" title="@sup.SubCategory">
+                                        @sup.SubCategory
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="text-truncate d-inline-block" style="max-width: 150px;" title="@sup.CityRegion">
+                                        📍 @sup.CityRegion
+                                    </span>
+                                </td>
+                                <td>
+                                    <div>👤 @sup.ContactPerson</div>
+                                    <div class="font-monospace @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">📞 @sup.ContactPhone</div>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge @GetStatusBadgeClass(sup.CooperationStatus)">
+                                        @sup.CooperationStatus
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="text-truncate d-inline-block @(Theme.IsDarkMode ? "text-white-50" : "text-muted")" style="max-width: 260px;" title="@sup.Remarks">
+                                        @sup.Remarks
+                                    </span>
+                                </td>
+                                <td class="text-center">
+                                    <div class="btn-group btn-group-sm">
+                                        <button class="btn btn-xs btn-outline-primary" @onclick="() => OpenEditModal(sup)" title="编辑档案">
+                                            ✏️
+                                        </button>
+                                        <button class="btn btn-xs btn-outline-danger" @onclick="() => ConfirmDelete(sup)" title="删除供应商">
+                                            🗑️
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else
+    {
+        <!-- 视图 2：企业名片磁贴视图 (Card Grid) -->
+        <div class="row g-2 overflow-auto flex-grow-1" style="max-height: 600px;">
+            @if (!FilteredSuppliers.Any())
+            {
+                <div class="col-12 text-center py-5 text-muted">
+                    📭 没有找到匹配的供应商企业名片。
+                </div>
+            }
+            else
+            {
+                @foreach (var sup in FilteredSuppliers)
+                {
+                    <div class="col-md-6 col-lg-4 col-xl-3">
+                        <div class="card h-100 p-2 position-relative @(Theme.IsDarkMode ? "bg-dark border-secondary text-white" : "bg-white border-light-subtle shadow-sm text-dark")">
+                            <!-- 顶部标识条 -->
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <span class="badge @GetCategoryBadgeClass(sup.Category)">
+                                    @GetCategoryName(sup.Category)
+                                </span>
+                                <span class="badge @GetStatusBadgeClass(sup.CooperationStatus)">
+                                    @sup.CooperationStatus
+                                </span>
+                            </div>
+
+                            <!-- 企业核心信息 -->
+                            <h6 class="fw-bold mb-1 text-truncate" title="@sup.Name">@sup.Name</h6>
+                            <div class="text-xs text-secondary mb-2 d-flex flex-wrap align-items-center justify-content-between gap-1">
+                                <span>简称: <strong class="text-primary">@sup.ShortName</strong></span>
+                                <span class="font-monospace text-muted">@sup.Code</span>
+                                @if (sup.Category == SupplierCategory.SteelMill)
+                                {
+                                    <span class="badge @(sup.BenchmarkPremiumPerTon > 0 ? "bg-warning text-dark" : (sup.BenchmarkPremiumPerTon < 0 ? "bg-success" : "bg-secondary")) px-1 py-0">
+                                        溢价: @(sup.BenchmarkPremiumPerTon >= 0 ? "+" : "")@sup.BenchmarkPremiumPerTon 元/t
+                                    </span>
+                                }
+                            </div>
+
+                            <!-- 业务与产品标签 -->
+                            <div class="p-1 mb-2 rounded @(Theme.IsDarkMode ? "bg-black bg-opacity-25" : "bg-light") text-xs">
+                                <div class="text-muted mb-1">主营产品 / 细分子类:</div>
+                                <div class="fw-semibold text-truncate" title="@sup.SubCategory">@sup.SubCategory</div>
+                            </div>
+
+                            <!-- 联系人与区域 -->
+                            <div class="text-xs mb-2">
+                                <div class="d-flex align-items-center gap-1 mb-1">
+                                    <span class="text-muted">📍 基地/城市:</span>
+                                    <span class="text-truncate" title="@sup.CityRegion">@sup.CityRegion</span>
+                                </div>
+                                <div class="d-flex align-items-center gap-1 mb-1">
+                                    <span class="text-muted">👤 对接联系:</span>
+                                    <span>@sup.ContactPerson</span>
+                                </div>
+                                <div class="d-flex align-items-center gap-1">
+                                    <span class="text-muted">📞 联络电话:</span>
+                                    <span class="font-monospace">@sup.ContactPhone</span>
+                                </div>
+                            </div>
+
+                            <!-- 备注特长 -->
+                            <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted") text-truncate mb-2" title="@sup.Remarks">
+                                💡 @sup.Remarks
+                            </div>
+
+                            <!-- 底部动作条 -->
+                            <div class="mt-auto pt-2 border-top @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle") d-flex justify-content-end gap-1">
+                                <button class="btn btn-xs btn-outline-primary" @onclick="() => OpenEditModal(sup)">
+                                    ✏️ 编辑
+                                </button>
+                                <button class="btn btn-xs btn-outline-danger" @onclick="() => ConfirmDelete(sup)">
+                                    🗑️ 删除
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+    }
+
+    <!-- ======================= 模态弹窗 1：新增/编辑供应商模态窗 ======================= -->
+    @if (ShowEditModal)
+    {
+        <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.65); z-index: 1060;">
+            <div class="modal-dialog modal-lg modal-dialog-centered">
+                <div class="modal-content @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark") shadow-lg">
+                    <div class="modal-header py-2 @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle bg-light")">
+                        <h6 class="modal-title fw-bold">
+                            @(EditingSupplier.Id == 0 ? "➕ 录入新供应商企业档案" : $"✏️ 编辑供应商档案 - {EditingSupplier.Name}")
+                        </h6>
+                        <button type="button" class="btn-close @(Theme.IsDarkMode ? "btn-close-white" : "")" @onclick="() => ShowEditModal = false"></button>
+                    </div>
+                    <div class="modal-body p-3 text-xs">
+                        <div class="row g-2 mb-2">
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold mb-1">系统代码 / 唯一编号:</label>
+                                <input type="text" class="form-control form-control-sm font-monospace @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "")"
+                                       placeholder="系统自动按规则生成" @bind="EditingSupplier.Code" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold mb-1">大类分类 <span class="text-danger">*</span>:</label>
+                                <select class="form-select form-select-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "")"
+                                        @bind="EditingSupplier.Category">
+                                    <option value="@SupplierCategory.SteelMill">🏭 钢厂制造</option>
+                                    <option value="@SupplierCategory.SteelTrader">🏪 贸易现货</option>
+                                    <option value="@SupplierCategory.CraneRental">🏗️ 吊机租赁</option>
+                                    <option value="@SupplierCategory.FastenerBolt">🔩 紧固件螺栓</option>
+                                    <option value="@SupplierCategory.SpecialtyMaterial">🔗 特种构件与材料</option>
+                                    <option value="@SupplierCategory.PaintCoating">🎨 防腐防火涂装</option>
+                                    <option value="@SupplierCategory.OtherCustom">➕ 自定义新型品类</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold mb-1">合作准入状态:</label>
+                                <select class="form-select form-select-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "")"
+                                        @bind="EditingSupplier.CooperationStatus">
+                                    <option value="战略合作">⭐ 战略合作</option>
+                                    <option value="优先推荐">👍 优先推荐</option>
+                                    <option value="合格在册">✔️ 合格在册</option>
+                                    <option value="考察备选">⏳ 考察备选</option>
+                                    <option value="暂停合作">⛔ 暂停合作</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="row g-2 mb-2">
+                            <div class="col-md-7">
+                                <label class="form-label fw-bold mb-1">企业工商全称 <span class="text-danger">*</span>:</label>
+                                <input type="text" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "")"
+                                       placeholder="如 宝山钢铁股份有限公司" @bind="EditingSupplier.Name" />
+                            </div>
+                            <div class="col-md-5">
+                                <label class="form-label fw-bold mb-1">企业简称 / 常用品牌名:</label>
+                                <input type="text" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "")"
+                                       placeholder="如 宝钢股份" @bind="EditingSupplier.ShortName" />
+                            </div>
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label fw-bold mb-1">
+                                供应产品 / 细分子类标签 (支持动态扩展与输入):
+                            </label>
+                            <input type="text" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "")"
+                                   placeholder="输入细分产品名称，用斜杠分隔，如 '10.9S大六角高强螺栓 / 地脚锚栓'" @bind="EditingSupplier.SubCategory" />
+                            <!-- 常用快捷补全胶囊 -->
+                            <div class="mt-1 d-flex flex-wrap gap-1">
+                                <span class="text-muted text-xs">快捷推荐标签:</span>
+                                <span class="badge bg-secondary-subtle text-secondary cursor-pointer" @onclick='() => AppendSubCategory("10.9S高强螺栓")'>+高强螺栓</span>
+                                <span class="badge bg-secondary-subtle text-secondary cursor-pointer" @onclick='() => AppendSubCategory("扭剪型螺栓")'>+扭剪型螺栓</span>
+                                <span class="badge bg-secondary-subtle text-secondary cursor-pointer" @onclick='() => AppendSubCategory("地脚锚栓")'>+地脚锚栓</span>
+                                <span class="badge bg-secondary-subtle text-secondary cursor-pointer" @onclick='() => AppendSubCategory("空间拉索索具")'>+空间拉索</span>
+                                <span class="badge bg-secondary-subtle text-secondary cursor-pointer" @onclick='() => AppendSubCategory("建筑减隔震支座")'>+减隔震支座</span>
+                                <span class="badge bg-secondary-subtle text-secondary cursor-pointer" @onclick='() => AppendSubCategory("闭口型楼承板")'>+闭口楼承板</span>
+                                <span class="badge bg-secondary-subtle text-secondary cursor-pointer" @onclick='() => AppendSubCategory("动臂/平头塔式起重机")'>+塔吊租赁</span>
+                                <span class="badge bg-secondary-subtle text-secondary cursor-pointer" @onclick='() => AppendSubCategory("环氧富锌防腐漆")'>+环氧富锌漆</span>
+                                <span class="badge bg-secondary-subtle text-secondary cursor-pointer" @onclick='() => AppendSubCategory("钢结构超薄型防火涂料")'>+防火涂料</span>
+                            </div>
+                        </div>
+
+                        <div class="row g-2 mb-2">
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold mb-1">业务对接联系人:</label>
+                                <input type="text" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "")"
+                                       placeholder="联系人姓名及部门" @bind="EditingSupplier.ContactPerson" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold mb-1">联系电话 / 手机号码:</label>
+                                <input type="text" class="form-control form-control-sm font-monospace @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "")"
+                                       placeholder="座机或手机" @bind="EditingSupplier.ContactPhone" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold mb-1">商务邮箱 / 传真:</label>
+                                <input type="email" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "")"
+                                       placeholder="sales@company.com" @bind="EditingSupplier.Email" />
+                            </div>
+                        </div>
+
+                        <div class="row g-2 mb-2">
+                            <div class="col-md-7">
+                                <label class="form-label fw-bold mb-1">主要生产基地 / 常驻城市 / 供货辐射区域:</label>
+                                <input type="text" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "")"
+                                       placeholder="如 上海宝山 / 广东湛江 / 华东枢纽仓" @bind="EditingSupplier.CityRegion" />
+                            </div>
+                            <div class="col-md-5">
+                                <label class="form-label fw-bold mb-1">
+                                    @(EditingSupplier.Category == SupplierCategory.SteelMill ? "★ 钢厂基准品牌溢价 (元/吨):" : "基准价格浮动/溢价参考 (元/吨):")
+                                </label>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text @(Theme.IsDarkMode ? "bg-dark text-white-50 border-secondary" : "bg-light text-muted")">¥</span>
+                                    <input type="number" step="10" class="form-control form-control-sm @(EditingSupplier.Category == SupplierCategory.SteelMill ? "fw-bold text-primary" : "") @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "")"
+                                           placeholder="0" @bind="EditingSupplier.BenchmarkPremiumPerTon" />
+                                    <span class="input-group-text @(Theme.IsDarkMode ? "bg-dark text-white-50 border-secondary" : "bg-light text-muted")">元/t</span>
+                                </div>
+                                <span class="text-xs text-muted">与材料五维估值引擎实时联动自动核算</span>
+                            </div>
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label fw-bold mb-1">企业资质、产能规模、专精特长及合作备注:</label>
+                            <textarea class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "")"
+                                      rows="3" placeholder="填写资质证书编号、重大工程供货业绩或特定要求说明..."
+                                      @bind="EditingSupplier.Remarks"></textarea>
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(ValidationErrorMessage))
+                        {
+                            <div class="alert alert-danger py-1 px-2 mb-0 text-xs">
+                                ⚠️ @ValidationErrorMessage
+                            </div>
+                        }
+                    </div>
+                    <div class="modal-footer py-2 @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle bg-light")">
+                        <button type="button" class="btn btn-sm btn-secondary" @onclick="() => ShowEditModal = false">取消</button>
+                        <button type="button" class="btn btn-sm btn-primary" @onclick="SaveEditingSupplier">
+                            💾 保存档案
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- ======================= 模态弹窗 2：JSON 批量导入面板 ======================= -->
+    @if (ShowImportModal)
+    {
+        <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.65); z-index: 1060;">
+            <div class="modal-dialog modal-lg modal-dialog-centered">
+                <div class="modal-content @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")">
+                    <div class="modal-header py-2 @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle bg-light")">
+                        <h6 class="modal-title fw-bold">📥 供应商数据库批量导入 (JSON 格式)</h6>
+                        <button type="button" class="btn-close @(Theme.IsDarkMode ? "btn-close-white" : "")" @onclick="() => ShowImportModal = false"></button>
+                    </div>
+                    <div class="modal-body p-3 text-xs">
+                        <div class="mb-2 @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">
+                            支持粘贴由 ERP、物资系统或备份文件导出的 SupplierItem 标准 JSON 数组：
+                        </div>
+                        <textarea class="form-control form-control-sm font-monospace text-xs mb-2 @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "")"
+                                  rows="8" placeholder="[ { 'Name': '...', 'Category': 1, ... } ]" @bind="ImportJsonText"></textarea>
+                        <div class="form-check text-xs">
+                            <input class="form-check-input" type="checkbox" id="chkOverwriteSup" @bind="ImportOverwrite">
+                            <label class="form-check-label @(Theme.IsDarkMode ? "text-white-50" : "text-muted")" for="chkOverwriteSup">
+                                全量覆盖现有数据库 (默认不勾选，仅增量追加)
+                            </label>
+                        </div>
+                        @if (!string.IsNullOrEmpty(ImportError))
+                        {
+                            <div class="alert alert-danger py-1 px-2 mt-2 text-xs">@ImportError</div>
+                        }
+                    </div>
+                    <div class="modal-footer py-2 @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle bg-light")">
+                        <button class="btn btn-sm btn-secondary" @onclick="() => ShowImportModal = false">取消</button>
+                        <button class="btn btn-sm btn-info" @onclick="ExecuteImport">🚀 解析并导入</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- ======================= 模态弹窗 3：JSON 导出面板 ======================= -->
+    @if (ShowExportModal)
+    {
+        <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.65); z-index: 1060;">
+            <div class="modal-dialog modal-lg modal-dialog-centered">
+                <div class="modal-content @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")">
+                    <div class="modal-header py-2 @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle bg-light")">
+                        <h6 class="modal-title fw-bold">📤 供应商数据库导出 (JSON)</h6>
+                        <button type="button" class="btn-close @(Theme.IsDarkMode ? "btn-close-white" : "")" @onclick="() => ShowExportModal = false"></button>
+                    </div>
+                    <div class="modal-body p-3 text-xs">
+                        <textarea class="form-control form-control-sm font-monospace text-xs mb-2 @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "")"
+                                  rows="10" readonly value="@ExportJsonText"></textarea>
+                    </div>
+                    <div class="modal-footer py-2 @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle bg-light")">
+                        <button class="btn btn-sm btn-secondary" @onclick="() => ShowExportModal = false">完成关闭</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- ======================= 模态弹窗 4：删除确认 ======================= -->
+    @if (DeletingSupplier != null)
+    {
+        <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.65); z-index: 1070;">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white") shadow-lg">
+                    <div class="modal-header py-2 @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle bg-light")">
+                        <h6 class="modal-title fw-bold text-danger">⚠️ 确认删除供应商</h6>
+                        <button type="button" class="btn-close @(Theme.IsDarkMode ? "btn-close-white" : "")" @onclick="() => DeletingSupplier = null"></button>
+                    </div>
+                    <div class="modal-body p-3 text-xs">
+                        您确认要从系统中移除以下供应商档案吗？
+                        <div class="p-2 my-2 rounded border @(Theme.IsDarkMode ? "bg-black border-danger" : "bg-danger bg-opacity-10 border-danger-subtle")">
+                            <div class="fw-bold">@DeletingSupplier.Name (@DeletingSupplier.ShortName)</div>
+                            <div class="text-muted">代码: @DeletingSupplier.Code | 分类: @GetCategoryName(DeletingSupplier.Category)</div>
+                        </div>
+                        <div class="text-danger fw-semibold">
+                            ⚠️ 注意：删除后不可撤销。如该供应商存在历史工程询价出处或正在供货，建议将状态修改为【暂停合作】而不是删除。
+                        </div>
+                    </div>
+                    <div class="modal-footer py-2 @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle bg-light")">
+                        <button class="btn btn-sm btn-secondary" @onclick="() => DeletingSupplier = null">取消</button>
+                        <button class="btn btn-sm btn-danger" @onclick="ExecuteDelete">确认删除</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private enum ViewMode { Grid, Cards }
+    private ViewMode CurrentView = ViewMode.Grid;
+
+    private SupplierCategory? SelectedCategory = null;
+    private string SelectedSubCategory = "全部";
+    private string SearchKeyword = "";
+    private string SelectedStatus = "全部";
+
+    private bool ShowEditModal = false;
+    private bool ShowImportModal = false;
+    private bool ShowExportModal = false;
+
+    private string ImportJsonText = "";
+    private bool ImportOverwrite = false;
+    private string ImportError = "";
+    private string ExportJsonText = "";
+    private string ValidationErrorMessage = "";
+
+    private SupplierItem EditingSupplier = new();
+    private SupplierItem? DeletingSupplier = null;
+
+    protected override void OnInitialized()
+    {
+        Theme.OnChange += StateHasChanged;
+    }
+
+    public void Dispose()
+    {
+        Theme.OnChange -= StateHasChanged;
+    }
+
+    private int TotalSuppliersCount => SupplierDatabase.AllSuppliers.Count;
+
+    private int GetCountByCategory(SupplierCategory cat) =>
+        SupplierDatabase.AllSuppliers.Count(s => s.Category == cat);
+
+    private List<string> AvailableSubCategories =>
+        SupplierDatabase.GetAllSubCategories(SelectedCategory);
+
+    private IEnumerable<SupplierItem> FilteredSuppliers
+    {
+        get
+        {
+            var res = SupplierDatabase.Filter(SelectedCategory, SelectedSubCategory, SearchKeyword);
+            if (SelectedStatus != "全部")
+            {
+                res = res.Where(s => s.CooperationStatus == SelectedStatus);
+            }
+            return res;
+        }
+    }
+
+    private void SelectCategory(SupplierCategory? cat)
+    {
+        SelectedCategory = cat;
+        SelectedSubCategory = "全部";
+    }
+
+    private void SelectSubCategory(string sub)
+    {
+        SelectedSubCategory = sub;
+    }
+
+    private void OpenAddModal()
+    {
+        ValidationErrorMessage = "";
+        EditingSupplier = new SupplierItem
+        {
+            Category = SelectedCategory ?? SupplierCategory.FastenerBolt,
+            CooperationStatus = "合格在册"
+        };
+        ShowEditModal = true;
+    }
+
+    private void OpenEditModal(SupplierItem item)
+    {
+        ValidationErrorMessage = "";
+        EditingSupplier = new SupplierItem
+        {
+            Id = item.Id,
+            Code = item.Code,
+            Name = item.Name,
+            ShortName = item.ShortName,
+            Category = item.Category,
+            SubCategory = item.SubCategory,
+            ContactPerson = item.ContactPerson,
+            ContactPhone = item.ContactPhone,
+            Email = item.Email,
+            CityRegion = item.CityRegion,
+            CooperationStatus = item.CooperationStatus,
+            Remarks = item.Remarks,
+            CreatedAt = item.CreatedAt,
+            UpdatedAt = item.UpdatedAt
+        };
+        ShowEditModal = true;
+    }
+
+    private void AppendSubCategory(string tag)
+    {
+        if (string.IsNullOrWhiteSpace(EditingSupplier.SubCategory))
+        {
+            EditingSupplier.SubCategory = tag;
+        }
+        else if (!EditingSupplier.SubCategory.Contains(tag))
+        {
+            EditingSupplier.SubCategory += " / " + tag;
+        }
+    }
+
+    private void SaveEditingSupplier()
+    {
+        if (string.IsNullOrWhiteSpace(EditingSupplier.Name))
+        {
+            ValidationErrorMessage = "企业法定全称不能为空。";
+            return;
+        }
+
+        if (EditingSupplier.Id == 0)
+        {
+            SupplierDatabase.AddSupplier(EditingSupplier);
+        }
+        else
+        {
+            SupplierDatabase.UpdateSupplier(EditingSupplier);
+        }
+
+        ShowEditModal = false;
+    }
+
+    private void ConfirmDelete(SupplierItem item)
+    {
+        DeletingSupplier = item;
+    }
+
+    private void ExecuteDelete()
+    {
+        if (DeletingSupplier != null)
+        {
+            SupplierDatabase.RemoveSupplier(DeletingSupplier.Id);
+            DeletingSupplier = null;
+        }
+    }
+
+    private void OpenExportModal()
+    {
+        ExportJsonText = SupplierDatabase.ExportToJson();
+        ShowExportModal = true;
+    }
+
+    private void OpenImportModal()
+    {
+        ImportJsonText = "";
+        ImportError = "";
+        ImportOverwrite = false;
+        ShowImportModal = true;
+    }
+
+    private void ExecuteImport()
+    {
+        if (string.IsNullOrWhiteSpace(ImportJsonText))
+        {
+            ImportError = "请先粘贴 JSON 内容。";
+            return;
+        }
+
+        var success = SupplierDatabase.ImportFromJson(ImportJsonText, ImportOverwrite);
+        if (success)
+        {
+            ShowImportModal = false;
+        }
+        else
+        {
+            ImportError = "JSON 格式解析失败，请检查数据结构是否符合规范。";
+        }
+    }
+
+    private void ResetToBenchmarkData()
+    {
+        SupplierDatabase.ResetToDefaults();
+    }
+
+    private string GetCategoryName(SupplierCategory cat) => cat switch
+    {
+        SupplierCategory.SteelMill => "钢厂制造",
+        SupplierCategory.SteelTrader => "贸易现货",
+        SupplierCategory.CraneRental => "吊机租赁",
+        SupplierCategory.FastenerBolt => "紧固件螺栓",
+        SupplierCategory.SpecialtyMaterial => "特种构件材料",
+        SupplierCategory.PaintCoating => "防腐防火涂料",
+        SupplierCategory.OtherCustom => "自定义品类",
+        _ => "其他"
+    };
+
+    private string GetCategoryBadgeClass(SupplierCategory cat) => cat switch
+    {
+        SupplierCategory.SteelMill => "bg-primary",
+        SupplierCategory.SteelTrader => "bg-info text-dark",
+        SupplierCategory.CraneRental => "bg-warning text-dark",
+        SupplierCategory.FastenerBolt => "bg-success",
+        SupplierCategory.SpecialtyMaterial => "bg-danger",
+        SupplierCategory.PaintCoating => "bg-primary bg-opacity-75",
+        SupplierCategory.OtherCustom => "bg-secondary",
+        _ => "bg-secondary"
+    };
+
+    private string GetStatusBadgeClass(string status) => status switch
+    {
+        "战略合作" => "bg-warning text-dark border border-warning",
+        "优先推荐" => "bg-success",
+        "合格在册" => "bg-primary",
+        "考察备选" => "bg-secondary",
+        "暂停合作" => "bg-danger",
+        _ => "bg-secondary"
+    };
+}

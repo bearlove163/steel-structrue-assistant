@@ -124,6 +124,10 @@ public class PaintProductItem
     public CoatingLayerType LayerType { get; set; }
     public string Name { get; set; } = "";
     public string Brand { get; set; } = "工业标准品";
+
+    /// <summary>强关联供应商实体主键ID (外键映射供应商库)</summary>
+    public int? SupplierId { get; set; }
+
     public string Description { get; set; } = "";
     public string Features { get; set; } = "";
     public string SupportedMethods { get; set; } = "高压无气喷涂 / 刷涂滚涂";

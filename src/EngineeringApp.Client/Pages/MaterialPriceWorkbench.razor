@@ -1,6 +1,8 @@
 @page "/material-pricing"
 @using EngineeringApp.Shared.Material
 @using EngineeringApp.Shared.Material.Pricing
+@using EngineeringApp.Shared.Data
+@using EngineeringApp.Shared.Models
 @using EngineeringApp.Client.Services
 @using System.Net.Http.Json
 @inject NavigationManager Nav
@@ -628,8 +630,14 @@
                                 </div>
                                 <div class="col-6">
                                     <label class="form-label text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-0">报价渠道/供应商:</label>
-                                    <input type="text" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-secondary-subtle") text-xs"
-                                           placeholder="如 宝武直供/现货仓" @bind="ProvenanceArchiveVendorInput" />
+                                    <input type="text" list="provenanceVendorsList" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-secondary-subtle") text-xs"
+                                           placeholder="如 宝钢股份 / 欧冶云商" @bind="ProvenanceArchiveVendorInput" />
+                                    <datalist id="provenanceVendorsList">
+                                        @foreach (var s in SupplierDatabase.AllSuppliers)
+                                        {
+                                            <option value="@s.ShortName">@s.Name (@s.Code)</option>
+                                        }
+                                    </datalist>
                                 </div>
                             </div>
                             <div class="mb-2">
@@ -2324,6 +2332,11 @@
         string vendor = string.IsNullOrWhiteSpace(ProvenanceArchiveVendorInput) ? "主流钢厂直供通道" : ProvenanceArchiveVendorInput;
         string principle = string.IsNullOrWhiteSpace(ProvenanceArchivePrincipleInput) ? "行业出厂常规阶梯与定尺规则" : ProvenanceArchivePrincipleInput;
 
+        var matchedSup = SupplierDatabase.AllSuppliers.FirstOrDefault(s =>
+            s.ShortName.Equals(vendor, StringComparison.OrdinalIgnoreCase) ||
+            s.Name.Equals(vendor, StringComparison.OrdinalIgnoreCase) ||
+            s.Code.Equals(vendor, StringComparison.OrdinalIgnoreCase));
+
         var newRecord = new MaterialProvenanceRecord
         {
             Id = nextId,
@@ -2340,6 +2353,7 @@
             InquiryBatchId = batchId,
             InquiryDate = ProvenanceArchiveDateInput,
             InquiryVendor = vendor,
+            SupplierId = matchedSup?.Id,
             RevisionNumber = 1,
             PricingPrincipleNote = principle,
             MillName = CurrentPlatePrice.MillName,

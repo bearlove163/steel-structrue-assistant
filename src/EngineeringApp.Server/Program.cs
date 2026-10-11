@@ -36,12 +36,14 @@ app.MapGet("/api/health", async (AppDbContext db) =>
 {
     var steelCount = await db.StandardSteels.CountAsync();
     var paintCount = await db.PaintProducts.CountAsync();
+    var supplierCount = await db.Suppliers.CountAsync();
     return Results.Ok(new
     {
         Status = "Online",
         Database = "SQLite (engineering_workstation.db)",
         StandardSteelsCount = steelCount,
         PaintProductsCount = paintCount,
+        SuppliersCount = supplierCount,
         Timestamp = DateTime.UtcNow
     });
 });
@@ -332,6 +334,147 @@ app.MapDelete("/api/pricing/provenance-records/{id:int}", async (int id, AppDbCo
     db.MaterialProvenanceRecords.Remove(item);
     await db.SaveChangesAsync();
     return Results.Ok(new { Message = $"Material provenance record {id} removed." });
+});
+
+// ======================== 供应商名录与资质库 API ========================
+
+// 16. 获取供应商列表 (支持分类筛选与模糊关键字搜索)
+app.MapGet("/api/database/suppliers", async (SupplierCategory? category, string? keyword, AppDbContext db) =>
+{
+    var query = db.Suppliers.AsQueryable();
+
+    if (category.HasValue && (int)category.Value > 0)
+    {
+        query = query.Where(s => s.Category == category.Value);
+    }
+
+    if (!string.IsNullOrWhiteSpace(keyword))
+    {
+        var kw = keyword.Trim().ToLower();
+        query = query.Where(s =>
+            s.Name.ToLower().Contains(kw) ||
+            s.ShortName.ToLower().Contains(kw) ||
+            s.Code.ToLower().Contains(kw) ||
+            s.SubCategory.ToLower().Contains(kw) ||
+            s.ContactPerson.ToLower().Contains(kw) ||
+            s.CityRegion.ToLower().Contains(kw));
+    }
+
+    var list = await query
+        .OrderBy(s => s.Category)
+        .ThenBy(s => s.Id)
+        .Select(s => s.ToDomain())
+        .ToListAsync();
+
+    return Results.Ok(list);
+});
+
+// 17. 获取单个供应商详情
+app.MapGet("/api/database/suppliers/{id:int}", async (int id, AppDbContext db) =>
+{
+    var supplier = await db.Suppliers.FindAsync(id);
+    if (supplier == null) return Results.NotFound();
+
+    return Results.Ok(supplier.ToDomain());
+});
+
+// 18. 新增供应商档案
+app.MapPost("/api/database/suppliers", async (SupplierItem input, AppDbContext db) =>
+{
+    if (string.IsNullOrWhiteSpace(input.Name))
+    {
+        return Results.BadRequest(new { Message = "供应商法定名称不能为空" });
+    }
+
+    if (string.IsNullOrWhiteSpace(input.Code))
+    {
+        var count = await db.Suppliers.CountAsync(s => s.Category == input.Category) + 1;
+        var prefix = input.Category switch
+        {
+            SupplierCategory.SteelMill => "SUP-MILL",
+            SupplierCategory.SteelTrader => "SUP-TRD",
+            SupplierCategory.CraneRental => "SUP-CRN",
+            SupplierCategory.FastenerBolt => "SUP-BLT",
+            SupplierCategory.SpecialtyMaterial => "SUP-MAT",
+            SupplierCategory.PaintCoating => "SUP-PNT",
+            _ => "SUP-CUS"
+        };
+        input.Code = $"{prefix}-{count:D3}";
+    }
+
+    var entity = SupplierEntity.FromDomain(input);
+    entity.Id = 0; // 自增
+    entity.CreatedAt = DateTime.Now;
+    entity.UpdatedAt = DateTime.Now;
+
+    db.Suppliers.Add(entity);
+    await db.SaveChangesAsync();
+
+    return Results.Created($"/api/database/suppliers/{entity.Id}", entity.ToDomain());
+});
+
+// 19. 更新供应商档案
+app.MapPut("/api/database/suppliers/{id:int}", async (int id, SupplierItem input, AppDbContext db) =>
+{
+    var entity = await db.Suppliers.FindAsync(id);
+    if (entity == null) return Results.NotFound();
+
+    entity.Name = input.Name;
+    entity.ShortName = input.ShortName;
+    entity.Category = input.Category;
+    entity.SubCategory = input.SubCategory;
+    entity.ContactPerson = input.ContactPerson;
+    entity.ContactPhone = input.ContactPhone;
+    entity.Email = input.Email;
+    entity.CityRegion = input.CityRegion;
+    entity.CooperationStatus = input.CooperationStatus;
+    entity.Remarks = input.Remarks;
+    entity.UpdatedAt = DateTime.Now;
+
+    await db.SaveChangesAsync();
+    return Results.Ok(entity.ToDomain());
+});
+
+// 20. 删除供应商档案 (带外键引用保护检查)
+app.MapDelete("/api/database/suppliers/{id:int}", async (int id, AppDbContext db) =>
+{
+    var entity = await db.Suppliers.FindAsync(id);
+    if (entity == null) return Results.NotFound();
+
+    // 检查是否有物料出处记录外键强关联引用
+    var isReferencedInProvenance = await db.MaterialProvenanceRecords.AnyAsync(r => r.SupplierId == id);
+    var isReferencedInPaint = await db.PaintProducts.AnyAsync(p => p.SupplierId == id);
+
+    if (isReferencedInProvenance || isReferencedInPaint)
+    {
+        return Results.BadRequest(new
+        {
+            Message = $"无法删除供应商【{entity.Name}】(ID: {id})：该供应商已被物料询价出处或涂装产品名录引用，请先解除业务关联或将其合作状态设为【暂停合作】。"
+        });
+    }
+
+    db.Suppliers.Remove(entity);
+    await db.SaveChangesAsync();
+    return Results.Ok(new { Message = $"供应商【{entity.Name}】已成功移除。" });
+});
+
+// 21. 重置为行业基准供应商库预设
+app.MapPost("/api/database/suppliers/reset", async (AppDbContext db) =>
+{
+    var existingCodes = await db.Suppliers.Select(s => s.Code).ToListAsync();
+    var seedSuppliers = EngineeringApp.Shared.Data.SupplierDatabase.AllSuppliers;
+
+    foreach (var seed in seedSuppliers)
+    {
+        if (!existingCodes.Contains(seed.Code))
+        {
+            db.Suppliers.Add(SupplierEntity.FromDomain(seed));
+        }
+    }
+
+    await db.SaveChangesAsync();
+    var total = await db.Suppliers.CountAsync();
+    return Results.Ok(new { Message = "供应商标杆数据已同步对齐重置完成。", TotalCount = total });
 });
 
 app.Run();
