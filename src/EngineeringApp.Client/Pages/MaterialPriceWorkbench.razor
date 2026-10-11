@@ -1179,43 +1179,44 @@
                 </div>
             </div>
 
+            <style>
+                .cell-editable {
+                    cursor: pointer;
+                    padding: 2px 5px;
+                    border-radius: 4px;
+                    transition: background-color 0.15s ease-in-out, outline 0.15s ease-in-out;
+                    display: inline-flex;
+                    align-items: center;
+                }
+                .cell-editable:hover {
+                    background-color: rgba(13, 110, 253, 0.12);
+                    outline: 1px dashed #0d6efd;
+                }
+                .table-provenance th {
+                    white-space: nowrap !important;
+                    vertical-align: middle !important;
+                    font-size: 0.82rem;
+                    padding-top: 7px !important;
+                    padding-bottom: 7px !important;
+                }
+            </style>
+
             <!-- 物料出处记录与跨时序回溯表格 (造价三态并列：合同底账 / 当前执行 / 目标期回溯 / 采办剪刀差创效) -->
             <div class="table-responsive flex-grow-1 mb-3">
-                <table class="table table-sm @(Theme.IsDarkMode ? "table-dark table-hover table-bordered border-secondary" : "table-hover table-bordered bg-white shadow-sm border-light-subtle") small align-middle mb-0">
+                <table class="table table-sm @(Theme.IsDarkMode ? "table-dark table-hover table-bordered border-secondary" : "table-hover table-bordered bg-white shadow-sm border-light-subtle") table-provenance small align-middle mb-0">
                     <thead class="@(Theme.IsDarkMode ? "table-secondary text-white" : "table-light text-dark")">
                         <tr>
-                            <th style="width: 35px;">#</th>
-                            <th style="min-width: 240px;">物料规格与特征出处 (点击标签一键复制)</th>
-                            <th style="min-width: 130px;">询价批次与依据</th>
-                            <th class="text-end" style="min-width: 115px;">
-                                <div>合同基期单价</div>
-                                <div class="text-xs fw-normal @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">(不可变底账)</div>
-                            </th>
-                            <th class="text-end" style="min-width: 155px;">
-                                <div class="d-flex align-items-center justify-content-end gap-1">
-                                    <span>当前执行采购价</span>
-                                    <span class="badge bg-primary text-xs" title="可点击单元格快速微调">微调⚡</span>
-                                </div>
-                                <div class="text-xs fw-normal @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">(最新实付/谈判)</div>
-                            </th>
-                            <th class="text-end" style="min-width: 135px;">
-                                <div>目标期回溯单价</div>
-                                <div class="text-xs fw-normal @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">(@RetrospectionTargetSnapshot.EffectiveDate.ToString("MM-dd") 大盘)</div>
-                            </th>
-                            <th class="text-end" style="min-width: 90px;">吨差 (ΔP)</th>
-                            <th style="width: 75px;">用量 (t)</th>
-                            <th class="text-end" style="min-width: 105px;">
-                                <div>业主调差额</div>
-                                <div class="text-xs fw-normal @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">(向业主索赔)</div>
-                            </th>
-                            <th class="text-end" style="min-width: 150px;">
-                                <div class="d-flex align-items-center justify-content-end gap-1 text-success fw-bold">
-                                    <span>★ 采办经营创效</span>
-                                    <span class="badge bg-success text-xs">剪刀差利润</span>
-                                </div>
-                                <div class="text-xs fw-normal @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">(业主补 - 实多付)</div>
-                            </th>
-                            <th class="text-center" style="min-width: 145px;">操作与审计</th>
+                            <th class="text-center" style="width: 35px;" title="行序号">#</th>
+                            <th style="min-width: 230px;" title="物料特征规格与出处，点击物料指纹标签可一键复制">物料特征与规格</th>
+                            <th style="min-width: 130px;" title="询价批次号、报价渠道与版本依据">询价批次/供应商</th>
+                            <th class="text-end" style="min-width: 120px;" title="合同基期锁定底账锚点，点击单元格可直接就地修改">合同基期价 (元/t)</th>
+                            <th class="text-end" style="min-width: 130px;" title="当前实际采购谈判执行价，点击单元格可直接就地修改">当前执行价 (元/t)</th>
+                            <th class="text-end" style="min-width: 125px;" title="目标期大盘回溯测算单价 = 目标大盘基价 + 当前执行加价">目标回溯价 (元/t)</th>
+                            <th class="text-end" style="min-width: 90px;" title="吨钢对业主调差 = 目标回溯价 - 合同基期价">吨差 ΔP (元/t)</th>
+                            <th class="text-center" style="width: 80px;" title="工程预计用量(吨)，直接在格内修改数字">用量 (t)</th>
+                            <th class="text-end" style="min-width: 110px;" title="面向业主调差索赔总额 = 吨差 ΔP × 用量">业主调差额 (元)</th>
+                            <th class="text-end text-success" style="min-width: 140px;" title="采办经营净创效(剪刀差利润) = 业主索赔补价 - 实际采购多付">★ 经营创效利润 (元)</th>
+                            <th class="text-center" style="width: 115px;" title="过程变更审计履历与高级调整">操作与审计</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -1241,7 +1242,7 @@
                                 bool isQuickEditing = QuickEditingRecordId == rec.Id;
 
                                 <tr>
-                                    <td>@rec.Id</td>
+                                    <td class="text-center">@rec.Id</td>
                                     <td>
                                         <!-- Line 1: 物料名称 + 批次Badge + 工程引用 -->
                                         <div class="d-flex align-items-center gap-1 flex-wrap">
@@ -1294,36 +1295,51 @@
                                         </div>
                                     </td>
 
-                                    <!-- 列 1: 合同基期底账单价 (不可变锚点) -->
-                                    <td class="text-end">
-                                        <div class="fw-bold fs-6">¥@rec.ContractBaselinePrice.ToString("0.##")</div>
-                                        <div class="text-xs text-success">🔒 锁定底账</div>
-                                    </td>
-
-                                    <!-- 列 2: 当前执行采购单价 (支持就地快捷微调) -->
-                                    <td class="text-end">
-                                        @if (isQuickEditing)
+                                    <!-- 列 1: 合同基期底账单价 (支持就地点击直接修改) -->
+                                    <td class="text-end" title="点击直接就地修改合同基期底账 (按回车或点✓保存)">
+                                        @if (QuickEditingBaselineRecordId == rec.Id)
                                         {
-                                            <div class="p-1 rounded border @(Theme.IsDarkMode ? "bg-dark border-primary" : "bg-white border-primary shadow-sm") text-start" style="min-width: 155px;">
-                                                <div class="text-xs text-primary fw-bold mb-1">⚡ 快速微调执行价:</div>
-                                                <div class="input-group input-group-sm mb-1">
-                                                    <span class="input-group-text py-0 text-xs">¥</span>
-                                                    <input type="number" class="form-control form-control-sm py-0 text-xs fw-bold"
-                                                           @bind="QuickEditPriceInput" />
-                                                </div>
-                                                <input type="text" class="form-control form-control-sm py-0 text-xs mb-1"
-                                                       @bind="QuickEditReasonInput" placeholder="微调原因 (如谈判让利)" />
-                                                <div class="d-flex justify-content-end gap-1">
-                                                    <button class="btn btn-xs btn-outline-secondary py-0 px-1" @onclick="CancelQuickEdit">取消</button>
-                                                    <button class="btn btn-xs btn-primary py-0 px-2 fw-bold" @onclick="() => SaveQuickEdit(rec)">保存</button>
-                                                </div>
+                                            <div class="input-group input-group-sm d-inline-flex justify-content-end" style="width: 125px;">
+                                                <span class="input-group-text py-0 px-1 text-xs">¥</span>
+                                                <input type="number" class="form-control form-control-sm py-0 px-1 text-xs fw-bold text-end"
+                                                       @bind="QuickEditBaselineInput"
+                                                       @onkeydown="(e) => HandleQuickEditBaselineKeyDown(e, rec)"
+                                                       autofocus />
+                                                <button class="btn btn-xs btn-success py-0 px-1" @onclick="() => SaveQuickEditBaseline(rec)" title="保存 (Enter)">✓</button>
+                                                <button class="btn btn-xs btn-outline-secondary py-0 px-1" @onclick="CancelQuickEditBaseline" title="取消 (Esc)">✕</button>
                                             </div>
+                                            <div class="text-xs text-muted mt-0.5">回车保存 / Esc取消</div>
                                         }
                                         else
                                         {
-                                            <div class="d-flex align-items-center justify-content-end gap-1" style="cursor: pointer;" @onclick="() => StartQuickEdit(rec)" title="点击快捷微调当前执行价">
+                                            <div class="d-inline-flex align-items-center gap-1 cell-editable" @onclick="() => StartQuickEditBaseline(rec)">
+                                                <span class="fw-bold fs-6">¥@rec.ContractBaselinePrice.ToString("0.##")</span>
+                                                <span class="text-xs text-muted" title="点击微调底账">✏️</span>
+                                            </div>
+                                            <div class="text-xs text-success">🔒 基期底账</div>
+                                        }
+                                    </td>
+
+                                    <!-- 列 2: 当前执行采购单价 (支持就地快捷直接修改) -->
+                                    <td class="text-end" title="点击直接就地修改当前执行采购价 (按回车或点✓保存)">
+                                        @if (isQuickEditing)
+                                        {
+                                            <div class="input-group input-group-sm d-inline-flex justify-content-end" style="width: 125px;">
+                                                <span class="input-group-text py-0 px-1 text-xs">¥</span>
+                                                <input type="number" class="form-control form-control-sm py-0 px-1 text-xs fw-bold text-end"
+                                                       @bind="QuickEditPriceInput"
+                                                       @onkeydown="(e) => HandleQuickEditKeyDown(e, rec)"
+                                                       autofocus />
+                                                <button class="btn btn-xs btn-success py-0 px-1" @onclick="() => SaveQuickEdit(rec)" title="保存 (Enter)">✓</button>
+                                                <button class="btn btn-xs btn-outline-secondary py-0 px-1" @onclick="CancelQuickEdit" title="取消 (Esc)">✕</button>
+                                            </div>
+                                            <div class="text-xs text-muted mt-0.5">回车保存 / Esc取消</div>
+                                        }
+                                        else
+                                        {
+                                            <div class="d-inline-flex align-items-center gap-1 cell-editable" @onclick="() => StartQuickEdit(rec)">
                                                 <span class="fw-bold fs-6 @(rec.RevisionNumber > 1 ? "text-warning" : "")">¥@rec.FinalPricePerTon.ToString("0.##")</span>
-                                                <span class="text-xs text-primary" title="点击微调">✏️</span>
+                                                <span class="text-xs text-primary" title="点击修改执行价">✏️</span>
                                             </div>
                                             <div class="mt-0.5">
                                                 @if (Math.Abs(execVariance) < 0.01)
@@ -1343,7 +1359,7 @@
                                     </td>
 
                                     <!-- 列 3: 目标期回溯单价 -->
-                                    <td class="text-end">
+                                    <td class="text-end" title="大盘¥@retroPrice.BasePricePerTon.ToString("0") + 加价¥@((retroPrice.FinalPricePerTon - retroPrice.BasePricePerTon).ToString("0"))">
                                         <div class="fw-bold text-primary fs-6">¥@retroPrice.FinalPricePerTon.ToString("0.##")</div>
                                         <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">
                                             大盘¥@retroPrice.BasePricePerTon.ToString("0") + 加价¥@((retroPrice.FinalPricePerTon - retroPrice.BasePricePerTon).ToString("0"))
@@ -1357,12 +1373,13 @@
                                         </span>
                                     </td>
 
-                                    <!-- 列 5: 工程用量 (t) -->
-                                    <td>
+                                    <!-- 列 5: 工程用量 (t) (直接就地修改) -->
+                                    <td class="text-center">
                                         <input type="number" class="form-control form-control-sm text-center py-0 px-1 @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
                                                value="@tons"
                                                @onchange="(e) => SetRecordTons(rec.Id, e.Value)"
-                                               style="width: 75px;" />
+                                               style="width: 72px; display: inline-block;"
+                                               title="直接修改工程用量吨数" />
                                     </td>
 
                                     <!-- 列 6: 业主调差额 ΔCost -->
@@ -1371,7 +1388,7 @@
                                     </td>
 
                                     <!-- 列 7: ★ 采办经营创效 (剪刀差利润) -->
-                                    <td class="text-end">
+                                    <td class="text-end" title="核算拆解：业主索赔补 ¥@deltaP:0.## - 实际采购多付 ¥@execVariance:0.## = 净创效 ¥@spreadPerTon:0.##/t">
                                         <div class="fw-bold @(spreadPerTon >= 0 ? "text-success" : "text-danger") fs-6 d-flex align-items-center justify-content-end gap-1">
                                             <span>@(spreadPerTon >= 0 ? "+" : "")¥@spreadPerTon.ToString("0.##")/t</span>
                                             @if (spreadPerTon > 0)
@@ -1386,21 +1403,18 @@
                                         <div class="text-xs">
                                             净额: <b class="@(spreadCost >= 0 ? "text-success" : "text-danger")">@(spreadCost >= 0 ? "+" : "")¥@spreadCost.ToString("N0")</b>
                                         </div>
-                                        <div class="text-xs text-muted" style="font-size: 10px;" title="核算拆解：业主索赔补 ¥@deltaP:0.## - 实际采购多付 ¥@execVariance:0.##">
-                                            (补@deltaP.ToString("0") - 实多@execVariance.ToString("0"))
-                                        </div>
                                     </td>
 
                                     <!-- 操作与审计 -->
                                     <td class="text-center">
                                         <div class="d-flex align-items-center justify-content-center gap-1">
-                                            <button class="btn btn-xs btn-outline-warning p-1 px-2" @onclick="() => OpenRevisionModal(rec)" title="追加新询价批次或修改各加价项，生成新版本履历">
-                                                ✏️ 追加批次
+                                            <button class="btn btn-xs btn-outline-primary py-0 px-1" @onclick="() => OpenRevisionModal(rec)" title="打开高级加价与批次修订面板">
+                                                ⚙️ 详调
                                             </button>
-                                            <button class="btn btn-xs btn-outline-info p-1 px-2" @onclick="() => OpenAuditModal(rec)" title="查看过程变更审计履历 (@rec.RevisionLogs.Count 次)">
+                                            <button class="btn btn-xs btn-outline-info py-0 px-1" @onclick="() => OpenAuditModal(rec)" title="查看过程变更审计履历 (@rec.RevisionLogs.Count 次)">
                                                 🕒 履历 (@rec.RevisionLogs.Count)
                                             </button>
-                                            <button class="btn btn-xs btn-outline-danger p-1" @onclick="() => RemoveProvenanceRecord(rec.Id)" title="删除此物料记录">
+                                            <button class="btn btn-xs btn-outline-danger py-0 px-1" @onclick="() => RemoveProvenanceRecord(rec.Id)" title="删除此物料记录">
                                                 🗑️
                                             </button>
                                         </div>
@@ -1807,6 +1821,10 @@
     private double QuickEditPriceInput = 0;
     private string QuickEditReasonInput = "商务议价让利微调";
 
+    // 就地快捷微调基期底账状态
+    private int? QuickEditingBaselineRecordId = null;
+    private double QuickEditBaselineInput = 0;
+
     // 出处登记表单状态
     private string ProvenanceArchiveProjectInput = "粤港澳大湾区钢构主厂房项目";
     private string ProvenanceArchiveBatchInput = "INQ-20260401-LOT03";
@@ -2129,11 +2147,24 @@
         QuickEditingRecordId = rec.Id;
         QuickEditPriceInput = rec.FinalPricePerTon;
         QuickEditReasonInput = "商务议价让利微调";
+        QuickEditingBaselineRecordId = null;
     }
 
     private void CancelQuickEdit()
     {
         QuickEditingRecordId = null;
+    }
+
+    private async Task HandleQuickEditKeyDown(KeyboardEventArgs e, MaterialProvenanceRecord rec)
+    {
+        if (e.Key == "Enter")
+        {
+            await SaveQuickEdit(rec);
+        }
+        else if (e.Key == "Escape")
+        {
+            CancelQuickEdit();
+        }
     }
 
     private async Task SaveQuickEdit(MaterialProvenanceRecord rec)
@@ -2142,13 +2173,19 @@
         if (QuickEditPriceInput <= 0) return;
 
         double oldPrice = rec.FinalPricePerTon;
+        if (Math.Abs(oldPrice - QuickEditPriceInput) < 0.001)
+        {
+            QuickEditingRecordId = null;
+            return;
+        }
+
         double delta = QuickEditPriceInput - oldPrice;
         string reason = string.IsNullOrWhiteSpace(QuickEditReasonInput) ? "快捷单价微调" : QuickEditReasonInput;
         string details = $"执行单价快速微调: ¥{oldPrice:0.##} ➔ ¥{QuickEditPriceInput:0.##}/t (变动: {(delta >= 0 ? "+" : "")}{delta:0.##} 元/t)";
 
         rec.AddRevision(
             reason: reason,
-            revisedBy: "成本造价师",
+            revisedBy: "造价工程师",
             newPricePerTon: QuickEditPriceInput,
             changeDetails: details,
             appliedPrinciple: rec.PricingPrincipleNote
@@ -2161,6 +2198,63 @@
         catch { }
 
         QuickEditingRecordId = null;
+        StateHasChanged();
+    }
+
+    private void StartQuickEditBaseline(MaterialProvenanceRecord rec)
+    {
+        QuickEditingBaselineRecordId = rec.Id;
+        QuickEditBaselineInput = rec.ContractBaselinePrice;
+        QuickEditingRecordId = null;
+    }
+
+    private void CancelQuickEditBaseline()
+    {
+        QuickEditingBaselineRecordId = null;
+    }
+
+    private async Task HandleQuickEditBaselineKeyDown(KeyboardEventArgs e, MaterialProvenanceRecord rec)
+    {
+        if (e.Key == "Enter")
+        {
+            await SaveQuickEditBaseline(rec);
+        }
+        else if (e.Key == "Escape")
+        {
+            CancelQuickEditBaseline();
+        }
+    }
+
+    private async Task SaveQuickEditBaseline(MaterialProvenanceRecord rec)
+    {
+        if (QuickEditingBaselineRecordId != rec.Id) return;
+        if (QuickEditBaselineInput <= 0) return;
+
+        double oldBaseline = rec.ContractBaselinePrice;
+        if (Math.Abs(oldBaseline - QuickEditBaselineInput) < 0.001)
+        {
+            QuickEditingBaselineRecordId = null;
+            return;
+        }
+
+        double delta = QuickEditBaselineInput - oldBaseline;
+        rec.InitialRecordedPricePerTon = QuickEditBaselineInput;
+
+        rec.AddRevision(
+            reason: "合同基期底账调整",
+            revisedBy: "造价工程师",
+            newPricePerTon: rec.FinalPricePerTon,
+            changeDetails: $"合同基期底账变动: ¥{oldBaseline:0.##} ➔ ¥{QuickEditBaselineInput:0.##}/t (变动: {(delta >= 0 ? "+" : "")}{delta:0.##} 元/t)",
+            appliedPrinciple: rec.PricingPrincipleNote
+        );
+
+        try
+        {
+            await Http.PutAsJsonAsync($"/api/pricing/provenance-records/{rec.Id}", rec);
+        }
+        catch { }
+
+        QuickEditingBaselineRecordId = null;
         StateHasChanged();
     }
 
