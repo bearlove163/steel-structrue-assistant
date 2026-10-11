@@ -170,101 +170,122 @@
                         </div>
                     </div>
 
-                    <!-- 关键几何尺寸调节 -->
-                    <div class="p-2 rounded border mb-3 @(Theme.IsDarkMode ? "bg-dark bg-opacity-50 border-secondary" : "bg-light border-light-subtle")">
-                        <div class="text-xs fw-bold text-warning mb-2">📏 截面尺寸微调 (mm)</div>
+                    <!-- 第二块：数据 (固定最小高度 142px，切换截面类型时不跳动、绝不遮挡下行参数) -->
+                    <div class="p-2 rounded border mb-2 @(Theme.IsDarkMode ? "bg-dark bg-opacity-50 border-secondary" : "bg-light border-light-subtle")"
+                         style="min-height: 142px;">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="text-xs fw-bold text-warning">第二块：截面尺寸数据 (mm)</span>
+                            <span class="badge @(Theme.IsDarkMode ? "bg-secondary" : "bg-white border text-dark") text-xs" style="font-size: 10px;">
+                                @(CurrentParams.StandardProfileName ?? $"{CurrentParams.Type}")
+                            </span>
+                        </div>
                         @if (CurrentParams.Type == SectionType.HBeam || CurrentParams.Type == SectionType.Channel || CurrentParams.Type == SectionType.Cruciform)
                         {
-                            <div class="row g-2 text-xs mb-2">
+                            <div class="row g-2 text-xs">
                                 <div class="col-6">
-                                    <label class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">截面高度 H</label>
-                                    <input type="number" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
-                                           @bind="CurrentParams.Height" @bind:after="RecalculateAll" step="10" />
+                                    <label class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-0">截面高度 H</label>
+                                    <input type="number" class="form-control form-control-sm text-center p-1 @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                           style="height: 26px;" @bind="CurrentParams.Height" @bind:after="RecalculateAll" step="10" />
                                 </div>
                                 <div class="col-6">
-                                    <label class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">翼缘宽度 B</label>
-                                    <input type="number" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
-                                           @bind="CurrentParams.Width" @bind:after="RecalculateAll" step="10" />
+                                    <label class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-0">翼缘宽度 B</label>
+                                    <input type="number" class="form-control form-control-sm text-center p-1 @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                           style="height: 26px;" @bind="CurrentParams.Width" @bind:after="RecalculateAll" step="10" />
                                 </div>
                                 <div class="col-6">
-                                    <label class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">腹板厚 tw</label>
-                                    <input type="number" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
-                                           @bind="CurrentParams.WebThickness" @bind:after="RecalculateAll" step="1" />
+                                    <label class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-0">腹板厚 tw</label>
+                                    <input type="number" class="form-control form-control-sm text-center p-1 @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                           style="height: 26px;" @bind="CurrentParams.WebThickness" @bind:after="RecalculateAll" step="1" />
                                 </div>
                                 <div class="col-6">
-                                    <label class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">翼缘厚 tf</label>
-                                    <input type="number" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
-                                           @bind="CurrentParams.FlangeThickness" @bind:after="RecalculateAll" step="1" />
+                                    <label class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-0">翼缘厚 tf</label>
+                                    <input type="number" class="form-control form-control-sm text-center p-1 @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                           style="height: 26px;" @bind="CurrentParams.FlangeThickness" @bind:after="RecalculateAll" step="1" />
                                 </div>
                             </div>
                         }
                         else if (CurrentParams.Type == SectionType.RHS)
                         {
-                            <div class="row g-2 text-xs mb-2">
-                                <div class="col-4">
-                                    <label class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">高度 H</label>
-                                    <input type="number" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
-                                           @bind="CurrentParams.Height" @bind:after="RecalculateAll" step="10" />
+                            <div class="row g-2 text-xs">
+                                <div class="col-6">
+                                    <label class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-0">截面高度 H</label>
+                                    <input type="number" class="form-control form-control-sm text-center p-1 @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                           style="height: 26px;" @bind="CurrentParams.Height" @bind:after="RecalculateAll" step="10" />
                                 </div>
-                                <div class="col-4">
-                                    <label class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">宽度 B</label>
-                                    <input type="number" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
-                                           @bind="CurrentParams.Width" @bind:after="RecalculateAll" step="10" />
+                                <div class="col-6">
+                                    <label class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-0">截面宽度 B</label>
+                                    <input type="number" class="form-control form-control-sm text-center p-1 @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                           style="height: 26px;" @bind="CurrentParams.Width" @bind:after="RecalculateAll" step="10" />
                                 </div>
-                                <div class="col-4">
-                                    <label class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">壁厚 t</label>
-                                    <input type="number" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
-                                           @bind="CurrentParams.WallThickness" @bind:after="RecalculateAll" step="1" />
+                                <div class="col-6">
+                                    <label class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-0">壁厚 t</label>
+                                    <input type="number" class="form-control form-control-sm text-center p-1 @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                           style="height: 26px;" @bind="CurrentParams.WallThickness" @bind:after="RecalculateAll" step="1" />
+                                </div>
+                                <div class="col-6 d-flex flex-column justify-content-end">
+                                    <span class="text-muted" style="font-size: 10px; line-height: 26px;">空心闭口箱型</span>
                                 </div>
                             </div>
                         }
                         else if (CurrentParams.Type == SectionType.CHS || CurrentParams.Type == SectionType.Circle)
                         {
-                            <div class="row g-2 text-xs mb-2">
+                            <div class="row g-2 text-xs">
                                 <div class="col-6">
-                                    <label class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">外径 D (mm)</label>
-                                    <input type="number" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
-                                           @bind="CurrentParams.OuterDiameter" @bind:after="RecalculateAll" step="10" />
+                                    <label class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-0">外径 D</label>
+                                    <input type="number" class="form-control form-control-sm text-center p-1 @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                           style="height: 26px;" @bind="CurrentParams.OuterDiameter" @bind:after="RecalculateAll" step="10" />
                                 </div>
                                 <div class="col-6">
-                                    <label class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">壁厚 t (mm)</label>
-                                    <input type="number" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
-                                           @bind="CurrentParams.WallThickness" @bind:after="RecalculateAll" step="1" />
+                                    <label class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-0">壁厚 t</label>
+                                    <input type="number" class="form-control form-control-sm text-center p-1 @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                           style="height: 26px;" @bind="CurrentParams.WallThickness" @bind:after="RecalculateAll" step="1" />
+                                </div>
+                                <div class="col-6">
+                                    <label class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-0">内径 d (计算值)</label>
+                                    <div class="form-control form-control-sm text-center p-1 @(Theme.IsDarkMode ? "bg-dark text-white-50 border-secondary" : "bg-light text-muted")" style="height: 26px; line-height: 18px;">
+                                        @((CurrentParams.OuterDiameter - 2 * CurrentParams.WallThickness).ToString("F0")) mm
+                                    </div>
+                                </div>
+                                <div class="col-6 d-flex flex-column justify-content-end">
+                                    <span class="text-muted" style="font-size: 10px; line-height: 26px;">圆管空心截面</span>
                                 </div>
                             </div>
                         }
                         else if (CurrentParams.Type == SectionType.Angle)
                         {
-                            <div class="row g-2 text-xs mb-2">
-                                <div class="col-4">
-                                    <label class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">肢宽 b1</label>
-                                    <input type="number" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
-                                           @bind="CurrentParams.LegWidth1" @bind:after="RecalculateAll" step="5" />
+                            <div class="row g-2 text-xs">
+                                <div class="col-6">
+                                    <label class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-0">肢宽 b1</label>
+                                    <input type="number" class="form-control form-control-sm text-center p-1 @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                           style="height: 26px;" @bind="CurrentParams.LegWidth1" @bind:after="RecalculateAll" step="5" />
                                 </div>
-                                <div class="col-4">
-                                    <label class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">肢宽 b2</label>
-                                    <input type="number" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
-                                           @bind="CurrentParams.LegWidth2" @bind:after="RecalculateAll" step="5" />
+                                <div class="col-6">
+                                    <label class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-0">肢宽 b2</label>
+                                    <input type="number" class="form-control form-control-sm text-center p-1 @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                           style="height: 26px;" @bind="CurrentParams.LegWidth2" @bind:after="RecalculateAll" step="5" />
                                 </div>
-                                <div class="col-4">
-                                    <label class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">厚度 t</label>
-                                    <input type="number" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
-                                           @bind="CurrentParams.LegThickness" @bind:after="RecalculateAll" step="1" />
+                                <div class="col-6">
+                                    <label class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-0">厚度 t</label>
+                                    <input type="number" class="form-control form-control-sm text-center p-1 @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                           style="height: 26px;" @bind="CurrentParams.LegThickness" @bind:after="RecalculateAll" step="1" />
+                                </div>
+                                <div class="col-6 d-flex flex-column justify-content-end">
+                                    <span class="text-muted" style="font-size: 10px; line-height: 26px;">角钢截面</span>
                                 </div>
                             </div>
                         }
                         else if (CurrentParams.Type == SectionType.Rectangle)
                         {
-                            <div class="row g-2 text-xs mb-2">
+                            <div class="row g-2 text-xs">
                                 <div class="col-6">
-                                    <label class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">截面高度 H</label>
-                                    <input type="number" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
-                                           @bind="CurrentParams.Height" @bind:after="RecalculateAll" step="10" />
+                                    <label class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-0">截面高度 H</label>
+                                    <input type="number" class="form-control form-control-sm text-center p-1 @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                           style="height: 26px;" @bind="CurrentParams.Height" @bind:after="RecalculateAll" step="10" />
                                 </div>
                                 <div class="col-6">
-                                    <label class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">截面宽度 B</label>
-                                    <input type="number" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
-                                           @bind="CurrentParams.Width" @bind:after="RecalculateAll" step="10" />
+                                    <label class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-0">截面宽度 B</label>
+                                    <input type="number" class="form-control form-control-sm text-center p-1 @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                           style="height: 26px;" @bind="CurrentParams.Width" @bind:after="RecalculateAll" step="10" />
                                 </div>
                             </div>
                         }
