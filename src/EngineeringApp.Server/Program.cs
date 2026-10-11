@@ -306,7 +306,14 @@ app.MapPut("/api/pricing/provenance-records/{id:int}", async (int id, Engineerin
     existing.PerformanceSurchargePerTon = input.PerformanceSurchargePerTon;
     existing.InspectionSurchargePerTon = input.InspectionSurchargePerTon;
     existing.FreightPerTon = input.FreightPerTon;
-    existing.ContractFreightPerTon = input.ContractFreightPerTon;
+    if (existing.InitialRecordedPricePerTon <= 0)
+    {
+        existing.InitialRecordedPricePerTon = input.ContractBaselinePrice;
+    }
+    else if (input.InitialRecordedPricePerTon > 0)
+    {
+        existing.InitialRecordedPricePerTon = input.InitialRecordedPricePerTon;
+    }
     existing.FinalPricePerTon = input.FinalPricePerTon;
     existing.FullDescription = input.FullDescription;
     existing.RevisionLogsJson = System.Text.Json.JsonSerializer.Serialize(input.RevisionLogs ?? []);
