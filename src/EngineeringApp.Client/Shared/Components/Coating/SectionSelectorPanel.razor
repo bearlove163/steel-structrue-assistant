@@ -1,0 +1,444 @@
+@using EngineeringApp.Shared.Models
+@using EngineeringApp.Shared.Algorithms
+@using EngineeringApp.Shared.Data
+@using EngineeringApp.Client.Shared.Components
+
+<div class="card @(IsDarkMode ? "bg-black bg-opacity-30 border-secondary" : "bg-white border-light-subtle shadow-sm") p-3 h-100 d-flex flex-column">
+    <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom @(IsDarkMode ? "border-secondary" : "border-light-subtle")">
+        <span class="fw-bold small text-primary">📐 截面选型与特性参照视窗</span>
+        <span class="badge @(IsDarkMode ? "bg-secondary" : "bg-light text-dark border") text-xs">实时参数化</span>
+    </div>
+
+    <!-- 截面输入模式切换选项卡：自定义截面 vs 标准库型钢 vs 钢板板材 -->
+    <div class="btn-group btn-group-sm w-100 mb-2">
+        <button class="btn @(SectionInputMode == "custom" ? "btn-primary fw-bold" : (IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary"))"
+                @onclick='() => SetMode("custom")'>
+            ✏️ 自定义截面
+        </button>
+        <button class="btn @(SectionInputMode == "standard" ? "btn-primary fw-bold" : (IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary"))"
+                @onclick='() => SetMode("standard")'>
+            📚 标准型钢库
+        </button>
+        <button class="btn @(SectionInputMode == "plate" ? "btn-primary fw-bold" : (IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary"))"
+                @onclick='() => SetMode("plate")'>
+            📄 钢板板材
+        </button>
+    </div>
+
+    @if (SectionInputMode == "plate")
+    {
+        <!-- 钢板板材常用厚度与尺寸录入 -->
+        <div class="mb-2">
+            <label class="form-label text-xs @(IsDarkMode ? "text-white-50" : "text-muted") mb-1 d-flex justify-content-between">
+                <span>常用国标厚度快捷胶囊 (mm):</span>
+                <span class="text-warning fw-bold">t = @PlateThickness mm</span>
+            </label>
+            <div class="d-flex flex-wrap gap-1 mb-2">
+                @foreach (var t in StandardPlateThicknesses)
+                {
+                    <button class="btn btn-xs @(Math.Abs(PlateThickness - t) < 0.1 ? "btn-primary fw-bold" : (IsDarkMode ? "btn-outline-secondary text-white-75" : "btn-outline-secondary"))"
+                            style="min-width: 36px; padding: 2px 4px; font-size: 11px;"
+                            @onclick="() => SelectPlateThickness(t)">
+                        @t
+                    </button>
+                }
+            </div>
+        </div>
+
+        <!-- 钢板精确几何参数 -->
+        <div class="p-2 rounded border mb-2 @(IsDarkMode ? "bg-dark bg-opacity-50 border-secondary" : "bg-light border-light-subtle")"
+             style="min-height: 142px;">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="text-xs fw-bold text-success">
+                    <span class="badge bg-success py-0 px-1 me-1 text-xs">📄 钢板板材</span> 截面参数
+                </span>
+                <span class="badge bg-primary text-white text-xs font-monospace">
+                    PL @PlateThickness.ToString("0.##")×@PlateWidth.ToString("0.##")
+                </span>
+            </div>
+            <div class="row g-2 text-xs mb-2">
+                <div class="col-6">
+                    <label class="@(IsDarkMode ? "text-white-50" : "text-muted") mb-0">板厚 t (mm)</label>
+                    <input type="number" class="form-control form-control-sm text-center p-1 @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                           style="height: 26px;" @bind="PlateThickness" @bind:after="OnPlateInputChanged" step="1" min="1" max="200" />
+                </div>
+                <div class="col-6">
+                    <label class="@(IsDarkMode ? "text-white-50" : "text-muted") mb-0">标称板宽 B (mm)</label>
+                    <input type="number" class="form-control form-control-sm text-center p-1 @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                           style="height: 26px;" @bind="PlateWidth" @bind:after="OnPlateInputChanged" step="100" min="100" />
+                </div>
+            </div>
+            <div class="p-1 rounded bg-info bg-opacity-10 border border-info border-opacity-25 text-xs">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-info fw-bold">展开比表面积推导:</span>
+                    <span class="text-warning fw-bold">@((254.777 / PlateThickness).ToString("F2")) m²/t</span>
+                </div>
+                <div class="text-muted" style="font-size: 10px;">
+                    公式: S = 2000 / (7.85 × t) = 254.78 / @PlateThickness.ToString("0.##") m²/t
+                </div>
+            </div>
+        </div>
+    }
+    else if (SectionInputMode == "custom")
+    {
+        <!-- 第一块：自定义截面类型选择按钮组 -->
+        <div class="mb-2">
+            <label class="form-label text-xs @(IsDarkMode ? "text-white-50" : "text-muted") mb-1">自定义几何截面分类:</label>
+            <div class="row g-1">
+                <div class="col-4">
+                    <button class="btn btn-xs w-100 @(CurrentParams.Type == SectionType.HBeam ? "btn-primary fw-bold" : "btn-outline-secondary")"
+                            @onclick="() => ChangeSectionType(SectionType.HBeam)">H型钢</button>
+                </div>
+                <div class="col-4">
+                    <button class="btn btn-xs w-100 @(CurrentParams.Type == SectionType.RHS ? "btn-primary fw-bold" : "btn-outline-secondary")"
+                            @onclick="() => ChangeSectionType(SectionType.RHS)">箱型/方管</button>
+                </div>
+                <div class="col-4">
+                    <button class="btn btn-xs w-100 @(CurrentParams.Type == SectionType.CHS ? "btn-primary fw-bold" : "btn-outline-secondary")"
+                            @onclick="() => ChangeSectionType(SectionType.CHS)">圆管 (CHS)</button>
+                </div>
+                <div class="col-4">
+                    <button class="btn btn-xs w-100 @(CurrentParams.Type == SectionType.Channel ? "btn-primary fw-bold" : "btn-outline-secondary")"
+                            @onclick="() => ChangeSectionType(SectionType.Channel)">槽钢</button>
+                </div>
+                <div class="col-4">
+                    <button class="btn btn-xs w-100 @(CurrentParams.Type == SectionType.Angle ? "btn-primary fw-bold" : "btn-outline-secondary")"
+                            @onclick="() => ChangeSectionType(SectionType.Angle)">角钢</button>
+                </div>
+                <div class="col-4">
+                    <button class="btn btn-xs w-100 @(CurrentParams.Type == SectionType.Cruciform ? "btn-primary fw-bold" : "btn-outline-secondary")"
+                            @onclick="() => ChangeSectionType(SectionType.Cruciform)">十字形柱</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 第二块：自定义尺寸数据 (手动输入，可编辑) -->
+        <div class="p-2 rounded border mb-2 @(IsDarkMode ? "bg-dark bg-opacity-50 border-secondary" : "bg-light border-light-subtle")"
+             style="min-height: 142px;">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="text-xs fw-bold text-warning">第二块：自定义截面尺寸 (mm)</span>
+                <span class="badge @(IsDarkMode ? "bg-primary text-white" : "bg-primary text-white") text-xs font-monospace" style="font-size: 11px;">
+                    @SectionDesignation
+                </span>
+            </div>
+            @if (CurrentParams.Type == SectionType.HBeam || CurrentParams.Type == SectionType.Channel || CurrentParams.Type == SectionType.Cruciform)
+            {
+                <div class="row g-2 text-xs">
+                    <div class="col-6">
+                        <label class="@(IsDarkMode ? "text-white-50" : "text-muted") mb-0">截面高度 H</label>
+                        <input type="number" class="form-control form-control-sm text-center p-1 @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                               style="height: 26px;" @bind="CurrentParams.Height" @bind:after="NotifyParamsChanged" step="10" />
+                    </div>
+                    <div class="col-6">
+                        <label class="@(IsDarkMode ? "text-white-50" : "text-muted") mb-0">翼缘宽度 B</label>
+                        <input type="number" class="form-control form-control-sm text-center p-1 @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                               style="height: 26px;" @bind="CurrentParams.Width" @bind:after="NotifyParamsChanged" step="10" />
+                    </div>
+                    <div class="col-6">
+                        <label class="@(IsDarkMode ? "text-white-50" : "text-muted") mb-0">腹板厚 tw</label>
+                        <input type="number" class="form-control form-control-sm text-center p-1 @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                               style="height: 26px;" @bind="CurrentParams.WebThickness" @bind:after="NotifyParamsChanged" step="1" />
+                    </div>
+                    <div class="col-6">
+                        <label class="@(IsDarkMode ? "text-white-50" : "text-muted") mb-0">翼缘厚 tf</label>
+                        <input type="number" class="form-control form-control-sm text-center p-1 @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                               style="height: 26px;" @bind="CurrentParams.FlangeThickness" @bind:after="NotifyParamsChanged" step="1" />
+                    </div>
+                </div>
+            }
+            else if (CurrentParams.Type == SectionType.RHS)
+            {
+                <div class="row g-2 text-xs">
+                    <div class="col-6">
+                        <label class="@(IsDarkMode ? "text-white-50" : "text-muted") mb-0">截面高度 H</label>
+                        <input type="number" class="form-control form-control-sm text-center p-1 @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                               style="height: 26px;" @bind="CurrentParams.Height" @bind:after="NotifyParamsChanged" step="10" />
+                    </div>
+                    <div class="col-6">
+                        <label class="@(IsDarkMode ? "text-white-50" : "text-muted") mb-0">截面宽度 B</label>
+                        <input type="number" class="form-control form-control-sm text-center p-1 @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                               style="height: 26px;" @bind="CurrentParams.Width" @bind:after="NotifyParamsChanged" step="10" />
+                    </div>
+                    <div class="col-6">
+                        <label class="@(IsDarkMode ? "text-white-50" : "text-muted") mb-0">壁厚 t</label>
+                        <input type="number" class="form-control form-control-sm text-center p-1 @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                               style="height: 26px;" @bind="CurrentParams.WallThickness" @bind:after="NotifyParamsChanged" step="1" />
+                    </div>
+                    <div class="col-6 d-flex flex-column justify-content-end">
+                        <span class="text-muted" style="font-size: 10px; line-height: 26px;">空心闭口箱型</span>
+                    </div>
+                </div>
+            }
+            else if (CurrentParams.Type == SectionType.CHS || CurrentParams.Type == SectionType.Circle)
+            {
+                <div class="row g-2 text-xs">
+                    <div class="col-6">
+                        <label class="@(IsDarkMode ? "text-white-50" : "text-muted") mb-0">外径 D</label>
+                        <input type="number" class="form-control form-control-sm text-center p-1 @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                               style="height: 26px;" @bind="CurrentParams.OuterDiameter" @bind:after="NotifyParamsChanged" step="10" />
+                    </div>
+                    <div class="col-6">
+                        <label class="@(IsDarkMode ? "text-white-50" : "text-muted") mb-0">壁厚 t</label>
+                        <input type="number" class="form-control form-control-sm text-center p-1 @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                               style="height: 26px;" @bind="CurrentParams.WallThickness" @bind:after="NotifyParamsChanged" step="1" />
+                    </div>
+                    <div class="col-6">
+                        <label class="@(IsDarkMode ? "text-white-50" : "text-muted") mb-0">内径 d (计算值)</label>
+                        <div class="form-control form-control-sm text-center p-1 @(IsDarkMode ? "bg-dark text-white-50 border-secondary" : "bg-light text-muted")" style="height: 26px; line-height: 18px;">
+                            @((CurrentParams.OuterDiameter - 2 * CurrentParams.WallThickness).ToString("F0")) mm
+                        </div>
+                    </div>
+                    <div class="col-6 d-flex flex-column justify-content-end">
+                        <span class="text-muted" style="font-size: 10px; line-height: 26px;">圆管空心截面</span>
+                    </div>
+                </div>
+            }
+            else if (CurrentParams.Type == SectionType.Angle)
+            {
+                <div class="row g-2 text-xs">
+                    <div class="col-6">
+                        <label class="@(IsDarkMode ? "text-white-50" : "text-muted") mb-0">长肢宽 B1</label>
+                        <input type="number" class="form-control form-control-sm text-center p-1 @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                               style="height: 26px;" @bind="CurrentParams.LegWidth1" @bind:after="NotifyParamsChanged" step="5" />
+                    </div>
+                    <div class="col-6">
+                        <label class="@(IsDarkMode ? "text-white-50" : "text-muted") mb-0">短肢宽 B2</label>
+                        <input type="number" class="form-control form-control-sm text-center p-1 @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                               style="height: 26px;" @bind="CurrentParams.LegWidth2" @bind:after="NotifyParamsChanged" step="5" />
+                    </div>
+                    <div class="col-6">
+                        <label class="@(IsDarkMode ? "text-white-50" : "text-muted") mb-0">厚度 t</label>
+                        <input type="number" class="form-control form-control-sm text-center p-1 @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                               style="height: 26px;" @bind="CurrentParams.LegThickness" @bind:after="NotifyParamsChanged" step="1" />
+                    </div>
+                    <div class="col-6 d-flex flex-column justify-content-end">
+                        <span class="text-muted" style="font-size: 10px; line-height: 26px;">角钢截面</span>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <!-- 第一块：全球标准库分类与选型 -->
+        <div class="mb-2">
+            <div class="row g-1 mb-1">
+                <div class="col-6">
+                    <label class="text-xs @(IsDarkMode ? "text-white-50" : "text-muted") mb-0">标准体系:</label>
+                    <select class="form-select form-select-xs @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                            style="height: 26px; font-size: 11px; padding: 2px 6px;"
+                            value="@SelectedStandardSystem"
+                            @onchange="OnStandardSystemChanged">
+                        <option value="GB/T (国标)">🇨🇳 国标 GB/T</option>
+                        <option value="EN (欧标)">🇪🇺 欧标 EN</option>
+                        <option value="AISC (美标)">🇺🇸 美标 AISC</option>
+                    </select>
+                </div>
+                <div class="col-6">
+                    <label class="text-xs @(IsDarkMode ? "text-white-50" : "text-muted") mb-0">型钢系列:</label>
+                    <select class="form-select form-select-xs @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                            style="height: 26px; font-size: 11px; padding: 2px 6px;"
+                            value="@SelectedStandardCategory"
+                            @onchange="OnStandardCategoryChanged">
+                        @foreach (var cat in CurrentSystemCategories)
+                        {
+                            <option value="@cat">@cat.Replace("GB/T 11263 ", "").Replace("GB/T 706 ", "").Replace("GB/T 6728 ", "").Replace("EN 10034 ", "").Replace("AISC ", "")</option>
+                        }
+                    </select>
+                </div>
+            </div>
+            <div class="row g-1 align-items-end">
+                <div class="col-8">
+                    <label class="text-xs @(IsDarkMode ? "text-white-50" : "text-muted") mb-0">标准规格型号:</label>
+                    <select class="form-select form-select-xs fw-bold @(IsDarkMode ? "bg-dark text-warning border-secondary" : "bg-white text-primary")"
+                            style="height: 26px; font-size: 11px; padding: 2px 6px;"
+                            value="@SelectedStandardDesignation"
+                            @onchange="OnStandardDesignationChanged">
+                        @foreach (var item in CurrentCategoryItems)
+                        {
+                            <option value="@item.Designation">@item.Designation</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-4">
+                    <button class="btn btn-outline-info btn-xs w-100 py-1 text-nowrap"
+                            style="height: 26px; font-size: 11px;"
+                            @onclick="() => OnOpenSteelModal.InvokeAsync()" title="打开完整规格表检索">
+                        📖 库检索
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 第二块：标准尺寸与出厂物性 (只读锁定，防随意修改) -->
+        <div class="p-2 rounded border mb-2 @(IsDarkMode ? "bg-dark bg-opacity-50 border-secondary" : "bg-light border-light-subtle")"
+             style="min-height: 142px;">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="text-xs fw-bold text-success">
+                    <span class="badge bg-success py-0 px-1 me-1 text-xs">🔒 标准锁定</span> 截面参数 (只读)
+                </span>
+                <span class="badge @(IsDarkMode ? "bg-secondary text-warning" : "bg-white border text-primary") text-xs" style="font-size: 10px;">
+                    @(CurrentParams.StandardProfileName ?? "标准截面")
+                </span>
+            </div>
+            <div class="row g-2 text-xs">
+                <div class="col-6">
+                    <label class="@(IsDarkMode ? "text-white-50" : "text-muted") mb-0">高度 H (mm)</label>
+                    <div class="form-control form-control-sm text-center p-1 @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-light text-dark")"
+                         style="height: 26px; line-height: 18px; font-weight: 600;">
+                        @CurrentParams.Height.ToString("F1")
+                    </div>
+                </div>
+                <div class="col-6">
+                    <label class="@(IsDarkMode ? "text-white-50" : "text-muted") mb-0">宽度 B (mm)</label>
+                    <div class="form-control form-control-sm text-center p-1 @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-light text-dark")"
+                         style="height: 26px; line-height: 18px; font-weight: 600;">
+                        @CurrentParams.Width.ToString("F1")
+                    </div>
+                </div>
+                @if (CurrentParams.Type == SectionType.HBeam || CurrentParams.Type == SectionType.Channel || CurrentParams.Type == SectionType.Cruciform)
+                {
+                    <div class="col-6">
+                        <label class="@(IsDarkMode ? "text-white-50" : "text-muted") mb-0">腹板厚 tw (mm)</label>
+                        <div class="form-control form-control-sm text-center p-1 @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-light text-dark")"
+                             style="height: 26px; line-height: 18px; font-weight: 600;">
+                            @CurrentParams.WebThickness.ToString("F1")
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <label class="@(IsDarkMode ? "text-white-50" : "text-muted") mb-0">翼缘厚 tf (mm)</label>
+                        <div class="form-control form-control-sm text-center p-1 @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-light text-dark")"
+                             style="height: 26px; line-height: 18px; font-weight: 600;">
+                            @CurrentParams.FlangeThickness.ToString("F1")
+                        </div>
+                    </div>
+                }
+                else if (CurrentParams.Type == SectionType.RHS || CurrentParams.Type == SectionType.CHS)
+                {
+                    <div class="col-6">
+                        <label class="@(IsDarkMode ? "text-white-50" : "text-muted") mb-0">壁厚 t (mm)</label>
+                        <div class="form-control form-control-sm text-center p-1 @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-light text-dark")"
+                             style="height: 26px; line-height: 18px; font-weight: 600;">
+                            @CurrentParams.WallThickness.ToString("F1")
+                        </div>
+                    </div>
+                    <div class="col-6 d-flex flex-column justify-content-end">
+                        <span class="text-success" style="font-size: 10px; line-height: 26px;">标准闭口空心截面</span>
+                    </div>
+                }
+                else if (CurrentParams.Type == SectionType.Angle)
+                {
+                    <div class="col-6">
+                        <label class="@(IsDarkMode ? "text-white-50" : "text-muted") mb-0">厚度 t (mm)</label>
+                        <div class="form-control form-control-sm text-center p-1 @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-light text-dark")"
+                             style="height: 26px; line-height: 18px; font-weight: 600;">
+                            @CurrentParams.LegThickness.ToString("F1")
+                        </div>
+                    </div>
+                    <div class="col-6 d-flex flex-column justify-content-end">
+                        <span class="text-success" style="font-size: 10px; line-height: 26px;">标准角钢截面</span>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    <!-- CAD 2D 矢量截面视口 (固定标准化视口，与截面特性主页风格完全统一) -->
+    <div class="mb-3 rounded border overflow-hidden shadow-sm flex-shrink-0" style="height: 330px;">
+        <SectionSvgCanvas Result="@CurrentResult"
+                          Parameters="@CurrentParams"
+                          IsDarkMode="@IsDarkMode"
+                          HighlightTopSurface="@ExcludeTopSurface"
+                          MinHeight="250px"
+                          MaxSvgHeight="310px" />
+    </div>
+
+    <!-- 截面特性参数卡片 -->
+    <div class="table-responsive text-xs">
+        <table class="table table-sm @(IsDarkMode ? "table-dark table-borderless" : "table-light table-borderless") mb-0">
+            <tbody>
+                <tr>
+                    <td class="@(IsDarkMode ? "text-white-50" : "text-muted")">截面面积 A:</td>
+                    <td class="text-end fw-bold">@CurrentResult.AreaCm2.ToString("F1") cm²</td>
+                </tr>
+                <tr>
+                    <td class="@(IsDarkMode ? "text-white-50" : "text-muted")">展开外周长 P:</td>
+                    <td class="text-end fw-bold">@CurrentResult.OuterPerimeter.ToString("F0") mm</td>
+                </tr>
+                <tr>
+                    <td class="@(IsDarkMode ? "text-white-50" : "text-muted")">上表面宽度 b_top:</td>
+                    <td class="text-end text-warning fw-bold">@CurrentResult.TopSurfaceWidth.ToString("F0") mm</td>
+                </tr>
+                <tr>
+                    <td class="@(IsDarkMode ? "text-white-50" : "text-muted")">截面形状系数 F/V:</td>
+                    <td class="text-end text-primary fw-bold">@CurrentPaintResult.SectionFactorFOverV.ToString("F1") m⁻¹</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@code {
+    [Parameter] public string SectionInputMode { get; set; } = "standard";
+    [Parameter] public EventCallback<string> SectionInputModeChanged { get; set; }
+
+    [Parameter] public SectionParameters CurrentParams { get; set; } = new();
+    [Parameter] public SectionPropertiesResult CurrentResult { get; set; } = new();
+    [Parameter] public PaintSystemCalculationResult CurrentPaintResult { get; set; } = new();
+
+    [Parameter] public double PlateThickness { get; set; } = 10.0;
+    [Parameter] public EventCallback<double> PlateThicknessChanged { get; set; }
+    [Parameter] public double PlateWidth { get; set; } = 1000.0;
+    [Parameter] public EventCallback<double> PlateWidthChanged { get; set; }
+
+    [Parameter] public string SectionDesignation { get; set; } = "";
+    [Parameter] public string SelectedStandardSystem { get; set; } = "GB/T (国标)";
+    [Parameter] public EventCallback<ChangeEventArgs> OnStandardSystemChanged { get; set; }
+    [Parameter] public string SelectedStandardCategory { get; set; } = "";
+    [Parameter] public EventCallback<ChangeEventArgs> OnStandardCategoryChanged { get; set; }
+    [Parameter] public string SelectedStandardDesignation { get; set; } = "";
+    [Parameter] public EventCallback<ChangeEventArgs> OnStandardDesignationChanged { get; set; }
+
+    [Parameter] public IEnumerable<string> CurrentSystemCategories { get; set; } = [];
+    [Parameter] public IEnumerable<StandardSteelItem> CurrentCategoryItems { get; set; } = [];
+
+    [Parameter] public bool ExcludeTopSurface { get; set; } = false;
+    [Parameter] public bool IsDarkMode { get; set; } = true;
+
+    [Parameter] public EventCallback OnOpenSteelModal { get; set; }
+    [Parameter] public EventCallback<SectionType> OnChangeSectionType { get; set; }
+    [Parameter] public EventCallback OnParamsChanged { get; set; }
+    [Parameter] public EventCallback<double> OnSelectPlateThickness { get; set; }
+
+    private static readonly double[] StandardPlateThicknesses = [6, 8, 10, 12, 14, 16, 18, 20, 22, 25, 28, 30, 35, 40, 50, 60, 80];
+
+    private async Task SetMode(string mode)
+    {
+        SectionInputMode = mode;
+        await SectionInputModeChanged.InvokeAsync(mode);
+    }
+
+    private async Task SelectPlateThickness(double t)
+    {
+        PlateThickness = t;
+        await PlateThicknessChanged.InvokeAsync(t);
+        await OnSelectPlateThickness.InvokeAsync(t);
+    }
+
+    private async Task OnPlateInputChanged()
+    {
+        await PlateThicknessChanged.InvokeAsync(PlateThickness);
+        await PlateWidthChanged.InvokeAsync(PlateWidth);
+        await OnParamsChanged.InvokeAsync();
+    }
+
+    private async Task ChangeSectionType(SectionType type)
+    {
+        await OnChangeSectionType.InvokeAsync(type);
+    }
+
+    private async Task NotifyParamsChanged()
+    {
+        await OnParamsChanged.InvokeAsync();
+    }
+}

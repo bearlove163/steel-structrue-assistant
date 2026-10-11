@@ -1,0 +1,295 @@
+@using EngineeringApp.Shared.Models
+@using EngineeringApp.Shared.Algorithms
+@using EngineeringApp.Shared.Data
+
+<div class="card @(IsDarkMode ? "bg-black bg-opacity-30 border-secondary" : "bg-white border-light-subtle shadow-sm") p-3 h-100 d-flex flex-column">
+    <!-- 顶部工法选择与预设配套方案按钮组 -->
+    <div class="p-2 mb-3 rounded border @(IsDarkMode ? "bg-secondary bg-opacity-10 border-secondary" : "bg-light border-light-subtle")">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+            <!-- 施工工法单选组 -->
+            <div class="d-flex align-items-center gap-2">
+                <span class="fw-bold text-xs text-primary">🛠️ 施工工法:</span>
+                <div class="btn-group btn-group-sm">
+                    <button class="btn btn-xs @(CurrentMethod == CoatingApplicationMethod.AirlessSpraying ? "btn-primary fw-bold" : "btn-outline-secondary")"
+                            @onclick="() => SetMethod(CoatingApplicationMethod.AirlessSpraying)">
+                        高压无气喷涂 (主流高效)
+                    </button>
+                    <button class="btn btn-xs @(CurrentMethod == CoatingApplicationMethod.AirSpraying ? "btn-primary fw-bold" : "btn-outline-secondary")"
+                            @onclick="() => SetMethod(CoatingApplicationMethod.AirSpraying)">
+                        空气喷涂 (细腻飞散大)
+                    </button>
+                    <button class="btn btn-xs @(CurrentMethod == CoatingApplicationMethod.BrushOrRoller ? "btn-primary fw-bold" : "btn-outline-secondary")"
+                            @onclick="() => SetMethod(CoatingApplicationMethod.BrushOrRoller)">
+                        手工刷滚涂 (零飞散工费高)
+                    </button>
+                </div>
+            </div>
+
+            <!-- 扣除楼板与批量工程量 -->
+            <div class="d-flex align-items-center gap-3 text-xs">
+                <div class="form-check form-switch m-0 d-flex align-items-center gap-1">
+                    <input class="form-check-input" type="checkbox" id="checkExcludeTop"
+                           @bind="ExcludeTopSurface" @bind:after="OnExcludeTopChanged" />
+                    <label class="form-check-label @(IsDarkMode ? "text-white-50" : "text-muted")" for="checkExcludeTop">
+                        扣除楼板贴合面 (@CurrentResult.TopSurfaceWidth.ToString("F0")mm)
+                    </label>
+                </div>
+                <div class="d-flex align-items-center gap-1">
+                    <span>工程总长:</span>
+                    <input type="number" class="form-control form-control-sm text-end p-1 @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                           style="width: 75px;" @bind="ProjectTotalLengthM" @bind:after="OnLengthChanged" min="0.1" step="1" />
+                    <span>m</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 行业推荐施工配套预设方案 -->
+        <div class="d-flex align-items-center gap-2 flex-wrap pt-1 border-top @(IsDarkMode ? "border-secondary border-opacity-50" : "border-light-subtle")">
+            <span class="text-xs fw-bold text-success">📋 行业预设配套:</span>
+            <button class="btn btn-xs @(CurrentPresetName == "轻钢厂房常温防腐" ? "btn-success" : "btn-outline-secondary")"
+                    @onclick='() => OnApplyPreset.InvokeAsync("轻钢厂房常温防腐")'>轻钢厂房常温 (底+面)</button>
+            <button class="btn btn-xs @(CurrentPresetName == "标准工业厂房重防腐" ? "btn-success" : "btn-outline-secondary")"
+                    @onclick='() => OnApplyPreset.InvokeAsync("标准工业厂房重防腐")'>标准工业重防腐 (底+中+面)</button>
+            <button class="btn btn-xs @(CurrentPresetName == "沿海高腐蚀 C4/C5 氟碳体系" ? "btn-success" : "btn-outline-secondary")"
+                    @onclick='() => OnApplyPreset.InvokeAsync("沿海高腐蚀 C4/C5 氟碳体系")'>C4/C5 氟碳超耐候体系</button>
+            <button class="btn btn-xs @(CurrentPresetName == "商业建筑室内 2.0h 膨胀防火体系" ? "btn-success" : "btn-outline-secondary")"
+                    @onclick='() => OnApplyPreset.InvokeAsync("商业建筑室内 2.0h 膨胀防火体系")'>室内 2.0h 薄型防火体系</button>
+            <button class="btn btn-xs @(CurrentPresetName == "超高层钢柱 3.0h 厚型非膨胀防火体系" ? "btn-success" : "btn-outline-secondary")"
+                    @onclick='() => OnApplyPreset.InvokeAsync("超高层钢柱 3.0h 厚型非膨胀防火体系")'>超高层 3.0h 厚型防火体系</button>
+        </div>
+    </div>
+
+    <!-- 涂层分层表格 -->
+    <div class="table-responsive rounded border mb-3 flex-grow-1 @(IsDarkMode ? "border-secondary" : "border-light-subtle")">
+        <table class="table table-sm @(IsDarkMode ? "table-dark table-hover" : "table-hover") align-middle mb-0 text-xs">
+            <thead class="@(IsDarkMode ? "table-secondary table-opacity-25" : "table-light") text-center">
+                <tr>
+                    <th style="width: 45px;">启用</th>
+                    <th style="width: 105px;" class="text-center">涂层类别</th>
+                    <th style="min-width: 220px;">规格型号 / 品牌产品联动</th>
+                    <th style="width: 95px;">膜厚 (DFT)</th>
+                    <th style="width: 75px;">固含%</th>
+                    <th style="width: 75px;">比重</th>
+                    <th style="width: 80px;" title="根据截面形状(圆管>箱型)与工法自动修正">损耗%</th>
+                    <th style="width: 85px;">漆价(元/kg)</th>
+                    <th style="width: 85px;">工费(元/m²)</th>
+                    <th style="width: 95px;">单耗(kg/m²)</th>
+                    <th style="width: 95px;">小计(元/m²)</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var layer in CurrentLayers)
+                {
+                    <tr class="@(layer.IsEnabled ? "" : (IsDarkMode ? "opacity-50" : "text-muted opacity-50"))">
+                        <td class="text-center">
+                            <input class="form-check-input" type="checkbox" @bind="layer.IsEnabled" @bind:after="NotifyRecalculate" />
+                        </td>
+                        <td class="text-center align-middle">
+                            @{
+                                var (cnName, enName) = GetLayerNames(layer.LayerType);
+                            }
+                            <div class="badge @GetLayerBadgeClass(layer.LayerType) d-inline-flex flex-column align-items-center justify-content-center py-1 px-2 text-center shadow-sm" style="min-width: 92px; border-radius: 6px;">
+                                <span class="fw-bold" style="font-size: 14px; line-height: 1.25; letter-spacing: 0.5px;">@cnName</span>
+                                <span style="font-size: 11px; font-weight: normal; opacity: 0.9; line-height: 1.1; letter-spacing: 0.5px;">(@enName)</span>
+                            </div>
+                        </td>
+                        <td>
+                            <select class="form-select form-select-sm py-0 @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark")"
+                                    style="font-size: 11px; height: 28px;"
+                                    @onchange="(e) => OnSelectProduct(layer, e)">
+                                @if (!string.IsNullOrEmpty(layer.ProductName) && !PaintProductDatabase.GetByType(layer.LayerType).Any(p => p.Name == layer.ProductName))
+                                {
+                                    <option value="@layer.ProductName" selected>@layer.ProductName</option>
+                                }
+                                @foreach (var prod in PaintProductDatabase.GetByType(layer.LayerType))
+                                {
+                                    <option value="@prod.Name" selected="@(prod.Name == layer.ProductName)">
+                                        @prod.Brand: @prod.ModelCode - @prod.Name
+                                    </option>
+                                }
+                            </select>
+                        </td>
+                        <td>
+                            <div class="input-group input-group-sm">
+                                <input type="number" class="form-control form-control-sm text-end p-1 @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                       @bind="layer.Dft" @bind:after="NotifyRecalculate" step="@(layer.LayerType == CoatingLayerType.Fireproof ? 0.2 : 5)" />
+                                <span class="input-group-text px-1 @(IsDarkMode ? "bg-secondary bg-opacity-25 text-white-50 border-secondary" : "bg-light")">
+                                    @(layer.LayerType == CoatingLayerType.Fireproof ? "mm" : "μm")
+                                </span>
+                            </div>
+                        </td>
+                        <td>
+                            <input type="number" class="form-control form-control-sm text-end p-1 @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                   @bind="layer.VolumeSolids" @bind:after="NotifyRecalculate" step="1" />
+                        </td>
+                        <td>
+                            <input type="number" class="form-control form-control-sm text-end p-1 @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                   @bind="layer.Density" @bind:after="NotifyRecalculate" step="0.05" />
+                        </td>
+                        <td>
+                            <div class="text-end">
+                                <input type="number" class="form-control form-control-sm text-end p-1 @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                       @bind="layer.LossRate" @bind:after="NotifyRecalculate" step="5" />
+                                <span class="text-muted" style="font-size: 10px;">
+                                    实际: @(CurrentPaintResult.Layers.FirstOrDefault(x => x.LayerType == layer.LayerType)?.EffectiveLossRatePercent.ToString("F0") ?? "-")%
+                                </span>
+                            </div>
+                        </td>
+                        <td>
+                            <input type="number" class="form-control form-control-sm text-end p-1 @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                   @bind="layer.MaterialPrice" @bind:after="NotifyRecalculate" step="1" />
+                        </td>
+                        <td>
+                            <input type="number" class="form-control form-control-sm text-end p-1 @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                   @bind="layer.LaborPrice" @bind:after="NotifyRecalculate" step="1" />
+                        </td>
+                        <td class="text-end font-monospace">
+                            @(CurrentPaintResult.Layers.FirstOrDefault(x => x.LayerType == layer.LayerType)?.ActualUsageKgPerM2.ToString("F3") ?? "-")
+                        </td>
+                        <td class="text-end pe-2 fw-bold font-monospace @(layer.IsEnabled ? "text-success" : "")">
+                            @(CurrentPaintResult.Layers.FirstOrDefault(x => x.LayerType == layer.LayerType) != null ? $"¥{CurrentPaintResult.Layers.First(x => x.LayerType == layer.LayerType).TotalCostPerM2:F2}" : "-")
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <!-- 综合造价四大指标横幅 -->
+    <div class="row g-2 mb-3">
+        <div class="col-md-3">
+            <div class="p-2 rounded border text-center @(IsDarkMode ? "bg-dark border-secondary" : "bg-light border-light-subtle")">
+                <div class="@(IsDarkMode ? "text-white-50" : "text-muted") text-xs">每平方米综合造价</div>
+                <div class="fs-5 fw-bold text-primary font-monospace">
+                    ¥ @CurrentPaintResult.TotalCostPerM2.ToString("F2") <span class="fs-6 fw-normal">元/m²</span>
+                </div>
+                <div class="text-xs text-muted" style="font-size: 10px;">
+                    (料: ¥@CurrentPaintResult.TotalMaterialCostPerM2.ToString("F1") + 工: ¥@CurrentPaintResult.TotalLaborCostPerM2.ToString("F1"))
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="p-2 rounded border text-center @(IsDarkMode ? "bg-dark border-secondary" : "bg-light border-light-subtle")">
+                <div class="@(IsDarkMode ? "text-white-50" : "text-muted") text-xs">延米综合涂装造价</div>
+                <div class="fs-5 fw-bold text-warning font-monospace">
+                    ¥ @CurrentPaintResult.TotalCostPerMeter.ToString("F2") <span class="fs-6 fw-normal">元/m</span>
+                </div>
+                <div class="text-xs text-muted" style="font-size: 10px;">
+                    延米耗漆: @CurrentPaintResult.TotalUsageKgPerMeter.ToString("F2") kg/m
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="p-2 rounded border text-center @(IsDarkMode ? "bg-dark border-secondary" : "bg-light border-light-subtle")">
+                <div class="@(IsDarkMode ? "text-white-50" : "text-muted") text-xs">吨钢涂装综合造价</div>
+                <div class="fs-5 fw-bold text-success font-monospace">
+                    ¥ @CurrentPaintResult.TotalCostPerTon.ToString("F0") <span class="fs-6 fw-normal">元/t</span>
+                </div>
+                <div class="text-xs text-muted" style="font-size: 10px;">
+                    吨钢耗漆: @CurrentPaintResult.TotalUsageKgPerTon.ToString("F1") kg/t
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="p-2 rounded border text-center @(IsDarkMode ? "bg-primary bg-opacity-10 border-primary" : "bg-primary-subtle border-primary-subtle")">
+                <div class="text-primary text-xs fw-bold">工程总造价预算 (@ProjectTotalLengthM.ToString("F0")m)</div>
+                <div class="fs-5 fw-bold text-danger font-monospace">
+                    ¥ @CurrentPaintResult.ProjectTotalCostYuan.ToString("N2")
+                </div>
+                <div class="text-xs text-dark" style="font-size: 10px;">
+                    总油漆采购量: @CurrentPaintResult.ProjectTotalPaintKg.ToString("F1") kg
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 标准化 Describe 输出框 -->
+    <div class="@(IsDarkMode ? "bg-black border-secondary" : "bg-light border-light-subtle") p-3 rounded border">
+        <div class="d-flex justify-content-between align-items-center mb-1">
+            <span class="badge @(IsDarkMode ? "bg-secondary" : "bg-secondary-subtle text-dark border") text-xs">标准化 Describe 技术规格输出</span>
+            <button class="btn btn-xs btn-outline-success py-0 px-2" @onclick="() => OnCopyDescribe.InvokeAsync()">
+                📋 一键复制
+            </button>
+        </div>
+        <div class="font-monospace small @(IsDarkMode ? "text-warning bg-dark border-secondary" : "text-dark bg-white border-secondary-subtle") p-2 rounded border text-break user-select-all" style="font-size: 11px; line-height: 1.5;">
+            @CurrentPaintResult.FullTechnicalDescribe
+        </div>
+        @if (!string.IsNullOrEmpty(CopyAlertMessage))
+        {
+            <div class="text-success small mt-1 animate-pulse">@CopyAlertMessage</div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public CoatingApplicationMethod CurrentMethod { get; set; } = CoatingApplicationMethod.AirlessSpraying;
+    [Parameter] public EventCallback<CoatingApplicationMethod> CurrentMethodChanged { get; set; }
+
+    [Parameter] public bool ExcludeTopSurface { get; set; } = false;
+    [Parameter] public EventCallback<bool> ExcludeTopSurfaceChanged { get; set; }
+
+    [Parameter] public double ProjectTotalLengthM { get; set; } = 1.0;
+    [Parameter] public EventCallback<double> ProjectTotalLengthMChanged { get; set; }
+
+    [Parameter] public string CurrentPresetName { get; set; } = "轻钢厂房常温防腐";
+    [Parameter] public List<CoatingLayerConfig> CurrentLayers { get; set; } = [];
+    [Parameter] public PaintSystemCalculationResult CurrentPaintResult { get; set; } = new();
+    [Parameter] public SectionPropertiesResult CurrentResult { get; set; } = new();
+
+    [Parameter] public bool IsDarkMode { get; set; } = true;
+    [Parameter] public string CopyAlertMessage { get; set; } = "";
+
+    [Parameter] public EventCallback<string> OnApplyPreset { get; set; }
+    [Parameter] public EventCallback OnRecalculate { get; set; }
+    [Parameter] public EventCallback<(CoatingLayerConfig layer, ChangeEventArgs e)> OnSelectProductItem { get; set; }
+    [Parameter] public EventCallback OnCopyDescribe { get; set; }
+
+    private async Task SetMethod(CoatingApplicationMethod method)
+    {
+        CurrentMethod = method;
+        await CurrentMethodChanged.InvokeAsync(method);
+        await OnRecalculate.InvokeAsync();
+    }
+
+    private async Task OnExcludeTopChanged()
+    {
+        await ExcludeTopSurfaceChanged.InvokeAsync(ExcludeTopSurface);
+        await OnRecalculate.InvokeAsync();
+    }
+
+    private async Task OnLengthChanged()
+    {
+        await ProjectTotalLengthMChanged.InvokeAsync(ProjectTotalLengthM);
+        await OnRecalculate.InvokeAsync();
+    }
+
+    private async Task NotifyRecalculate()
+    {
+        await OnRecalculate.InvokeAsync();
+    }
+
+    private async Task OnSelectProduct(CoatingLayerConfig layer, ChangeEventArgs e)
+    {
+        await OnSelectProductItem.InvokeAsync((layer, e));
+    }
+
+    private static (string cnName, string enName) GetLayerNames(CoatingLayerType type) => type switch
+    {
+        CoatingLayerType.Primer => ("防腐底漆", "Primer"),
+        CoatingLayerType.Intermediate => ("云铁中间漆", "Intermediate"),
+        CoatingLayerType.Topcoat => ("耐候面漆", "Topcoat"),
+        CoatingLayerType.Fireproof => ("防火涂料", "Fireproof"),
+        CoatingLayerType.Sealer => ("清漆/封闭", "Sealer"),
+        _ => (type.ToString(), "Layer")
+    };
+
+    private static string GetLayerBadgeClass(CoatingLayerType type) => type switch
+    {
+        CoatingLayerType.Primer => "bg-primary text-white",
+        CoatingLayerType.Intermediate => "bg-info text-dark",
+        CoatingLayerType.Topcoat => "bg-success text-white",
+        CoatingLayerType.Fireproof => "bg-danger text-white",
+        CoatingLayerType.Sealer => "bg-warning text-dark",
+        _ => "bg-secondary text-white"
+    };
+}

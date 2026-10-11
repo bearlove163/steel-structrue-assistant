@@ -1,0 +1,132 @@
+@using EngineeringApp.Shared.Algorithms
+
+<div class="row g-3 flex-grow-1">
+    <div class="col-lg-6">
+        <!-- 详细推导公式与当前代入过程 -->
+        <div class="card @(IsDarkMode ? "bg-black bg-opacity-30 border-secondary" : "bg-white border-light-subtle shadow-sm") p-3 h-100">
+            <h6 class="fw-bold text-success mb-2 d-flex align-items-center gap-2">
+                <span>📐 涂装算量数学推导步骤全景</span>
+                <span class="badge bg-success text-xs">公式透明化</span>
+            </h6>
+            <p class="small @(IsDarkMode ? "text-white-50" : "text-muted") mb-3">
+                基于国际 SSPC/NACE 理论涂布率标准与中国《钢结构涂装工程工艺规范》，每道涂层的严格推导过程：
+            </p>
+
+            @if (CurrentPaintResult.ProcessTrace != null)
+            {
+                <div class="d-flex flex-column gap-2 overflow-auto" style="max-height: 520px;">
+                    @foreach (var step in CurrentPaintResult.ProcessTrace.Steps)
+                    {
+                        <div class="p-2 rounded border @(IsDarkMode ? "bg-dark bg-opacity-60 border-secondary" : "bg-light border-light-subtle")">
+                            <div class="fw-bold text-primary small mb-1">@step.Title</div>
+                            <div class="font-monospace text-xs text-muted mb-1">公式: @step.Formula</div>
+                            <div class="font-monospace text-xs text-warning mb-1">代入: @step.ValueSubstitution</div>
+                            <div class="font-monospace text-xs text-success fw-bold">成果: @step.Conclusion</div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <!-- 断面几何形状影响与工法对比剖析 -->
+        <div class="card @(IsDarkMode ? "bg-black bg-opacity-30 border-secondary" : "bg-white border-light-subtle shadow-sm") p-3 h-100">
+            <h6 class="fw-bold text-warning mb-2 d-flex align-items-center gap-2">
+                <span>🌀 为什么圆管喷涂损耗显著大于箱型？(断面机理解析)</span>
+            </h6>
+
+            <div class="p-3 rounded border mb-3 @(IsDarkMode ? "bg-warning bg-opacity-10 border-warning border-opacity-25" : "bg-warning-subtle border-warning-subtle")">
+                <p class="small mb-2 fw-bold text-warning">
+                    @CurrentPaintResult.ProcessTrace?.SectionShapeExplanation
+                </p>
+                <div class="table-responsive">
+                    <table class="table table-sm @(IsDarkMode ? "table-dark" : "table-light") table-bordered text-xs mb-0 text-center">
+                        <thead>
+                            <tr>
+                                <th>断面类型</th>
+                                <th>有效靶面特征</th>
+                                <th>过喷 (Overspray) 机理</th>
+                                <th>损耗修正系数 K</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="fw-bold">箱型 / 平板</td>
+                                <td>平整垂直开阔</td>
+                                <td>反弹极少，有效着漆率最高</td>
+                                <td><span class="badge bg-success">1.00 (基准)</span></td>
+                            </tr>
+                            <tr>
+                                <td class="fw-bold">H型钢 / 工字钢</td>
+                                <td>翼缘腹板内直角</td>
+                                <td>内阴角气流涡流反弹</td>
+                                <td><span class="badge bg-primary">1.15</span></td>
+                            </tr>
+                            <tr class="table-warning">
+                                <td class="fw-bold text-danger">圆管 / 圆形 (CHS)</td>
+                                <td>曲率表面无垂直靶面</td>
+                                <td>切线边缘漆雾大量逸散落空</td>
+                                <td><span class="badge bg-danger">1.38 (+38%)</span></td>
+                            </tr>
+                            <tr>
+                                <td class="fw-bold">角钢 / 细长桁架</td>
+                                <td>肢件狭窄，密集网格</td>
+                                <td>间隙大，喷雾大面积落空穿透</td>
+                                <td><span class="badge bg-danger">1.60 (+60%)</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <h6 class="fw-bold text-primary mb-2">🛠️ 现场施工工法特性与工费影响对比:</h6>
+            <div class="p-3 rounded border @(IsDarkMode ? "bg-info bg-opacity-10 border-info border-opacity-25" : "bg-info-subtle border-info-subtle")">
+                <p class="small mb-2 fw-bold text-info">
+                    @CurrentPaintResult.ProcessTrace?.MethodExplanation
+                </p>
+                <div class="table-responsive">
+                    <table class="table table-sm @(IsDarkMode ? "table-dark" : "table-light") table-bordered text-xs mb-0 text-center">
+                        <thead>
+                            <tr>
+                                <th>施工工法</th>
+                                <th>飞散损耗 K_loss</th>
+                                <th>工效 (m²/人日)</th>
+                                <th>人工单价倍数</th>
+                                <th>优劣势评价</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="fw-bold">高压无气喷涂</td>
+                                <td>1.00 (基准)</td>
+                                <td>300 ~ 600</td>
+                                <td>1.00</td>
+                                <td>工业首选，膜厚快速建立，车间主力</td>
+                            </tr>
+                            <tr>
+                                <td class="fw-bold">常规空气喷涂</td>
+                                <td>1.28 (+28%)</td>
+                                <td>150 ~ 250</td>
+                                <td>1.15</td>
+                                <td>雾化极细腻，但气流飞散严重，耗漆大</td>
+                            </tr>
+                            <tr>
+                                <td class="fw-bold text-success">手工刷涂/滚涂</td>
+                                <td>0.45 (-55%)</td>
+                                <td>40 ~ 80</td>
+                                <td>1.65 (+65%)</td>
+                                <td>零飞溅极省料，但工效极低人工费昂贵</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public PaintSystemCalculationResult CurrentPaintResult { get; set; } = new();
+    [Parameter] public bool IsDarkMode { get; set; } = true;
+}
