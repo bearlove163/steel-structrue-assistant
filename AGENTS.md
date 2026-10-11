@@ -17,6 +17,7 @@ You must strictly restrict all code generation and refactoring to the following 
 You must respect and strictly adhere to the following project layout when generating files:
 
 ├── .agents/                 # Antigravity rule engine configs
+├── doc/                     # 规划方案与工程设计文档归档目录 (强制：所有 /plan 文件必须存放于此)
 ├── src/
 │   ├── EngineeringApp.Client/   # Blazor WASM Frontend project
 │   │   ├── Pages/              # Web views (e.g., QuotationGrid.razor, Dashboard.razor)
@@ -35,6 +36,9 @@ You must respect and strictly adhere to the following project layout when genera
 2. **Algorithm Extraction:** Keep engineering computation blocks decoupled from the UI. Place logic inside `Shared/Algorithms/` as pure C# classes to facilitate high performance and isolated testing.
 3. **Simplified Databases:** When writing database interactions, stick to standard async Linq-to-Entities (EF Core) queries. Avoid raw SQL queries or complex repository patterns that complicate maintenance.
 4. **Excel Grid Pattern:** Always structure grid data-binding around observable collections or reactive `Sheet` objects compatible with Blazor data-grid components. Keep cell-recalculation functions optimized for performance.
+5. **Plan & Specification File Archival (方案归档规则):**
+   * **强制统一存放于 `doc/` 目录：** 每次通过 `/plan` 或其他交互制定的所有规划方案、架构设计、工程计算规范与实施计划 Markdown 文件（例如 `doc/xxx_plan.md`），**必须直接写入项目根目录下的 `doc/` 文件夹中**，严禁存放至缓存目录、临时目录或项目外的其他路径。
+   * **便于追溯与归档：** 文件命名应具备清晰的工程业务含义（如 `doc/section_calculator_plan.md`、`doc/coating_database_plan.md`），确保团队及用户随时可在版本库中检索、追溯和复核。
 
 ## Git Commit & Collaboration Rules
 1. **Commit Message Structure (提交信息双层结构):** 必须严格遵循工业级 Conventional Commits 标准结构，包含「首行简要标题」与「详细变更要点列表」：
