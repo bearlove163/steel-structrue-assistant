@@ -1,0 +1,56 @@
+@using EngineeringApp.Shared.Models
+@using EngineeringApp.Shared.Algorithms
+
+<div class="@(IsDarkMode ? "bg-black bg-opacity-40 border-secondary" : "bg-white border-light-subtle shadow-sm") p-2 rounded border mb-3 d-flex align-items-center justify-content-between gap-2 flex-nowrap overflow-x-auto text-nowrap">
+    <div class="d-flex align-items-center gap-2 flex-nowrap text-nowrap">
+        @if (SectionInputMode == "plate" || CurrentParams.Type == SectionType.Plate)
+        {
+            <span class="badge bg-warning text-dark fs-6 fw-bold">🇨🇳 国标 GB/T</span>
+            <span class="badge bg-primary fs-6 fw-bold font-monospace">@SectionDesignation</span>
+            <span class="badge @(IsDarkMode ? "bg-secondary text-white" : "bg-light text-dark border") text-xs">GB/T 709 钢板</span>
+        }
+        else if (SectionInputMode == "standard")
+        {
+            <span class="badge @StandardBadgeClass fs-6 fw-bold">@StandardSystemDisplay</span>
+            <span class="badge bg-primary fs-6 fw-bold font-monospace">@CurrentParams.StandardProfileName</span>
+            <span class="badge @(IsDarkMode ? "bg-secondary text-white" : "bg-light text-dark border") text-xs">@SelectedStandardCategory</span>
+        }
+        else
+        {
+            <span class="badge bg-secondary fs-6 fw-bold">✏️ 自定义截面</span>
+            <span class="badge bg-primary fs-6 fw-bold font-monospace">@SectionDesignation</span>
+        }
+        <div class="badge @(IsDarkMode ? "bg-secondary text-white" : "bg-light text-dark border")">
+            理论米重 (自重): <b class="text-warning">@CurrentResult.LinearMass.ToString("F1")</b> kg/m
+        </div>
+        <div class="badge @(IsDarkMode ? "bg-secondary text-white" : "bg-light text-dark border")">
+            全外表面积: <b class="text-info">@CurrentResult.GrossPaintingAreaPerMeter.ToString("F3")</b> m²/m
+        </div>
+        <div class="badge @(IsDarkMode ? "bg-secondary text-white" : "bg-light text-dark border")">
+            楼板扣除净面积: <b class="text-success">@CurrentResult.PaintingAreaExcludingTop.ToString("F3")</b> m²/m
+        </div>
+        <div class="badge @(IsDarkMode ? "bg-secondary text-white" : "bg-light text-dark border")">
+            吨钢比表面积: <b class="text-danger">@CurrentResult.AreaPerTon.ToString("F1")</b> m²/t
+        </div>
+        <div class="badge @(IsDarkMode ? "bg-secondary text-white" : "bg-light text-dark border")" title="截面形状系数 F/V = P/A * 1000，防火涂料升温与厚度设计核心物理量">
+            形状系数 F/V: <b class="text-primary">@CurrentPaintResult.SectionFactorFOverV.ToString("F1")</b> m⁻¹
+        </div>
+    </div>
+    <div class="d-flex align-items-center gap-2 flex-shrink-0">
+        <span class="badge @(SectionInputMode == "plate" ? "bg-success" : (SectionInputMode == "standard" ? "bg-info text-dark" : "bg-primary")) text-xs">
+            @(SectionInputMode == "plate" ? "📄 钢板板材" : (SectionInputMode == "standard" ? "📚 标准库驱动" : "✏️ 自定义参数"))
+        </span>
+    </div>
+</div>
+
+@code {
+    [Parameter] public string SectionInputMode { get; set; } = "standard";
+    [Parameter] public SectionParameters CurrentParams { get; set; } = new();
+    [Parameter] public SectionPropertiesResult CurrentResult { get; set; } = new();
+    [Parameter] public PaintSystemCalculationResult CurrentPaintResult { get; set; } = new();
+    [Parameter] public string SectionDesignation { get; set; } = "";
+    [Parameter] public string StandardBadgeClass { get; set; } = "bg-primary";
+    [Parameter] public string StandardSystemDisplay { get; set; } = "🇨🇳 国标 GB/T";
+    [Parameter] public string SelectedStandardCategory { get; set; } = "";
+    [Parameter] public bool IsDarkMode { get; set; } = true;
+}

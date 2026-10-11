@@ -1,0 +1,460 @@
+@using EngineeringApp.Shared.Models
+@using EngineeringApp.Shared.Data
+@using EngineeringApp.Shared.Pricing.Coating
+
+<div class="d-flex flex-column gap-3 flex-grow-1">
+    <!-- Part A: 双时期快照调差总控面板与大盘价差看板 -->
+    <div class="card @(IsDarkMode ? "bg-black bg-opacity-30 border-secondary" : "bg-white border-light-subtle shadow-sm") p-3">
+        <div class="d-flex flex-wrap align-items-center justify-content-between pb-2 mb-3 border-bottom @(IsDarkMode ? "border-secondary" : "border-light-subtle")">
+            <div>
+                <h6 class="fw-bold mb-1 d-flex align-items-center gap-2 @(IsDarkMode ? "text-warning" : "text-primary")">
+                    <span>⏳ 双时期历史价格快照调差总控看板</span>
+                    <span class="badge bg-warning text-dark text-xs">调差结算核心</span>
+                </h6>
+                <div class="text-xs @(IsDarkMode ? "text-white-50" : "text-muted")">
+                    对比合同基期（投标锁价基准日）与施工现行期（大盘或询价日），实时核算吨钢与全工程防腐造价涨跌额
+                </div>
+            </div>
+
+            <div class="d-flex align-items-center gap-2 flex-wrap mt-2 mt-md-0">
+                <!-- 基期选择器 -->
+                <div class="d-flex align-items-center gap-1">
+                    <span class="text-xs fw-bold text-muted">基期快照(定标日):</span>
+                    <select class="form-select form-select-xs fw-bold @(IsDarkMode ? "bg-dark text-warning border-secondary" : "bg-light text-primary")"
+                            style="width: 220px; font-size: 11px; height: 28px;"
+                            value="@BaselineSnapshotId"
+                            @onchange="OnBaselineSnapshotChanged">
+                        @foreach (var snap in SeedPaintPriceSnapshots.AllSnapshots)
+                        {
+                            <option value="@snap.SnapshotId">
+                                @(snap.IsLocked ? "🔒" : "📊") @snap.SnapshotName
+                            </option>
+                        }
+                    </select>
+                </div>
+
+                <span class="fw-bold text-muted">VS</span>
+
+                <!-- 目标期选择器 -->
+                <div class="d-flex align-items-center gap-1">
+                    <span class="text-xs fw-bold text-muted">目标期快照(结算日):</span>
+                    <select class="form-select form-select-xs fw-bold @(IsDarkMode ? "bg-dark text-info border-secondary" : "bg-light text-primary")"
+                            style="width: 220px; font-size: 11px; height: 28px;"
+                            value="@TargetSnapshotId"
+                            @onchange="OnTargetSnapshotChanged">
+                        @foreach (var snap in SeedPaintPriceSnapshots.AllSnapshots)
+                        {
+                            <option value="@snap.SnapshotId">
+                                @(snap.IsLocked ? "🔒" : "📊") @snap.SnapshotName
+                            </option>
+                        }
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- 大盘品类价差卡片组 -->
+        @{
+            var bSnap = SeedPaintPriceSnapshots.GetById(BaselineSnapshotId);
+            var tSnap = SeedPaintPriceSnapshots.GetById(TargetSnapshotId);
+            double primerDiff = tSnap.EpoxyZincRichPrimerBase - bSnap.EpoxyZincRichPrimerBase;
+            double primerDiffPct = bSnap.EpoxyZincRichPrimerBase > 0 ? (primerDiff / bSnap.EpoxyZincRichPrimerBase * 100.0) : 0;
+
+            double mioDiff = tSnap.EpoxyMioIntermediateBase - bSnap.EpoxyMioIntermediateBase;
+            double mioDiffPct = bSnap.EpoxyMioIntermediateBase > 0 ? (mioDiff / bSnap.EpoxyMioIntermediateBase * 100.0) : 0;
+
+            double topcoatDiff = tSnap.PolyurethaneTopcoatBase - bSnap.PolyurethaneTopcoatBase;
+            double topcoatDiffPct = bSnap.PolyurethaneTopcoatBase > 0 ? (topcoatDiff / bSnap.PolyurethaneTopcoatBase * 100.0) : 0;
+
+            double fluoroDiff = tSnap.FluorocarbonTopcoatBase - bSnap.FluorocarbonTopcoatBase;
+            double fluoroDiffPct = bSnap.FluorocarbonTopcoatBase > 0 ? (fluoroDiff / bSnap.FluorocarbonTopcoatBase * 100.0) : 0;
+
+            double laborDiff = tSnap.AirlessSprayingLaborBase - bSnap.AirlessSprayingLaborBase;
+            double laborDiffPct = bSnap.AirlessSprayingLaborBase > 0 ? (laborDiff / bSnap.AirlessSprayingLaborBase * 100.0) : 0;
+
+            double zincDiff = tSnap.ZincIngotBasePerTon - bSnap.ZincIngotBasePerTon;
+            double zincDiffPct = bSnap.ZincIngotBasePerTon > 0 ? (zincDiff / bSnap.ZincIngotBasePerTon * 100.0) : 0;
+        }
+        <div class="row g-2 mb-3">
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="p-2 rounded border @(IsDarkMode ? "bg-dark border-secondary" : "bg-light border-light-subtle") text-center">
+                    <div class="text-xs text-muted">环氧富锌底漆</div>
+                    <div class="fw-bold fs-6">¥@bSnap.EpoxyZincRichPrimerBase → ¥@tSnap.EpoxyZincRichPrimerBase</div>
+                    <div class="text-xs @(primerDiff >= 0 ? "text-danger" : "text-success") fw-bold">
+                        @(primerDiff >= 0 ? "+" : "")@primerDiff.ToString("F1") 元/kg (@(primerDiffPct >= 0 ? "+" : "")@primerDiffPct.ToString("F1")%)
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="p-2 rounded border @(IsDarkMode ? "bg-dark border-secondary" : "bg-light border-light-subtle") text-center">
+                    <div class="text-xs text-muted">环氧云铁中间漆</div>
+                    <div class="fw-bold fs-6">¥@bSnap.EpoxyMioIntermediateBase → ¥@tSnap.EpoxyMioIntermediateBase</div>
+                    <div class="text-xs @(mioDiff >= 0 ? "text-danger" : "text-success") fw-bold">
+                        @(mioDiff >= 0 ? "+" : "")@mioDiff.ToString("F1") 元/kg (@(mioDiffPct >= 0 ? "+" : "")@mioDiffPct.ToString("F1")%)
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="p-2 rounded border @(IsDarkMode ? "bg-dark border-secondary" : "bg-light border-light-subtle") text-center">
+                    <div class="text-xs text-muted">聚氨酯面漆</div>
+                    <div class="fw-bold fs-6">¥@bSnap.PolyurethaneTopcoatBase → ¥@tSnap.PolyurethaneTopcoatBase</div>
+                    <div class="text-xs @(topcoatDiff >= 0 ? "text-danger" : "text-success") fw-bold">
+                        @(topcoatDiff >= 0 ? "+" : "")@topcoatDiff.ToString("F1") 元/kg (@(topcoatDiffPct >= 0 ? "+" : "")@topcoatDiffPct.ToString("F1")%)
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="p-2 rounded border @(IsDarkMode ? "bg-dark border-secondary" : "bg-light border-light-subtle") text-center">
+                    <div class="text-xs text-muted">氟碳树脂面漆</div>
+                    <div class="fw-bold fs-6">¥@bSnap.FluorocarbonTopcoatBase → ¥@tSnap.FluorocarbonTopcoatBase</div>
+                    <div class="text-xs @(fluoroDiff >= 0 ? "text-danger" : "text-success") fw-bold">
+                        @(fluoroDiff >= 0 ? "+" : "")@fluoroDiff.ToString("F1") 元/kg (@(fluoroDiffPct >= 0 ? "+" : "")@fluoroDiffPct.ToString("F1")%)
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="p-2 rounded border @(IsDarkMode ? "bg-dark border-secondary" : "bg-light border-light-subtle") text-center">
+                    <div class="text-xs text-muted">喷涂人工费</div>
+                    <div class="fw-bold fs-6">¥@bSnap.AirlessSprayingLaborBase → ¥@tSnap.AirlessSprayingLaborBase</div>
+                    <div class="text-xs @(laborDiff >= 0 ? "text-danger" : "text-success") fw-bold">
+                        @(laborDiff >= 0 ? "+" : "")@laborDiff.ToString("F1") 元/m² (@(laborDiffPct >= 0 ? "+" : "")@laborDiffPct.ToString("F1")%)
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="p-2 rounded border @(IsDarkMode ? "bg-dark border-secondary" : "bg-light border-light-subtle") text-center">
+                    <div class="text-xs text-muted">热浸锌锭基价</div>
+                    <div class="fw-bold fs-6">¥@(bSnap.ZincIngotBasePerTon/1000)k → ¥@(tSnap.ZincIngotBasePerTon/1000)k</div>
+                    <div class="text-xs @(zincDiff >= 0 ? "text-danger" : "text-success") fw-bold">
+                        @(zincDiff >= 0 ? "+" : "")@zincDiff.ToString("F0") 元/t (@(zincDiffPct >= 0 ? "+" : "")@zincDiffPct.ToString("F1")%)
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 品牌实体询价值对比折叠看板 -->
+        <div class="p-2 rounded border @(IsDarkMode ? "bg-secondary bg-opacity-10 border-secondary" : "bg-light border-light-subtle") text-xs">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="fw-bold text-info">🏢 真实询价品牌实体对比 (底漆/面漆实际报价):</span>
+                <button class="btn btn-xs btn-outline-success py-0 px-2" @onclick="() => OnOpenAddBrandModal.InvokeAsync()">➕ 登记新品牌报价</button>
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+                @foreach (var brand in PaintProductDatabase.AllBrands.Take(6))
+                {
+                    double basePrice = bSnap.GetPriceForBrandOrCategory(brand.NameCn, "底漆");
+                    double targetPrice = tSnap.GetPriceForBrandOrCategory(brand.NameCn, "底漆");
+                    double diff = targetPrice - basePrice;
+                    <div class="badge @(IsDarkMode ? "bg-dark border-secondary" : "bg-white border text-dark") p-1">
+                        <span class="fw-bold">@brand.NameCn:</span>
+                        <span>¥@basePrice.ToString("F0") → ¥@targetPrice.ToString("F0")</span>
+                        <span class="@(diff >= 0 ? "text-danger" : "text-success") ms-1">(@(diff >= 0 ? "+" : "")@diff.ToString("F1"))</span>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Part B: 典型板材与型钢规格防腐用量速查矩阵 -->
+    <div class="card @(IsDarkMode ? "bg-black bg-opacity-30 border-secondary" : "bg-white border-light-subtle shadow-sm") p-3">
+        <div class="d-flex flex-wrap align-items-center justify-content-between pb-2 mb-2 border-bottom @(IsDarkMode ? "border-secondary" : "border-light-subtle")">
+            <div>
+                <h6 class="fw-bold mb-1 text-primary d-flex align-items-center gap-2">
+                    <span>📊 规格防腐用量速查矩阵 (定额物理量 × 双时期造价)</span>
+                    <span class="badge bg-primary text-xs">正交映射</span>
+                </h6>
+                <div class="text-xs @(IsDarkMode ? "text-white-50" : "text-muted")">
+                    钢板比表面积严格遵循 S = 254.78/t 定律；型钢含断面几何及飞散损耗修正；支持一键加入工程防腐清单或调入主算量台
+                </div>
+            </div>
+
+            <div class="btn-group btn-group-sm">
+                <button class="btn btn-xs @(BacktrackingMatrixFilter == "plate" ? "btn-primary fw-bold" : "btn-outline-secondary")"
+                        @onclick='() => SetMatrixFilter("plate")'>
+                    📄 钢板厚度系列 (6~80mm)
+                </button>
+                <button class="btn btn-xs @(BacktrackingMatrixFilter == "profile" ? "btn-primary fw-bold" : "btn-outline-secondary")"
+                        @onclick='() => SetMatrixFilter("profile")'>
+                    🏗️ 典型型钢系列 (H型/箱型/圆管)
+                </button>
+            </div>
+        </div>
+
+        <!-- 矩阵表格 -->
+        <div class="table-responsive rounded border @(IsDarkMode ? "border-secondary" : "border-light-subtle")" style="max-height: 380px;">
+            <table class="table table-sm @(IsDarkMode ? "table-dark table-hover" : "table-hover") align-middle mb-0 text-xs text-center">
+                <thead class="@(IsDarkMode ? "table-secondary table-opacity-25" : "table-light") sticky-top">
+                    <tr>
+                        <th>规格代号</th>
+                        <th>分类</th>
+                        <th>主要厚度</th>
+                        <th>比表面积 (m²/t)</th>
+                        <th>涂料单耗 (kg/t)</th>
+                        <th>基期涂装造价 (元/t)</th>
+                        <th>现行涂装造价 (元/t)</th>
+                        <th>吨钢调差差额 (元/t)</th>
+                        <th>调差比例 (%)</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (BacktrackingMatrixFilter == "plate")
+                    {
+                        @foreach (var plateSpec in PaintPriceBacktrackingEngine.GetStandardPlateSpecs())
+                        {
+                            var item = PaintPriceBacktrackingEngine.BuildScheduleItem("钢板板材", plateSpec.Name, plateSpec.Thickness, plateSpec.AreaPerTon, 10.0, SectionType.Plate, CurrentLayers, bSnap, tSnap, CurrentMethod);
+                            <tr>
+                                <td class="fw-bold text-start ps-3 text-info">@plateSpec.Name</td>
+                                <td><span class="badge bg-secondary">钢板板材</span></td>
+                                <td>@plateSpec.Thickness mm</td>
+                                <td class="fw-bold text-danger">@plateSpec.AreaPerTon.ToString("F2")</td>
+                                <td class="fw-bold">@item.PaintUsageKgPerTon.ToString("F2")</td>
+                                <td>¥@item.BaseCostPerTon.ToString("F1")</td>
+                                <td class="fw-bold text-primary">¥@item.TargetCostPerTon.ToString("F1")</td>
+                                <td class="fw-bold @(item.VariancePerTon >= 0 ? "text-danger" : "text-success")">
+                                    @(item.VariancePerTon >= 0 ? "+" : "")@item.VariancePerTon.ToString("F1")
+                                </td>
+                                <td class="@(item.VariancePercentage >= 0 ? "text-danger" : "text-success")">
+                                    @(item.VariancePercentage >= 0 ? "+" : "")@item.VariancePercentage.ToString("F1")%
+                                </td>
+                                <td>
+                                    <div class="d-flex justify-content-center gap-1">
+                                        <button class="btn btn-xs btn-outline-success py-0 px-2"
+                                                @onclick="() => OnAddScheduleItem.InvokeAsync((item, plateSpec.Name))" title="加入工程防腐清单明细表">
+                                            ➕ 加入清单
+                                        </button>
+                                        <button class="btn btn-xs btn-outline-primary py-0 px-2"
+                                                @onclick="() => OnApplyProfileToWorkbench.InvokeAsync((plateSpec.Name, SectionType.Plate))" title="调入主算量台详细计算">
+                                            🎯 调入算量台
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        @foreach (var prof in PaintPriceBacktrackingEngine.GetTypicalProfileSpecs())
+                        {
+                            var item = PaintPriceBacktrackingEngine.BuildScheduleItem(prof.Type.ToString(), prof.Name, prof.Thickness, prof.AreaPerTon, 10.0, prof.Type, CurrentLayers, bSnap, tSnap, CurrentMethod);
+                            <tr>
+                                <td class="fw-bold text-start ps-3 text-info">@prof.Name</td>
+                                <td><span class="badge bg-primary">@prof.Type</span></td>
+                                <td>@prof.Thickness mm</td>
+                                <td class="fw-bold text-danger">@prof.AreaPerTon.ToString("F2")</td>
+                                <td class="fw-bold">@item.PaintUsageKgPerTon.ToString("F2")</td>
+                                <td>¥@item.BaseCostPerTon.ToString("F1")</td>
+                                <td class="fw-bold text-primary">¥@item.TargetCostPerTon.ToString("F1")</td>
+                                <td class="fw-bold @(item.VariancePerTon >= 0 ? "text-danger" : "text-success")">
+                                    @(item.VariancePerTon >= 0 ? "+" : "")@item.VariancePerTon.ToString("F1")
+                                </td>
+                                <td class="@(item.VariancePercentage >= 0 ? "text-danger" : "text-success")">
+                                    @(item.VariancePercentage >= 0 ? "+" : "")@item.VariancePercentage.ToString("F1")%
+                                </td>
+                                <td>
+                                    <div class="d-flex justify-content-center gap-1">
+                                        <button class="btn btn-xs btn-outline-success py-0 px-2"
+                                                @onclick="() => OnAddScheduleItem.InvokeAsync((item, prof.Name))" title="加入工程防腐清单明细表">
+                                            ➕ 加入清单
+                                        </button>
+                                        <button class="btn btn-xs btn-outline-primary py-0 px-2"
+                                                @onclick="() => OnApplyProfileToWorkbench.InvokeAsync((prof.Name, prof.Type))" title="调入主算量台详细计算">
+                                            🎯 调入算量台
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Part C: 工程防腐清单明细表 (支持调差汇总与导出) -->
+    <div class="card @(IsDarkMode ? "bg-black bg-opacity-30 border-secondary" : "bg-white border-light-subtle shadow-sm") p-3">
+        <div class="d-flex flex-wrap align-items-center justify-content-between pb-2 mb-2 border-bottom @(IsDarkMode ? "border-secondary" : "border-light-subtle")">
+            <div>
+                <h6 class="fw-bold mb-1 text-success d-flex align-items-center gap-2">
+                    <span>📑 工程防腐清单明细表 (BOM 算量与历史调差汇总)</span>
+                    <span class="badge bg-success text-xs">@ProjectSchedule.Count 个构件行</span>
+                </h6>
+                <div class="text-xs @(IsDarkMode ? "text-white-50" : "text-muted")">
+                    直接在表格中调整各构件工程吨数 (t)，系统实时重算油漆采购总量与双时期总调差金额；支持一键导出商业报表
+                </div>
+            </div>
+
+            <div class="d-flex align-items-center gap-2 flex-wrap mt-2 mt-md-0">
+                <button class="btn btn-xs btn-outline-info" @onclick="() => OnLoadDemoSchedule.InvokeAsync()" title="一键导入典型工程构件示范清单">
+                    📥 加载示范清单
+                </button>
+                <button class="btn btn-xs btn-outline-success" @onclick="() => OnExportScheduleCsv.InvokeAsync()" title="导出为 CSV 电子表格供 Excel / 商务造价软件使用">
+                    📋 导出清单 CSV
+                </button>
+                <button class="btn btn-xs btn-outline-danger" @onclick="() => ProjectSchedule.Clear()" title="清空清单所有记录">
+                    🗑️ 清空清单
+                </button>
+            </div>
+        </div>
+
+        @if (ProjectSchedule.Count == 0)
+        {
+            <div class="p-4 text-center @(IsDarkMode ? "text-white-50" : "text-muted")">
+                <div class="fs-4 mb-2">📋</div>
+                <div>当前工程防腐清单为空。</div>
+                <div class="mt-2">
+                    <button class="btn btn-sm btn-primary me-2" @onclick="() => OnLoadDemoSchedule.InvokeAsync()">📥 点击加载典型工程构件示范清单</button>
+                    <span class="text-xs">或者在上方规格矩阵点击【➕ 加入清单】添加构件。</span>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive rounded border mb-3 @(IsDarkMode ? "border-secondary" : "border-light-subtle")">
+                <table class="table table-sm @(IsDarkMode ? "table-dark table-hover" : "table-hover") align-middle mb-0 text-xs text-center">
+                    <thead class="@(IsDarkMode ? "table-secondary table-opacity-25" : "table-light")">
+                        <tr>
+                            <th style="width: 40px;">#</th>
+                            <th>构件部位/编号</th>
+                            <th>规格分类</th>
+                            <th>规格型号</th>
+                            <th style="width: 100px;">工程吨数 (t)</th>
+                            <th>比表面积 (m²/t)</th>
+                            <th>涂装总面积 (m²)</th>
+                            <th>油漆单耗 (kg/t)</th>
+                            <th>计划采购量 (kg)</th>
+                            <th>基期合价 (元)</th>
+                            <th>现行合价 (元)</th>
+                            <th>调差金额 (元)</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @{ int rowIdx = 1; }
+                        @foreach (var item in ProjectSchedule)
+                        {
+                            <tr>
+                                <td>@(rowIdx++)</td>
+                                <td>
+                                    <input type="text" class="form-control form-control-xs p-1 text-center @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                           style="height: 24px; font-size: 11px;"
+                                           @bind="item.PartName" />
+                                </td>
+                                <td><span class="badge @(item.Category == "钢板板材" ? "bg-primary" : "bg-secondary")">@item.Category</span></td>
+                                <td class="fw-bold text-info">@item.SpecName</td>
+                                <td>
+                                    <input type="number" class="form-control form-control-xs p-1 text-center fw-bold @(IsDarkMode ? "bg-dark text-warning border-secondary" : "bg-white text-primary")"
+                                           style="height: 24px; font-size: 11px;"
+                                           @bind="item.ProjectTons" @bind:after="NotifyTonsChanged" step="1" min="0.1" />
+                                </td>
+                                <td>@item.AreaPerTon.ToString("F2")</td>
+                                <td class="fw-bold text-success">@item.TotalAreaM2.ToString("F1")</td>
+                                <td>@item.PaintUsageKgPerTon.ToString("F2")</td>
+                                <td class="fw-bold text-warning">@item.TotalPaintKg.ToString("F1")</td>
+                                <td>¥@item.BaseTotalCost.ToString("F0")</td>
+                                <td class="fw-bold text-primary">¥@item.TargetTotalCost.ToString("F0")</td>
+                                <td class="fw-bold @(item.VarianceTotalCost >= 0 ? "text-danger" : "text-success")">
+                                    @(item.VarianceTotalCost >= 0 ? "+" : "")¥@item.VarianceTotalCost.ToString("F0")
+                                </td>
+                                <td>
+                                    <button class="btn btn-xs btn-outline-danger py-0 px-2"
+                                            @onclick="() => ProjectSchedule.Remove(item)" title="移除此行">
+                                        ✕
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot class="@(IsDarkMode ? "table-dark border-top border-secondary" : "table-light border-top") fw-bold">
+                        <tr>
+                            <td colspan="4" class="text-end">工程汇总合计:</td>
+                            <td class="text-warning">@ProjectScheduleSumTons.ToString("F1") t</td>
+                            <td>-</td>
+                            <td class="text-success">@ProjectScheduleSumArea.ToString("F1") m²</td>
+                            <td>-</td>
+                            <td class="text-warning">@ProjectScheduleSumPaintKg.ToString("F1") kg</td>
+                            <td>¥@ProjectScheduleSumBaseCost.ToString("F0")</td>
+                            <td class="text-primary">¥@ProjectScheduleSumTargetCost.ToString("F0")</td>
+                            <td class="@(ProjectScheduleSumVariance >= 0 ? "text-danger" : "text-success")">
+                                @(ProjectScheduleSumVariance >= 0 ? "+" : "")¥@ProjectScheduleSumVariance.ToString("F0")
+                            </td>
+                            <td>-</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            <!-- 调差总结算总括卡片 -->
+            <div class="p-3 rounded border @(IsDarkMode ? "bg-dark border-secondary" : "bg-light border-light-subtle") d-flex flex-wrap align-items-center justify-content-between gap-3">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="p-2 bg-warning rounded-circle text-dark fs-4">⚖️</div>
+                    <div>
+                        <h6 class="fw-bold mb-0">工程防腐调差终审结果:</h6>
+                        <div class="text-xs @(IsDarkMode ? "text-white-50" : "text-muted")">
+                            总吨位 @ProjectScheduleSumTons.ToString("F1") t · 涂装总面积 @ProjectScheduleSumArea.ToString("F1") m² · 油漆采购 @ProjectScheduleSumPaintKg.ToString("F1") kg
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex align-items-center gap-3 flex-wrap">
+                    <div class="text-end">
+                        <div class="text-xs text-muted">基期合同总造价:</div>
+                        <div class="fw-bold fs-6">¥@ProjectScheduleSumBaseCost.ToString("N0")</div>
+                    </div>
+                    <div class="text-end">
+                        <div class="text-xs text-muted">目标期核算总造价:</div>
+                        <div class="fw-bold fs-6 text-primary">¥@ProjectScheduleSumTargetCost.ToString("N0")</div>
+                    </div>
+                    <div class="p-2 px-3 rounded-pill @(ProjectScheduleSumVariance >= 0 ? "bg-danger text-white" : "bg-success text-white") text-center shadow-sm">
+                        <div class="text-xs" style="font-size: 10px;">调差补差总额</div>
+                        <div class="fw-bold fs-5">
+                            @(ProjectScheduleSumVariance >= 0 ? "+" : "")¥@ProjectScheduleSumVariance.ToString("N0")
+                            <span class="fs-6 fw-normal">(@(ProjectScheduleSumBaseCost > 0 ? (ProjectScheduleSumVariance / ProjectScheduleSumBaseCost * 100.0) : 0):F1%)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public string BaselineSnapshotId { get; set; } = "snap_2025_q1";
+    [Parameter] public EventCallback<ChangeEventArgs> OnBaselineSnapshotChanged { get; set; }
+
+    [Parameter] public string TargetSnapshotId { get; set; } = "snap_2026_q1";
+    [Parameter] public EventCallback<ChangeEventArgs> OnTargetSnapshotChanged { get; set; }
+
+    [Parameter] public string BacktrackingMatrixFilter { get; set; } = "plate";
+    [Parameter] public EventCallback<string> BacktrackingMatrixFilterChanged { get; set; }
+
+    [Parameter] public List<CoatingLayerConfig> CurrentLayers { get; set; } = [];
+    [Parameter] public CoatingApplicationMethod CurrentMethod { get; set; } = CoatingApplicationMethod.AirlessSpraying;
+
+    [Parameter] public List<ProjectCoatingScheduleItem> ProjectSchedule { get; set; } = [];
+    [Parameter] public double ProjectScheduleSumTons { get; set; }
+    [Parameter] public double ProjectScheduleSumArea { get; set; }
+    [Parameter] public double ProjectScheduleSumPaintKg { get; set; }
+    [Parameter] public double ProjectScheduleSumBaseCost { get; set; }
+    [Parameter] public double ProjectScheduleSumTargetCost { get; set; }
+    [Parameter] public double ProjectScheduleSumVariance { get; set; }
+
+    [Parameter] public bool IsDarkMode { get; set; } = true;
+
+    [Parameter] public EventCallback OnOpenAddBrandModal { get; set; }
+    [Parameter] public EventCallback<(ProjectCoatingScheduleItem item, string specName)> OnAddScheduleItem { get; set; }
+    [Parameter] public EventCallback<(string specName, SectionType type)> OnApplyProfileToWorkbench { get; set; }
+    [Parameter] public EventCallback OnLoadDemoSchedule { get; set; }
+    [Parameter] public EventCallback OnExportScheduleCsv { get; set; }
+    [Parameter] public EventCallback OnScheduleChanged { get; set; }
+
+    private async Task SetMatrixFilter(string filter)
+    {
+        BacktrackingMatrixFilter = filter;
+        await BacktrackingMatrixFilterChanged.InvokeAsync(filter);
+    }
+
+    private async Task NotifyTonsChanged()
+    {
+        await OnScheduleChanged.InvokeAsync();
+    }
+}
