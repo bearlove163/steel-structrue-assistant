@@ -343,8 +343,8 @@ public class HotDipGalvanizingOptions
     /// <summary>下池打捞锌渣、锌灰及挂锌不均匀损耗率 (%)</summary>
     public double ZincLossRatePercent { get; set; } = 18.0;
 
-    /// <summary>批量构件总长度 (m)</summary>
-    public double ProjectLengthM { get; set; } = 100.0;
+    /// <summary>批量构件总长度 (m，默认按 1 延米基准计价)</summary>
+    public double ProjectLengthM { get; set; } = 1.0;
 }
 
 /// <summary>
