@@ -322,7 +322,7 @@ public static class PaintCoatingCalculator
             new CoatingLayerConfig { BrandId = "Hempel", ModelCode = "47950", LayerType = CoatingLayerType.Intermediate, ProductName = "海虹老人 Hempadur MIO 云铁中间漆", Dft = 80, VolumeSolids = 65, Density = 1.50, LossRate = 25, MaterialPrice = 32, LaborPrice = 12 },
             new CoatingLayerConfig { BrandId = "Jotun", LayerType = CoatingLayerType.Sealer, IsEnabled = false, ProductName = "环氧封闭漆", Dft = 25, VolumeSolids = 45, Density = 1.15, LossRate = 20, MaterialPrice = 42, LaborPrice = 8 },
             new CoatingLayerConfig { BrandId = "Jotun", LayerType = CoatingLayerType.Topcoat, IsEnabled = false, ProductName = "丙烯酸面漆", Dft = 50, VolumeSolids = 55, Density = 1.25, LossRate = 30, MaterialPrice = 42, LaborPrice = 14 },
-            new CoatingLayerConfig { BrandId = "BBMG", ModelCode = "TL-S1520", LayerType = CoatingLayerType.Fireproof, IsEnabled = true, ProductName = "金隅天龙室内超薄膨胀防火涂料 (2.0h)", Dft = 2.2, VolumeSolids = 72, Density = 1.30, LossRate = 30, MaterialPrice = 28, LaborPrice = 30 }
+            new CoatingLayerConfig { BrandId = "BBMG", ModelCode = "TL-S1520", LayerType = CoatingLayerType.Fireproof, IsEnabled = true, ProductName = "金隅天龙室内超薄膨胀防火涂料", Dft = 2.2, VolumeSolids = 72, Density = 1.30, LossRate = 30, MaterialPrice = 28, LaborPrice = 30 }
         ],
 
         "底漆 + 中漆 + 防火涂料 + 面漆" or "商业建筑室内 2.0h 膨胀防火体系" or "底+中+防火+面" =>
@@ -330,7 +330,7 @@ public static class PaintCoatingCalculator
             new CoatingLayerConfig { BrandId = "Hempel", ModelCode = "17360", LayerType = CoatingLayerType.Primer, ProductName = "海虹老人 Hempadur 环氧防锈底漆", Dft = 60, VolumeSolids = 65, Density = 2.20, LossRate = 25, MaterialPrice = 46, LaborPrice = 12 },
             new CoatingLayerConfig { BrandId = "Hempel", ModelCode = "47950", LayerType = CoatingLayerType.Intermediate, ProductName = "海虹老人 Hempadur MIO 云铁中间漆", Dft = 80, VolumeSolids = 65, Density = 1.50, LossRate = 25, MaterialPrice = 32, LaborPrice = 12 },
             new CoatingLayerConfig { BrandId = "Jotun", LayerType = CoatingLayerType.Sealer, IsEnabled = false, ProductName = "环氧封闭漆", Dft = 25, VolumeSolids = 45, Density = 1.15, LossRate = 20, MaterialPrice = 42, LaborPrice = 8 },
-            new CoatingLayerConfig { BrandId = "BBMG", ModelCode = "TL-S1520", LayerType = CoatingLayerType.Fireproof, IsEnabled = true, ProductName = "金隅天龙室内超薄膨胀防火涂料 (2.0h)", Dft = 2.2, VolumeSolids = 72, Density = 1.30, LossRate = 30, MaterialPrice = 28, LaborPrice = 30 },
+            new CoatingLayerConfig { BrandId = "BBMG", ModelCode = "TL-S1520", LayerType = CoatingLayerType.Fireproof, IsEnabled = true, ProductName = "金隅天龙室内超薄膨胀防火涂料", Dft = 2.2, VolumeSolids = 72, Density = 1.30, LossRate = 30, MaterialPrice = 28, LaborPrice = 30 },
             new CoatingLayerConfig { BrandId = "Jotun", ModelCode = "Hardtop XP", LayerType = CoatingLayerType.Topcoat, IsEnabled = true, ProductName = "丙烯酸聚氨酯装饰面漆", Dft = 50, VolumeSolids = 60, Density = 1.30, LossRate = 30, MaterialPrice = 50, LaborPrice = 15 }
         ],
 
@@ -349,7 +349,7 @@ public static class PaintCoatingCalculator
             new CoatingLayerConfig { BrandId = "AkzoNobel", ModelCode = "Intergard 475HS", LayerType = CoatingLayerType.Intermediate, IsEnabled = false, ProductName = "环氧厚浆中间漆", Dft = 80, VolumeSolids = 70, Density = 1.50, LossRate = 25, MaterialPrice = 36, LaborPrice = 12 },
             new CoatingLayerConfig { BrandId = "Jotun", LayerType = CoatingLayerType.Sealer, IsEnabled = false, ProductName = "环氧封闭漆", Dft = 30, VolumeSolids = 45, Density = 1.15, LossRate = 20, MaterialPrice = 42, LaborPrice = 8 },
             new CoatingLayerConfig { BrandId = "Lanling", LayerType = CoatingLayerType.Topcoat, IsEnabled = false, ProductName = "保护面漆", Dft = 50, VolumeSolids = 55, Density = 1.25, LossRate = 30, MaterialPrice = 45, LaborPrice = 15 },
-            new CoatingLayerConfig { BrandId = "BBMG", ModelCode = "TL-H2530", LayerType = CoatingLayerType.Fireproof, IsEnabled = true, ProductName = "金隅天龙室内厚型非膨胀无机防火涂料 (3.0h)", Dft = 25.0, VolumeSolids = 85, Density = 0.65, LossRate = 35, MaterialPrice = 12, LaborPrice = 48 }
+            new CoatingLayerConfig { BrandId = "BBMG", ModelCode = "TL-H2530", LayerType = CoatingLayerType.Fireproof, IsEnabled = true, ProductName = "金隅天龙室内厚型非膨胀无机防火涂料", Dft = 25.0, VolumeSolids = 85, Density = 0.65, LossRate = 35, MaterialPrice = 12, LaborPrice = 48 }
         ],
 
         _ => CreatePreset("标准工业厂房重防腐")

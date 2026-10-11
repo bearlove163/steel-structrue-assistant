@@ -32,10 +32,10 @@
     </div>
 
     <!-- SVG 画布区域 -->
-    <div class="flex-grow-1 position-relative d-flex align-items-center justify-content-center p-2" style="min-height: 420px; background-color: @CanvasBgColor;">
+    <div class="flex-grow-1 position-relative d-flex align-items-center justify-content-center p-2" style="min-height: @MinHeight; background-color: @CanvasBgColor;">
         @if (Result != null && (Result.OuterContour.Count > 0 || Result.IsCircular))
         {
-            <svg viewBox="@SvgViewBox" class="w-100 h-100" style="max-height: 600px; user-select: none;">
+            <svg viewBox="@SvgViewBox" class="w-100 h-100" style="max-height: @MaxSvgHeight; user-select: none;">
                 <defs>
                     <!-- 尺寸箭头标记 -->
                     <marker id="arrow-start" viewBox="0 0 10 10" refX="2" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
@@ -79,6 +79,22 @@
                     <!-- 任意多边形 / 复合截面 -->
                     <path d="@GetSvgPolygonPath(Result.OuterContour, Result.InnerContours)"
                           fill="@SectionFillColor" fill-rule="evenodd" stroke="@SectionStrokeColor" stroke-width="@(StrokeWidth * 1.5)" />
+                }
+
+                <!-- 楼板贴合免涂装面指示标线 -->
+                @if (HighlightTopSurface && Result.TopSurfaceWidth > 0)
+                {
+                    double topZ = Result.Zmax;
+                    double topY1 = Result.Yc - Result.TopSurfaceWidth / 2.0;
+                    double topY2 = Result.Yc + Result.TopSurfaceWidth / 2.0;
+                    <line x1="@ToSvgX(topY1)" y1="@ToSvgY(topZ)" x2="@ToSvgX(topY2)" y2="@ToSvgY(topZ)"
+                          stroke="#f97316" stroke-width="@(StrokeWidth * 3.5)" stroke-dasharray="@(StrokeWidth * 4),@(StrokeWidth * 2)" />
+                    double slabLabelZ = topZ + Math.Max(12.0, BoxHeight * 0.05);
+                    string slabText = $"楼板贴合免喷区 ({Result.TopSurfaceWidth:F0}mm)";
+                    double slabW = GetTextWidthApprox(slabText, FontSize * 0.85);
+                    <rect x="@(ToSvgX(Result.Yc) - slabW / 2.0 - 4)" y="@(ToSvgY(slabLabelZ) - FontSize * 0.65)"
+                          width="@(slabW + 8)" height="@(FontSize * 1.3)" fill="@CanvasBgColor" fill-opacity="0.95" stroke="#f97316" stroke-width="1" rx="3" />
+                    @((MarkupString)$"<text x=\"{ToSvgX(Result.Yc):F1}\" y=\"{ToSvgY(slabLabelZ):F1}\" fill=\"#f97316\" font-size=\"{(FontSize * 0.85):F1}\" font-weight=\"bold\" text-anchor=\"middle\" dominant-baseline=\"middle\">{slabText}</text>")
                 }
 
                 <!-- 应力云图点集展示 (当开启且存在应力计算) -->
@@ -241,6 +257,9 @@
     [Parameter] public SectionPropertiesResult? Result { get; set; }
     [Parameter] public SectionParameters? Parameters { get; set; }
     [Parameter] public bool IsDarkMode { get; set; } = true;
+    [Parameter] public string MinHeight { get; set; } = "360px";
+    [Parameter] public string MaxSvgHeight { get; set; } = "600px";
+    [Parameter] public bool HighlightTopSurface { get; set; } = false;
 
     public bool ShowDimensions { get; set; } = true;
     public bool ShowAxes { get; set; } = true;

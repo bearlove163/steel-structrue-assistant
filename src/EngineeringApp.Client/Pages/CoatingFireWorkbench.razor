@@ -173,7 +173,7 @@
                     <!-- 关键几何尺寸调节 -->
                     <div class="p-2 rounded border mb-3 @(Theme.IsDarkMode ? "bg-dark bg-opacity-50 border-secondary" : "bg-light border-light-subtle")">
                         <div class="text-xs fw-bold text-warning mb-2">📏 截面尺寸微调 (mm)</div>
-                        @if (CurrentParams.Type == SectionType.HBeam || CurrentParams.Type == SectionType.Channel)
+                        @if (CurrentParams.Type == SectionType.HBeam || CurrentParams.Type == SectionType.Channel || CurrentParams.Type == SectionType.Cruciform)
                         {
                             <div class="row g-2 text-xs mb-2">
                                 <div class="col-6">
@@ -253,51 +253,31 @@
                                 </div>
                             </div>
                         }
+                        else if (CurrentParams.Type == SectionType.Rectangle)
+                        {
+                            <div class="row g-2 text-xs mb-2">
+                                <div class="col-6">
+                                    <label class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">截面高度 H</label>
+                                    <input type="number" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                           @bind="CurrentParams.Height" @bind:after="RecalculateAll" step="10" />
+                                </div>
+                                <div class="col-6">
+                                    <label class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">截面宽度 B</label>
+                                    <input type="number" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                           @bind="CurrentParams.Width" @bind:after="RecalculateAll" step="10" />
+                                </div>
+                            </div>
+                        }
                     </div>
 
-                    <!-- 截面 2D SVG 可视化示意图 -->
-                    <div class="p-2 rounded border mb-3 flex-grow-1 d-flex flex-column @(Theme.IsDarkMode ? "bg-dark border-secondary" : "bg-light border-light-subtle")" style="min-height: 220px;">
-                        <div class="d-flex justify-content-between align-items-center mb-1">
-                            <span class="text-xs fw-bold text-info">👁️ 截面轮廓与受漆面形态</span>
-                            <span class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">
-                                橙色顶线: 楼板贴合免喷涂面
-                            </span>
-                        </div>
-                        <div class="flex-grow-1 d-flex align-items-center justify-content-center">
-                            @if (CurrentResult.OuterContour.Count > 0 || CurrentResult.IsCircular)
-                            {
-                                <svg viewBox="-250 -250 500 500" class="w-100 h-100" style="max-height: 220px;">
-                                    <!-- 简易截面轮廓填充 -->
-                                    <rect x="-240" y="-240" width="480" height="480" fill="@(Theme.IsDarkMode ? "#111827" : "#f8fafc")" rx="8" />
-                                    @if (CurrentResult.IsCircular)
-                                    {
-                                        <circle cx="0" cy="0" r="140" fill="#3b82f6" fill-opacity="0.3" stroke="#3b82f6" stroke-width="6" />
-                                        @if (CurrentResult.CircleInnerRadius > 0)
-                                        {
-                                            <circle cx="0" cy="0" r="@(140.0 * (CurrentResult.CircleInnerRadius / CurrentResult.CircleOuterRadius))" fill="@(Theme.IsDarkMode ? "#111827" : "#f8fafc")" stroke="#3b82f6" stroke-width="4" />
-                                        }
-                                    }
-                                    else
-                                    {
-                                        <!-- 多边形外轮廓 -->
-                                        <polygon points="@GetSvgPointsString(CurrentResult.OuterContour)" fill="#3b82f6" fill-opacity="0.35" stroke="#3b82f6" stroke-width="4" />
-                                        @if (CurrentResult.InnerContours.Count > 0)
-                                        {
-                                            @foreach (var inner in CurrentResult.InnerContours)
-                                            {
-                                                <polygon points="@GetSvgPointsString(inner)" fill="@(Theme.IsDarkMode ? "#111827" : "#f8fafc")" stroke="#3b82f6" stroke-width="3" />
-                                            }
-                                        }
-                                    }
-                                    <!-- 顶部楼板贴合指示橙色高亮线 -->
-                                    @if (ExcludeTopSurface)
-                                    {
-                                        <line x1="-120" y1="-145" x2="120" y2="-145" stroke="#f97316" stroke-width="8" stroke-dasharray="8,4" />
-                                        @((MarkupString)"<text x='0' y='-160' fill='#f97316' font-size='16' text-anchor='middle' font-weight='bold'>楼板密贴面 (已扣除)</text>")
-                                    }
-                                </svg>
-                            }
-                        </div>
+                    <!-- CAD 2D 矢量截面视口 (固定标准化视口，与截面特性主页风格完全统一) -->
+                    <div class="mb-3 rounded border overflow-hidden shadow-sm flex-shrink-0" style="height: 330px;">
+                        <SectionSvgCanvas Result="@CurrentResult"
+                                          Parameters="@CurrentParams"
+                                          IsDarkMode="@Theme.IsDarkMode"
+                                          HighlightTopSurface="@ExcludeTopSurface"
+                                          MinHeight="250px"
+                                          MaxSvgHeight="310px" />
                     </div>
 
                     <!-- 截面特性参数卡片 -->
@@ -391,8 +371,8 @@
                             <thead class="@(Theme.IsDarkMode ? "table-secondary table-opacity-25" : "table-light") text-center">
                                 <tr>
                                     <th style="width: 45px;">启用</th>
-                                    <th style="width: 110px;">层次分类</th>
-                                    <th>规格名称 / 品牌型号联动</th>
+                                    <th style="width: 95px;">层次分类</th>
+                                    <th style="min-width: 220px;">规格型号 / 品牌产品联动</th>
                                     <th style="width: 95px;">膜厚 (DFT)</th>
                                     <th style="width: 75px;">固含%</th>
                                     <th style="width: 75px;">比重</th>
@@ -414,23 +394,20 @@
                                             <span class="badge @GetLayerBadgeClass(layer.LayerType)">@layer.GetDisplayName()</span>
                                         </td>
                                         <td>
-                                            <div class="d-flex flex-column gap-1">
-                                                <select class="form-select form-select-sm py-0 @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark")"
-                                                        style="font-size: 11px; height: 26px;"
-                                                        @onchange="(e) => OnSelectProductItem(layer, e)">
-                                                    <option value="">-- 选择全球/国内一线产品库 --</option>
-                                                    @foreach (var prod in PaintProductDatabase.GetByType(layer.LayerType))
-                                                    {
-                                                        <option value="@prod.Name" selected="@(prod.Name == layer.ProductName)">
-                                                            @prod.Name (@prod.Brand) - ¥@prod.MaterialUnitPricePerKg/kg
-                                                        </option>
-                                                    }
-                                                </select>
-                                                <input type="text" class="form-control form-control-sm py-0 @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
-                                                       style="font-size: 11px; height: 24px;"
-                                                       placeholder="自定义名称 / 品牌"
-                                                       @bind="layer.ProductName" @bind:after="RecalculateAll" />
-                                            </div>
+                                            <select class="form-select form-select-sm py-0 @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark")"
+                                                    style="font-size: 11px; height: 28px;"
+                                                    @onchange="(e) => OnSelectProductItem(layer, e)">
+                                                @if (!string.IsNullOrEmpty(layer.ProductName) && !PaintProductDatabase.GetByType(layer.LayerType).Any(p => p.Name == layer.ProductName))
+                                                {
+                                                    <option value="@layer.ProductName" selected>@layer.ProductName</option>
+                                                }
+                                                @foreach (var prod in PaintProductDatabase.GetByType(layer.LayerType))
+                                                {
+                                                    <option value="@prod.Name" selected="@(prod.Name == layer.ProductName)">
+                                                        @prod.Brand: @prod.ModelCode - @prod.Name
+                                                    </option>
+                                                }
+                                            </select>
                                         </td>
                                         <td>
                                             <div class="input-group input-group-sm">
@@ -1165,17 +1142,6 @@
         {
             CopyAlertMessage = "复制失败，请手工选中复制。";
         }
-    }
-
-    private string GetSvgPointsString(List<Point2D> pts)
-    {
-        if (pts.Count == 0) return "";
-        // 缩放到大约 [-150, 150] 视口
-        double maxCoord = pts.SelectMany(p => new[] { Math.Abs(p.Y), Math.Abs(p.Z) }).DefaultIfEmpty(1).Max();
-        if (maxCoord < 1) maxCoord = 1;
-        double scale = 140.0 / maxCoord;
-
-        return string.Join(" ", pts.Select(p => $"{(p.Y * scale):F1},{( -p.Z * scale):F1}"));
     }
 
     private string GetLayerBadgeClass(CoatingLayerType type) => type switch
