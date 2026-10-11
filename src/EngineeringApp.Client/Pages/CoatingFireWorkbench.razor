@@ -102,14 +102,14 @@
         </div>
     </div>
 
-    <!-- ======================= 截面物性全局指标横幅 ======================= -->
-    <div class="@(Theme.IsDarkMode ? "bg-black bg-opacity-40 border-secondary" : "bg-white border-light-subtle shadow-sm") p-2 rounded border mb-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
-        <div class="d-flex align-items-center gap-3 flex-wrap">
+    <!-- ======================= 截面物性全局指标横幅 (统一单行展示) ======================= -->
+    <div class="@(Theme.IsDarkMode ? "bg-black bg-opacity-40 border-secondary" : "bg-white border-light-subtle shadow-sm") p-2 rounded border mb-3 d-flex align-items-center justify-content-between gap-2 flex-nowrap overflow-x-auto text-nowrap">
+        <div class="d-flex align-items-center gap-2 flex-nowrap text-nowrap">
             @if (SectionInputMode == "plate" || CurrentParams.Type == SectionType.Plate)
             {
-                <span class="badge bg-success fs-6 fw-bold">📄 钢板板材规格</span>
+                <span class="badge bg-warning text-dark fs-6 fw-bold">🇨🇳 国标 GB/T</span>
                 <span class="badge bg-primary fs-6 fw-bold font-monospace">@GetFormattedSectionDesignation()</span>
-                <span class="badge @(Theme.IsDarkMode ? "bg-secondary text-white" : "bg-light text-dark border") text-xs">t = @PlateThickness.ToString("0.##") mm</span>
+                <span class="badge @(Theme.IsDarkMode ? "bg-secondary text-white" : "bg-light text-dark border") text-xs">GB/T 709 钢板</span>
             }
             else if (SectionInputMode == "standard")
             {
@@ -137,42 +137,36 @@
             <div class="badge @(Theme.IsDarkMode ? "bg-secondary text-white" : "bg-light text-dark border")" title="截面形状系数 F/V = P/A * 1000，防火涂料升温与厚度设计核心物理量">
                 形状系数 F/V: <b class="text-primary">@CurrentPaintResult.SectionFactorFOverV.ToString("F1")</b> m⁻¹
             </div>
-            @if (CurrentParams.Type == SectionType.Plate)
-            {
-                <div class="badge bg-info text-dark" title="钢板板材双面展开理论比表面积公式 S = 2000 / (7.85 * t) = 254.78 / t">
-                    板材比表面积定律: <b>S = 254.78 / t</b>
-                </div>
-            }
         </div>
-        <div class="d-flex align-items-center gap-2">
+        <div class="d-flex align-items-center gap-2 flex-shrink-0">
             <span class="badge @(SectionInputMode == "plate" ? "bg-success" : (SectionInputMode == "standard" ? "bg-info text-dark" : "bg-primary")) text-xs">
-                @(SectionInputMode == "plate" ? "📄 钢板板材驱动" : (SectionInputMode == "standard" ? "📚 标准库驱动" : "✏️ 自定义参数"))
+                @(SectionInputMode == "plate" ? "📄 钢板板材" : (SectionInputMode == "standard" ? "📚 标准库驱动" : "✏️ 自定义参数"))
             </span>
         </div>
     </div>
 
-    <!-- ======================= 五大专属模块选项卡 ======================= -->
-    <div class="card @(Theme.IsDarkMode ? "bg-black bg-opacity-40 border-secondary" : "bg-white border-light-subtle shadow-sm") p-2 mb-3">
-        <div class="d-flex flex-wrap gap-2">
-            <button class="btn btn-sm py-2 px-3 fw-bold rounded @(ActiveTab == 1 ? "btn-primary shadow-sm" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-75" : "btn-outline-secondary text-dark"))"
+    <!-- ======================= 五大专属模块选项卡 (单行紧凑优化) ======================= -->
+    <div class="card @(Theme.IsDarkMode ? "bg-black bg-opacity-40 border-secondary" : "bg-white border-light-subtle shadow-sm") p-1 mb-3">
+        <div class="d-flex align-items-center gap-1 flex-nowrap overflow-x-auto text-nowrap">
+            <button class="btn btn-sm py-2 px-2 fw-bold rounded flex-fill text-center text-nowrap @(ActiveTab == 1 ? "btn-primary shadow-sm" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-75" : "btn-outline-secondary text-dark"))"
                     @onclick="() => ActiveTab = 1">
-                🎨 选项卡 1：油漆涂装与防火涂料核心算量
+                🎨 1. 涂装与防火算量
             </button>
-            <button class="btn btn-sm py-2 px-3 fw-bold rounded @(ActiveTab == 2 ? "btn-info text-dark shadow-sm" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-75" : "btn-outline-secondary text-dark"))"
+            <button class="btn btn-sm py-2 px-2 fw-bold rounded flex-fill text-center text-nowrap @(ActiveTab == 2 ? "btn-info text-dark shadow-sm" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-75" : "btn-outline-secondary text-dark"))"
                     @onclick="() => ActiveTab = 2">
-                ⚡ 选项卡 2：钢结构热浸镀锌 (HDG) 专项计算台
+                ⚡ 2. 热浸镀锌 (HDG)
             </button>
-            <button class="btn btn-sm py-2 px-3 fw-bold rounded @(ActiveTab == 3 ? "btn-success shadow-sm" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-75" : "btn-outline-secondary text-dark"))"
+            <button class="btn btn-sm py-2 px-2 fw-bold rounded flex-fill text-center text-nowrap @(ActiveTab == 3 ? "btn-success shadow-sm" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-75" : "btn-outline-secondary text-dark"))"
                     @onclick="() => ActiveTab = 3">
-                📐 选项卡 3：详细推导计算过程与工艺断面损耗分析
+                📐 3. 推导与断面损耗
             </button>
-            <button class="btn btn-sm py-2 px-3 fw-bold rounded @(ActiveTab == 4 ? "btn-danger shadow-sm" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-75" : "btn-outline-secondary text-dark"))"
+            <button class="btn btn-sm py-2 px-2 fw-bold rounded flex-fill text-center text-nowrap @(ActiveTab == 4 ? "btn-danger shadow-sm" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-75" : "btn-outline-secondary text-dark"))"
                     @onclick="() => ActiveTab = 4">
-                🏛️ 选项卡 4：全球名牌涂料与标准型号图鉴
+                🏛️ 4. 名牌涂料图鉴
             </button>
-            <button class="btn btn-sm py-2 px-3 fw-bold rounded @(ActiveTab == 5 ? "btn-warning text-dark shadow-sm" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-75" : "btn-outline-secondary text-dark"))"
+            <button class="btn btn-sm py-2 px-2 fw-bold rounded flex-fill text-center text-nowrap @(ActiveTab == 5 ? "btn-warning text-dark shadow-sm" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-75" : "btn-outline-secondary text-dark"))"
                     @onclick="() => ActiveTab = 5">
-                ⏳ 选项卡 5：历史回溯与工程防腐清单调差台
+                ⏳ 5. 价格回溯与清单调差
             </button>
         </div>
     </div>
@@ -259,8 +253,7 @@
                             </div>
                         </div>
                     }
-
-                    @if (SectionInputMode == "custom")
+                    else if (SectionInputMode == "custom")
                     {
                         <!-- 第一块：自定义截面类型选择按钮组 -->
                         <div class="mb-2">

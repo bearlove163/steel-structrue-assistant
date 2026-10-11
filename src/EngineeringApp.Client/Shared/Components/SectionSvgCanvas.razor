@@ -4,91 +4,219 @@
 <div class="cad-viewport-container position-relative w-100 h-100 d-flex flex-column rounded border shadow-sm overflow-hidden @(IsDarkMode ? "bg-dark border-secondary text-white" : "bg-white border-light-subtle text-dark")">
     <!-- SVG 画布区域 (第三块：图形) -->
     <div class="flex-grow-1 position-relative d-flex align-items-center justify-content-center p-2" style="min-height: @MinHeight; background-color: @CanvasBgColor;">
-        @if (Result != null && (Result.OuterContour.Count > 0 || Result.IsCircular))
+        @if (Result != null && (Result.OuterContour.Count > 0 || Result.IsCircular || Parameters?.Type == SectionType.Plate))
         {
-            <svg viewBox="@SvgViewBox" class="w-100 h-100" style="max-height: @MaxSvgHeight; user-select: none;">
-                <defs>
-                    <!-- 尺寸箭头标记 -->
-                    <marker id="arrow-start" viewBox="0 0 10 10" refX="2" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                        <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="@DimensionColor" />
-                    </marker>
-                    <marker id="arrow-end" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-                        <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="@DimensionColor" />
-                    </marker>
-                    <!-- 背景工程网格图案 -->
+            @if (Parameters?.Type == SectionType.Plate)
+            {
+                double t_mm = Math.Max(1.0, Result.TotalHeight);
+                double b_mm = Math.Max(100.0, Result.TotalWidth);
+                double plateW = 380.0;
+                double plateX = 70.0;
+                double centerY = 112.0;
+                double h_px = Math.Clamp(18.0 + (t_mm - 6.0) * 0.45, 18.0, 42.0);
+                double plateTopY = centerY - h_px / 2.0;
+                double plateBotY = centerY + h_px / 2.0;
+                double coatingThk = 7.0;
+                double dimRightX = plateX + plateW + 36.0;
+                double dimBottomY = plateBotY + 44.0;
+                string plateBadgeFill = IsDarkMode ? "#0f172a" : "#f1f5f9";
+                string plateBadgeStroke = IsDarkMode ? "#334155" : "#cbd5e1";
+                string plateTitleColor = IsDarkMode ? "#38bdf8" : "#0284c7";
+                string plateMetricsColor = IsDarkMode ? "#e2e8f0" : "#334155";
+                string plateSteelTextColor = IsDarkMode ? "#f8fafc" : "#0f172a";
+
+                <svg viewBox="0 0 580 230" class="w-100 h-100" style="max-height: @MaxSvgHeight; user-select: none;">
+                    <defs>
+                        <!-- 尺寸箭头标记 -->
+                        <marker id="plate-arrow-start" viewBox="0 0 10 10" refX="2" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                            <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="@DimensionColor" />
+                        </marker>
+                        <marker id="plate-arrow-end" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+                            <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="@DimensionColor" />
+                        </marker>
+                        <!-- 钢板金属质感渐变 -->
+                        <linearGradient id="plateSteelGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" stop-color="@(IsDarkMode ? "#334155" : "#cbd5e1")" />
+                            <stop offset="50%" stop-color="@(IsDarkMode ? "#1e293b" : "#94a3b8")" />
+                            <stop offset="100%" stop-color="@(IsDarkMode ? "#334155" : "#cbd5e1")" />
+                        </linearGradient>
+                        <!-- 防腐涂层绿色渐变 -->
+                        <linearGradient id="plateCoatingGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" stop-color="#10b981" />
+                            <stop offset="50%" stop-color="#34d399" />
+                            <stop offset="100%" stop-color="#10b981" />
+                        </linearGradient>
+                        <!-- 免喷涂斜纹图案 -->
+                        <pattern id="plateHatchStripes" width="8" height="8" patternTransform="rotate(45 0 0)" patternUnits="userSpaceOnUse">
+                            <line x1="0" y1="0" x2="0" y2="8" stroke="#f97316" stroke-width="3" />
+                        </pattern>
+                        <!-- 工程网格图案 -->
+                        @if (ShowGrid)
+                        {
+                            <pattern id="plate-grid-pattern" width="25" height="25" patternUnits="userSpaceOnUse">
+                                <path d="M 25 0 L 0 0 0 25" fill="none" stroke="@GridLineColor" stroke-width="0.8" />
+                            </pattern>
+                        }
+                    </defs>
+
+                    <!-- 画布底板背景 -->
+                    <rect x="0" y="0" width="580" height="230" fill="@CanvasBgColor" />
                     @if (ShowGrid)
                     {
-                        <pattern id="grid-pattern" width="@GridSpacing" height="@GridSpacing" patternUnits="userSpaceOnUse">
-                            <path d="M @GridSpacing 0 L 0 0 0 @GridSpacing" fill="none" stroke="@GridLineColor" stroke-width="@(StrokeWidth * 0.5)" />
-                        </pattern>
+                        <rect x="0" y="0" width="580" height="230" fill="url(#plate-grid-pattern)" />
                     }
-                </defs>
 
-                <!-- 画布底板背景 -->
-                <rect x="@BoxMinX" y="@BoxMinY" width="@BoxWidth" height="@BoxHeight" fill="@CanvasBgColor" />
+                    <!-- 顶部左侧规范铭牌 -->
+                    <rect x="16" y="10" width="168" height="22" rx="4" fill="@plateBadgeFill" stroke="@plateBadgeStroke" stroke-width="1" />
+                    @((MarkupString)$"<text x=\"24\" y=\"25\" fill=\"{plateTitleColor}\" font-size=\"11\" font-weight=\"bold\">🇨🇳 GB/T 709 钢板断面模型</text>")
 
-                <!-- 网格背景 -->
-                @if (ShowGrid)
-                {
-                    <rect x="@BoxMinX" y="@BoxMinY" width="@BoxWidth" height="@BoxHeight" fill="url(#grid-pattern)" />
-                }
+                    <!-- 顶部右侧物性胶囊 -->
+                    <rect x="345" y="10" width="220" height="22" rx="4" fill="@plateBadgeFill" stroke="@plateBadgeStroke" stroke-width="1" />
+                    @((MarkupString)$"<text x=\"353\" y=\"25\" fill=\"{plateMetricsColor}\" font-size=\"10.5\">米重: <tspan fill=\"#f59e0b\" font-weight=\"bold\">{Result.LinearMass:F1}kg</tspan> | 比表面积: <tspan fill=\"#ef4444\" font-weight=\"bold\">{(254.78 / t_mm):F1}m²/t</tspan></text>")
 
-                <!-- 截面主体轮廓填充 -->
-                @if (Result.IsCircular)
-                {
-                    <!-- 圆形 / 空心圆管 -->
-                    <circle cx="@ToSvgX(Result.Yc)" cy="@ToSvgY(Result.Zc)" r="@Result.CircleOuterRadius"
-                            fill="@SectionFillColor" stroke="@SectionStrokeColor" stroke-width="@(StrokeWidth * 1.5)" />
-                    @if (Result.CircleInnerRadius > 0)
-                    {
-                        <circle cx="@ToSvgX(Result.Yc)" cy="@ToSvgY(Result.Zc)" r="@Result.CircleInnerRadius"
-                                fill="@CanvasBgColor" stroke="@SectionStrokeColor" stroke-width="@StrokeWidth" />
-                    }
-                }
-                else
-                {
-                    <!-- 任意多边形 / 复合截面 -->
-                    <path d="@GetSvgPolygonPath(Result.OuterContour, Result.InnerContours)"
-                          fill="@SectionFillColor" fill-rule="evenodd" stroke="@SectionStrokeColor" stroke-width="@(StrokeWidth * 1.5)" />
-                }
-
-                <!-- 楼板贴合免涂装面指示标线 -->
-                @if (HighlightTopSurface && Result.TopSurfaceWidth > 0)
-                {
-                    double topZ = Result.Zmax;
-                    double topY1 = Result.Yc - Result.TopSurfaceWidth / 2.0;
-                    double topY2 = Result.Yc + Result.TopSurfaceWidth / 2.0;
-                    <line x1="@ToSvgX(topY1)" y1="@ToSvgY(topZ)" x2="@ToSvgX(topY2)" y2="@ToSvgY(topZ)"
-                          stroke="#f97316" stroke-width="@(StrokeWidth * 3.5)" stroke-dasharray="@(StrokeWidth * 4),@(StrokeWidth * 2)" />
-                    double slabLabelZ = topZ + FontSize * 1.5;
-                    string slabText = $"楼板贴合免喷区 ({Result.TopSurfaceWidth:F0}mm)";
-                    double slabFontSize = FontSize * 0.85;
-                    double slabW = GetTextWidthApprox(slabText, slabFontSize);
-                    double slabPad = FontSize * 0.3;
-                    <rect x="@(ToSvgX(Result.Yc) - slabW / 2.0 - slabPad)" y="@(ToSvgY(slabLabelZ) - slabFontSize * 0.7)"
-                          width="@(slabW + slabPad * 2.0)" height="@(slabFontSize * 1.4)" fill="@CanvasBgColor" fill-opacity="0.95" stroke="#f97316" stroke-width="@(StrokeWidth * 0.8)" rx="@(FontSize * 0.2)" />
-                    @((MarkupString)$"<text x=\"{ToSvgX(Result.Yc):F1}\" y=\"{ToSvgY(slabLabelZ):F1}\" fill=\"#f97316\" font-size=\"{slabFontSize:F1}\" font-weight=\"bold\" text-anchor=\"middle\" dominant-baseline=\"middle\">{slabText}</text>")
-                }
-
-                <!-- 钢板板材上下双面防腐涂装指示标线 -->
-                @if (Parameters?.Type == SectionType.Plate)
-                {
-                    double topZ = Result.Zmax;
-                    double botZ = Result.Zmin;
-                    <line x1="@ToSvgX(Result.Ymin)" y1="@ToSvgY(topZ)" x2="@ToSvgX(Result.Ymax)" y2="@ToSvgY(topZ)"
-                          stroke="#10b981" stroke-width="@(StrokeWidth * 3.0)" stroke-dasharray="@(StrokeWidth * 4),@(StrokeWidth * 2)" />
-                    <line x1="@ToSvgX(Result.Ymin)" y1="@ToSvgY(botZ)" x2="@ToSvgX(Result.Ymax)" y2="@ToSvgY(botZ)"
-                          stroke="#10b981" stroke-width="@(StrokeWidth * 3.0)" stroke-dasharray="@(StrokeWidth * 4),@(StrokeWidth * 2)" />
+                    <!-- 1. 钢板基体剖面 -->
+                    <rect x="@plateX" y="@plateTopY" width="@plateW" height="@h_px" rx="2"
+                          fill="url(#plateSteelGrad)" stroke="@(IsDarkMode ? "#64748b" : "#475569")" stroke-width="1.6" />
                     
-                    double plateLabelZ = topZ + FontSize * 1.4;
-                    string plateText = $"双面防腐涂装 (t={Result.TotalHeight:F0}mm)";
-                    double plateFontSize = FontSize * 0.85;
-                    double plateW = GetTextWidthApprox(plateText, plateFontSize);
-                    double platePad = FontSize * 0.3;
-                    <rect x="@(ToSvgX(Result.Yc) - plateW / 2.0 - platePad)" y="@(ToSvgY(plateLabelZ) - plateFontSize * 0.7)"
-                          width="@(plateW + platePad * 2.0)" height="@(plateFontSize * 1.4)" fill="@CanvasBgColor" fill-opacity="0.95" stroke="#10b981" stroke-width="@(StrokeWidth * 0.8)" rx="@(FontSize * 0.2)" />
-                    @((MarkupString)$"<text x=\"{ToSvgX(Result.Yc):F1}\" y=\"{ToSvgY(plateLabelZ):F1}\" fill=\"#10b981\" font-size=\"{plateFontSize:F1}\" font-weight=\"bold\" text-anchor=\"middle\" dominant-baseline=\"middle\">{plateText}</text>")
-                }
+                    <!-- 钢板截面中心标记与钢材等级说明 -->
+                    @((MarkupString)$"<text x=\"{(plateX + plateW / 2.0):F1}\" y=\"{(centerY + 3.5):F1}\" fill=\"{plateSteelTextColor}\" font-size=\"11.5\" font-weight=\"bold\" text-anchor=\"middle\" letter-spacing=\"0.5\">钢板基体 (Q355B · t = {t_mm:0.##} mm)</text>")
+
+                    @if (ShowCoatings)
+                    {
+                        <!-- 2. 上表面涂层/免喷涂层析 -->
+                        @if (HighlightTopSurface)
+                        {
+                            <!-- 上表面：贴合免喷涂区 (橙色警示斜纹) -->
+                            <rect x="@plateX" y="@(plateTopY - coatingThk)" width="@plateW" height="@coatingThk"
+                                  fill="url(#plateHatchStripes)" stroke="#f97316" stroke-width="1.2" />
+                            <!-- 上表面免喷标志引线与胶囊 -->
+                            <line x1="@(plateX + plateW * 0.5)" y1="@(plateTopY - coatingThk)" x2="@(plateX + plateW * 0.5)" y2="@(plateTopY - 24)"
+                                  stroke="#f97316" stroke-width="1.2" stroke-dasharray="3,2" />
+                            <rect x="@(plateX + plateW * 0.5 - 120)" y="@(plateTopY - 42)" width="240" height="20" rx="4"
+                                  fill="@(IsDarkMode ? "#1c1917" : "#fff7ed")" stroke="#f97316" stroke-width="1.2" />
+                            @((MarkupString)$"<text x=\"{(plateX + plateW * 0.5):F1}\" y=\"{(plateTopY - 28):F1}\" fill=\"#f97316\" font-size=\"10.5\" font-weight=\"bold\" text-anchor=\"middle\">⊘ 上表面免喷涂区 · 楼板紧密贴合扣除 (0.00 m²/m)</text>")
+                        }
+                        else
+                        {
+                            <!-- 上表面：正常有效涂装层 (绿色高亮) -->
+                            <rect x="@plateX" y="@(plateTopY - coatingThk)" width="@plateW" height="@coatingThk" rx="1"
+                                  fill="url(#plateCoatingGrad)" stroke="#10b981" stroke-width="1.2" />
+                            <!-- 涂层示意引线与胶囊 -->
+                            <line x1="@(plateX + plateW * 0.5)" y1="@(plateTopY - coatingThk)" x2="@(plateX + plateW * 0.5)" y2="@(plateTopY - 24)"
+                                  stroke="#10b981" stroke-width="1.2" stroke-dasharray="3,2" />
+                            <rect x="@(plateX + plateW * 0.5 - 110)" y="@(plateTopY - 42)" width="220" height="20" rx="4"
+                                  fill="@(IsDarkMode ? "#022c22" : "#f0fdf4")" stroke="#10b981" stroke-width="1.2" />
+                            @((MarkupString)$"<text x=\"{(plateX + plateW * 0.5):F1}\" y=\"{(plateTopY - 28):F1}\" fill=\"#10b981\" font-size=\"10.5\" font-weight=\"bold\" text-anchor=\"middle\">↑ 上表面防腐涂装层 (有效喷涂 1.00 m²/m)</text>")
+                        }
+
+                        <!-- 3. 下表面涂层 (标准有效涂装层，绿色高亮) -->
+                        <rect x="@plateX" y="@plateBotY" width="@plateW" height="@coatingThk" rx="1"
+                              fill="url(#plateCoatingGrad)" stroke="#10b981" stroke-width="1.2" />
+                        <!-- 下表面涂层引线与胶囊 -->
+                        <line x1="@(plateX + plateW * 0.5)" y1="@(plateBotY + coatingThk)" x2="@(plateX + plateW * 0.5)" y2="@(plateBotY + 20)"
+                              stroke="#10b981" stroke-width="1.2" stroke-dasharray="3,2" />
+                        <rect x="@(plateX + plateW * 0.5 - 110)" y="@(plateBotY + 18)" width="220" height="20" rx="4"
+                              fill="@(IsDarkMode ? "#022c22" : "#f0fdf4")" stroke="#10b981" stroke-width="1.2" />
+                        @((MarkupString)$"<text x=\"{(plateX + plateW * 0.5):F1}\" y=\"{(plateBotY + 32):F1}\" fill=\"#10b981\" font-size=\"10.5\" font-weight=\"bold\" text-anchor=\"middle\">↓ 下表面防腐涂装层 (有效喷涂 1.00 m²/m)</text>")
+                    }
+
+                    <!-- 4. CAD 尺寸标注 -->
+                    @if (ShowDimensions)
+                    {
+                        <!-- 标称计算板宽 B (水平尺寸线) -->
+                        <line x1="@plateX" y1="@dimBottomY" x2="@(plateX + plateW)" y2="@dimBottomY"
+                              stroke="@DimensionColor" stroke-width="1.2" marker-start="url(#plate-arrow-start)" marker-end="url(#plate-arrow-end)" />
+                        <!-- 尺寸界线 (竖向细虚线) -->
+                        <line x1="@plateX" y1="@plateBotY" x2="@plateX" y2="@(dimBottomY + 5)"
+                              stroke="@DimensionColor" stroke-opacity="0.5" stroke-width="0.8" stroke-dasharray="2,2" />
+                        <line x1="@(plateX + plateW)" y1="@plateBotY" x2="@(plateX + plateW)" y2="@(dimBottomY + 5)"
+                              stroke="@DimensionColor" stroke-opacity="0.5" stroke-width="0.8" stroke-dasharray="2,2" />
+                        <!-- 板宽数值胶囊 -->
+                        <rect x="@(plateX + plateW * 0.5 - 90)" y="@(dimBottomY - 9)" width="180" height="18" rx="3"
+                              fill="@CanvasBgColor" fill-opacity="0.95" stroke="@DimensionColor" stroke-width="0.8" />
+                        @((MarkupString)$"<text x=\"{(plateX + plateW * 0.5):F1}\" y=\"{(dimBottomY + 3.5):F1}\" fill=\"{DimensionTextColor}\" font-size=\"10.5\" font-weight=\"bold\" text-anchor=\"middle\">标称板宽 B = {b_mm:F0} mm (计算单元)</text>")
+
+                        <!-- 板厚 t 标注 (右侧竖向尺寸线) -->
+                        <line x1="@dimRightX" y1="@plateTopY" x2="@dimRightX" y2="@plateBotY"
+                              stroke="@DimensionColor" stroke-width="1.2" marker-start="url(#plate-arrow-start)" marker-end="url(#plate-arrow-end)" />
+                        <!-- 尺寸界线 (横向细虚线) -->
+                        <line x1="@(plateX + plateW)" y1="@plateTopY" x2="@(dimRightX + 5)" y2="@plateTopY"
+                              stroke="@DimensionColor" stroke-opacity="0.5" stroke-width="0.8" stroke-dasharray="2,2" />
+                        <line x1="@(plateX + plateW)" y1="@plateBotY" x2="@(dimRightX + 5)" y2="@plateBotY"
+                              stroke="@DimensionColor" stroke-opacity="0.5" stroke-width="0.8" stroke-dasharray="2,2" />
+                        <!-- 板厚数值胶囊 -->
+                        <rect x="@(dimRightX + 6)" y="@(centerY - 9)" width="82" height="18" rx="3"
+                              fill="@CanvasBgColor" fill-opacity="0.95" stroke="@DimensionColor" stroke-width="0.8" />
+                        @((MarkupString)$"<text x=\"{(dimRightX + 10):F1}\" y=\"{(centerY + 3.5):F1}\" fill=\"{DimensionTextColor}\" font-size=\"10.5\" font-weight=\"bold\">t = {t_mm:0.##} mm</text>")
+                    }
+                </svg>
+            }
+            else
+            {
+                <!-- ================= 标准型钢与任意多边形力学截面矢量图 ================= -->
+                <svg viewBox="@SvgViewBox" class="w-100 h-100" style="max-height: @MaxSvgHeight; user-select: none;">
+                    <defs>
+                        <!-- 尺寸箭头标记 -->
+                        <marker id="arrow-start" viewBox="0 0 10 10" refX="2" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                            <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="@DimensionColor" />
+                        </marker>
+                        <marker id="arrow-end" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+                            <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="@DimensionColor" />
+                        </marker>
+                        <!-- 背景工程网格图案 -->
+                        @if (ShowGrid)
+                        {
+                            <pattern id="grid-pattern" width="@GridSpacing" height="@GridSpacing" patternUnits="userSpaceOnUse">
+                                <path d="M @GridSpacing 0 L 0 0 0 @GridSpacing" fill="none" stroke="@GridLineColor" stroke-width="@(StrokeWidth * 0.5)" />
+                            </pattern>
+                        }
+                    </defs>
+
+                    <!-- 画布底板背景 -->
+                    <rect x="@BoxMinX" y="@BoxMinY" width="@BoxWidth" height="@BoxHeight" fill="@CanvasBgColor" />
+
+                    <!-- 网格背景 -->
+                    @if (ShowGrid)
+                    {
+                        <rect x="@BoxMinX" y="@BoxMinY" width="@BoxWidth" height="@BoxHeight" fill="url(#grid-pattern)" />
+                    }
+
+                    <!-- 截面主体轮廓填充 -->
+                    @if (Result.IsCircular)
+                    {
+                        <!-- 圆形 / 空心圆管 -->
+                        <circle cx="@ToSvgX(Result.Yc)" cy="@ToSvgY(Result.Zc)" r="@Result.CircleOuterRadius"
+                                fill="@SectionFillColor" stroke="@SectionStrokeColor" stroke-width="@(StrokeWidth * 1.5)" />
+                        @if (Result.CircleInnerRadius > 0)
+                        {
+                            <circle cx="@ToSvgX(Result.Yc)" cy="@ToSvgY(Result.Zc)" r="@Result.CircleInnerRadius"
+                                    fill="@CanvasBgColor" stroke="@SectionStrokeColor" stroke-width="@StrokeWidth" />
+                        }
+                    }
+                    else
+                    {
+                        <!-- 任意多边形 / 复合截面 -->
+                        <path d="@GetSvgPolygonPath(Result.OuterContour, Result.InnerContours)"
+                              fill="@SectionFillColor" fill-rule="evenodd" stroke="@SectionStrokeColor" stroke-width="@(StrokeWidth * 1.5)" />
+                    }
+
+                    <!-- 楼板贴合免涂装面指示标线 -->
+                    @if (HighlightTopSurface && Result.TopSurfaceWidth > 0)
+                    {
+                        double topZ = Result.Zmax;
+                        double topY1 = Result.Yc - Result.TopSurfaceWidth / 2.0;
+                        double topY2 = Result.Yc + Result.TopSurfaceWidth / 2.0;
+                        <line x1="@ToSvgX(topY1)" y1="@ToSvgY(topZ)" x2="@ToSvgX(topY2)" y2="@ToSvgY(topZ)"
+                              stroke="#f97316" stroke-width="@(StrokeWidth * 3.5)" stroke-dasharray="@(StrokeWidth * 4),@(StrokeWidth * 2)" />
+                        double slabLabelZ = topZ + FontSize * 1.5;
+                        string slabText = $"楼板贴合免喷区 ({Result.TopSurfaceWidth:F0}mm)";
+                        double slabFontSize = FontSize * 0.85;
+                        double slabW = GetTextWidthApprox(slabText, slabFontSize);
+                        double slabPad = FontSize * 0.3;
+                        <rect x="@(ToSvgX(Result.Yc) - slabW / 2.0 - slabPad)" y="@(ToSvgY(slabLabelZ) - slabFontSize * 0.7)"
+                              width="@(slabW + slabPad * 2.0)" height="@(slabFontSize * 1.4)" fill="@CanvasBgColor" fill-opacity="0.95" stroke="#f97316" stroke-width="@(StrokeWidth * 0.8)" rx="@(FontSize * 0.2)" />
+                        @((MarkupString)$"<text x=\"{ToSvgX(Result.Yc):F1}\" y=\"{ToSvgY(slabLabelZ):F1}\" fill=\"#f97316\" font-size=\"{slabFontSize:F1}\" font-weight=\"bold\" text-anchor=\"middle\" dominant-baseline=\"middle\">{slabText}</text>")
+                    }
 
                 <!-- 应力云图点集展示 (当开启且存在应力计算) -->
                 @if (ShowStressMap && Result.StressResult != null && Result.StressResult.StressSamplePoints.Count > 0)
@@ -250,6 +378,7 @@
                     @((MarkupString)$"<text x=\"{hTx:F1}\" y=\"{hTy:F1}\" fill=\"{DimensionTextColor}\" font-size=\"{FontSize:F1}\" font-weight=\"bold\" dominant-baseline=\"middle\">{hText}</text>")
                 }
             </svg>
+            }
         }
         else
         {
@@ -260,25 +389,45 @@
         }
     </div>
 
-    <!-- 最后一块：图形标注的选项 (单行居中，无多余标记及复位按钮) -->
-    <div class="cad-toolbar d-flex align-items-center justify-content-center gap-3 gap-md-4 px-3 py-2 border-top text-nowrap @(IsDarkMode ? "bg-black bg-opacity-50 border-secondary text-white" : "bg-light border-light-subtle text-dark") text-xs">
-        <div class="form-check form-switch m-0 d-flex align-items-center gap-1 text-nowrap">
-            <input class="form-check-input" type="checkbox" id="showDims" @bind="ShowDimensions">
-            <label class="form-check-label text-nowrap @(IsDarkMode ? "text-white-75" : "text-muted")" for="showDims">标注</label>
+    <!-- 底部控制栏：根据截面类型自适应呈现 (钢板专属 vs 型钢力学) -->
+    @if (Parameters?.Type == SectionType.Plate)
+    {
+        <div class="cad-toolbar d-flex align-items-center justify-content-center gap-3 gap-md-4 px-3 py-2 border-top text-nowrap @(IsDarkMode ? "bg-black bg-opacity-50 border-secondary text-white" : "bg-light border-light-subtle text-dark") text-xs">
+            <div class="form-check form-switch m-0 d-flex align-items-center gap-1 text-nowrap">
+                <input class="form-check-input" type="checkbox" id="plateDims" @bind="ShowDimensions">
+                <label class="form-check-label text-nowrap @(IsDarkMode ? "text-white-75" : "text-muted")" for="plateDims">尺寸标注</label>
+            </div>
+            <div class="form-check form-switch m-0 d-flex align-items-center gap-1 text-nowrap">
+                <input class="form-check-input" type="checkbox" id="plateCoating" @bind="ShowCoatings">
+                <label class="form-check-label text-nowrap @(IsDarkMode ? "text-white-75" : "text-muted")" for="plateCoating">涂层层析</label>
+            </div>
+            <div class="form-check form-switch m-0 d-flex align-items-center gap-1 text-nowrap">
+                <input class="form-check-input" type="checkbox" id="plateGrid" @bind="ShowGrid">
+                <label class="form-check-label text-nowrap @(IsDarkMode ? "text-white-75" : "text-muted")" for="plateGrid">工程网格</label>
+            </div>
         </div>
-        <div class="form-check form-switch m-0 d-flex align-items-center gap-1 text-nowrap">
-            <input class="form-check-input" type="checkbox" id="showAxes" @bind="ShowAxes">
-            <label class="form-check-label text-nowrap @(IsDarkMode ? "text-white-75" : "text-muted")" for="showAxes">形心/主轴</label>
+    }
+    else
+    {
+        <div class="cad-toolbar d-flex align-items-center justify-content-center gap-3 gap-md-4 px-3 py-2 border-top text-nowrap @(IsDarkMode ? "bg-black bg-opacity-50 border-secondary text-white" : "bg-light border-light-subtle text-dark") text-xs">
+            <div class="form-check form-switch m-0 d-flex align-items-center gap-1 text-nowrap">
+                <input class="form-check-input" type="checkbox" id="showDims" @bind="ShowDimensions">
+                <label class="form-check-label text-nowrap @(IsDarkMode ? "text-white-75" : "text-muted")" for="showDims">标注</label>
+            </div>
+            <div class="form-check form-switch m-0 d-flex align-items-center gap-1 text-nowrap">
+                <input class="form-check-input" type="checkbox" id="showAxes" @bind="ShowAxes">
+                <label class="form-check-label text-nowrap @(IsDarkMode ? "text-white-75" : "text-muted")" for="showAxes">形心/主轴</label>
+            </div>
+            <div class="form-check form-switch m-0 d-flex align-items-center gap-1 text-nowrap">
+                <input class="form-check-input" type="checkbox" id="showStress" @bind="ShowStressMap">
+                <label class="form-check-label text-nowrap @(IsDarkMode ? "text-white-75" : "text-muted")" for="showStress">中和轴/应力</label>
+            </div>
+            <div class="form-check form-switch m-0 d-flex align-items-center gap-1 text-nowrap">
+                <input class="form-check-input" type="checkbox" id="showGrid" @bind="ShowGrid">
+                <label class="form-check-label text-nowrap @(IsDarkMode ? "text-white-75" : "text-muted")" for="showGrid">网格</label>
+            </div>
         </div>
-        <div class="form-check form-switch m-0 d-flex align-items-center gap-1 text-nowrap">
-            <input class="form-check-input" type="checkbox" id="showStress" @bind="ShowStressMap">
-            <label class="form-check-label text-nowrap @(IsDarkMode ? "text-white-75" : "text-muted")" for="showStress">中和轴/应力</label>
-        </div>
-        <div class="form-check form-switch m-0 d-flex align-items-center gap-1 text-nowrap">
-            <input class="form-check-input" type="checkbox" id="showGrid" @bind="ShowGrid">
-            <label class="form-check-label text-nowrap @(IsDarkMode ? "text-white-75" : "text-muted")" for="showGrid">网格</label>
-        </div>
-    </div>
+    }
 </div>
 
 @code {
@@ -288,6 +437,8 @@
     [Parameter] public string MinHeight { get; set; } = "260px";
     [Parameter] public string MaxSvgHeight { get; set; } = "320px";
     [Parameter] public bool HighlightTopSurface { get; set; } = false;
+
+    public bool ShowCoatings { get; set; } = true;
 
     public bool ShowDimensions { get; set; } = true;
     public bool ShowAxes { get; set; } = true;
