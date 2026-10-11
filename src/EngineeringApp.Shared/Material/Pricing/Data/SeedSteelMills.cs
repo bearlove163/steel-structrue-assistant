@@ -143,18 +143,18 @@ public static class SeedSteelMills
         var match = mills.FirstOrDefault(m => string.Equals(m.Id, id, StringComparison.OrdinalIgnoreCase));
         if (match != null) return match;
 
-        // 2. 尝试按历史代码映射（如 Baosteel 映射至 宝钢股份）
+        // 2. 尝试按历史代码映射（如 Baosteel 映射至 宝钢股份，或 SUP-MILL-001 映射至 Baosteel）
         var aliasMatch = id.ToLowerInvariant() switch
         {
-            "baosteel" => mills.FirstOrDefault(m => m.Name.Contains("宝钢") || m.ShortName.Contains("宝钢")),
-            "nisco" => mills.FirstOrDefault(m => m.Name.Contains("南钢") || m.ShortName.Contains("南钢")),
-            "jinxi" => mills.FirstOrDefault(m => m.Name.Contains("津西") || m.ShortName.Contains("津西")),
-            "masteel" => mills.FirstOrDefault(m => m.Name.Contains("马钢") || m.ShortName.Contains("马钢")),
-            "shagang" => mills.FirstOrDefault(m => m.Name.Contains("沙钢") || m.ShortName.Contains("沙钢")),
-            "ansteel" => mills.FirstOrDefault(m => m.Name.Contains("鞍钢") || m.ShortName.Contains("鞍钢")),
-            "xiangsteel" => mills.FirstOrDefault(m => m.Name.Contains("湘钢") || m.ShortName.Contains("湘钢")),
-            "wisco" => mills.FirstOrDefault(m => m.Name.Contains("武钢") || m.ShortName.Contains("武钢")),
-            "generalmill" => mills.FirstOrDefault(m => m.Name.Contains("民营") || m.ShortName.Contains("民营")),
+            "baosteel" or "sup-mill-001" => mills.FirstOrDefault(m => m.Id == "Baosteel" || m.Name.Contains("宝钢") || m.ShortName.Contains("宝钢")),
+            "nisco" or "sup-mill-002" => mills.FirstOrDefault(m => m.Id == "NISCO" || m.Name.Contains("南钢") || m.ShortName.Contains("南钢")),
+            "jinxi" or "sup-mill-003" => mills.FirstOrDefault(m => m.Id == "Jinxi" || m.Name.Contains("津西") || m.ShortName.Contains("津西")),
+            "masteel" or "sup-mill-004" => mills.FirstOrDefault(m => m.Id == "MaSteel" || m.Name.Contains("马钢") || m.ShortName.Contains("马钢")),
+            "shagang" or "sup-mill-005" => mills.FirstOrDefault(m => m.Id == "Shagang" || m.Name.Contains("沙钢") || m.ShortName.Contains("沙钢")),
+            "ansteel" or "sup-mill-006" => mills.FirstOrDefault(m => m.Id == "Ansteel" || m.Name.Contains("鞍钢") || m.ShortName.Contains("鞍钢")),
+            "xiangsteel" or "sup-mill-007" => mills.FirstOrDefault(m => m.Id == "Xiangsteel" || m.Name.Contains("湘钢") || m.ShortName.Contains("湘钢")),
+            "wisco" or "sup-mill-008" => mills.FirstOrDefault(m => m.Id == "WISCO" || m.Name.Contains("武钢") || m.ShortName.Contains("武钢")),
+            "generalmill" or "sup-mill-009" => mills.FirstOrDefault(m => m.Id == "GeneralMill" || m.Name.Contains("民营") || m.ShortName.Contains("民营")),
             _ => null
         };
         if (aliasMatch != null) return aliasMatch;

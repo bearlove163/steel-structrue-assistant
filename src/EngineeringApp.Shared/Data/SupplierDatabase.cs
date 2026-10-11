@@ -603,17 +603,35 @@ public static class SupplierDatabase
     {
         var mills = _dynamicSuppliers
             .Where(s => s.Category == SupplierCategory.SteelMill)
-            .Select(s => new SteelMillBrand
+            .Select(s =>
             {
-                Id = s.Code, // 以系统唯一代码作为主键，如 SUP-MILL-001
-                Name = s.Name,
-                ShortName = s.ShortName,
-                ProductionBase = s.CityRegion,
-                Tier = s.BenchmarkPremiumPerTon > 100 ? 1 : (s.BenchmarkPremiumPerTon >= 0 ? 2 : 3),
-                BrandPremiumPerTon = s.BenchmarkPremiumPerTon,
-                SpecialtyDescription = $"{s.SubCategory} - {s.Remarks}",
-                SupportsThirdPartyCertification = true,
-                IsRecommended = s.CooperationStatus == "战略合作" || s.CooperationStatus == "优先推荐"
+                // 将标准前缀映射到历史标识，实现历史表单选择的 100% 丝滑兼容
+                string mappedId = s.Code switch
+                {
+                    "SUP-MILL-001" => "Baosteel",
+                    "SUP-MILL-002" => "NISCO",
+                    "SUP-MILL-003" => "Jinxi",
+                    "SUP-MILL-004" => "MaSteel",
+                    "SUP-MILL-005" => "Shagang",
+                    "SUP-MILL-006" => "Ansteel",
+                    "SUP-MILL-007" => "Xiangsteel",
+                    "SUP-MILL-008" => "WISCO",
+                    "SUP-MILL-009" => "GeneralMill",
+                    _ => s.Code
+                };
+
+                return new SteelMillBrand
+                {
+                    Id = mappedId,
+                    Name = s.Name,
+                    ShortName = s.ShortName,
+                    ProductionBase = s.CityRegion,
+                    Tier = s.BenchmarkPremiumPerTon > 100 ? 1 : (s.BenchmarkPremiumPerTon >= 0 ? 2 : 3),
+                    BrandPremiumPerTon = s.BenchmarkPremiumPerTon,
+                    SpecialtyDescription = $"{s.SubCategory} - {s.Remarks}",
+                    SupportsThirdPartyCertification = true,
+                    IsRecommended = s.CooperationStatus == "战略合作" || s.CooperationStatus == "优先推荐"
+                };
             })
             .ToList();
 

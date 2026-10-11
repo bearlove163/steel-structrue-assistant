@@ -207,14 +207,18 @@ public class SupplierDatabaseTests
         Assert.NotNull(baosteel);
         Assert.Equal(200.0, baosteel.BrandPremiumPerTon);
 
-        // 2. 验证 SeedSteelMills.AllMills 动态获取供应商库的钢厂
+        // 2. 验证 SeedSteelMills.AllMills 包含宝钢与各主流钢厂
         var allMills = SeedSteelMills.AllMills;
-        Assert.Contains(allMills, m => m.Id == "SUP-MILL-001");
+        Assert.Contains(allMills, m => m.Id == "Baosteel" || m.Name.Contains("宝钢"));
 
-        // 3. 验证 SeedSteelMills.GetById 支持历史 ID "Baosteel" 映射至供应商库的宝钢
+        // 3. 验证 SeedSteelMills.GetById 支持历史 ID "Baosteel" 及系统唯一编号 "SUP-MILL-001"
         var millById = SeedSteelMills.GetById("Baosteel");
         Assert.NotNull(millById);
         Assert.Equal(200.0, millById.BrandPremiumPerTon);
+
+        var millByCode = SeedSteelMills.GetById("SUP-MILL-001");
+        Assert.NotNull(millByCode);
+        Assert.Equal(200.0, millByCode.BrandPremiumPerTon);
 
         // 4. 验证在供应商库中动态新增一家新钢厂，估值引擎能即时识别其基准溢价
         var newMill = new SupplierItem
