@@ -299,6 +299,7 @@ public class SupplierEntity
     public string CityRegion { get; set; } = "";
     public string CooperationStatus { get; set; } = "合格在册";
     public string Remarks { get; set; } = "";
+    public double BenchmarkPremiumPerTon { get; set; } = 0.0;
     public DateTime CreatedAt { get; set; } = DateTime.Now;
     public DateTime UpdatedAt { get; set; } = DateTime.Now;
 
@@ -316,6 +317,7 @@ public class SupplierEntity
         CityRegion = CityRegion,
         CooperationStatus = CooperationStatus,
         Remarks = Remarks,
+        BenchmarkPremiumPerTon = BenchmarkPremiumPerTon,
         CreatedAt = CreatedAt,
         UpdatedAt = UpdatedAt
     };
@@ -334,6 +336,7 @@ public class SupplierEntity
         CityRegion = item.CityRegion,
         CooperationStatus = item.CooperationStatus,
         Remarks = item.Remarks,
+        BenchmarkPremiumPerTon = item.BenchmarkPremiumPerTon,
         CreatedAt = item.CreatedAt,
         UpdatedAt = item.UpdatedAt
     };

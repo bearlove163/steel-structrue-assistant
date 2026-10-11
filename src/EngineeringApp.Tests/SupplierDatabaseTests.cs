@@ -196,4 +196,60 @@ public class SupplierDatabaseTests
         };
         Assert.Equal(24, quote.SupplierId);
     }
+
+    [Fact]
+    public void Test_SteelMill_Pricing_Engine_Dynamic_Integration()
+    {
+        // 1. 验证 SupplierDatabase.GetSteelMillsAsBrands() 成功将供应商库的钢厂转换为 SteelMillBrand
+        var brands = SupplierDatabase.GetSteelMillsAsBrands();
+        Assert.NotEmpty(brands);
+        var baosteel = brands.FirstOrDefault(b => b.Name.Contains("宝钢"));
+        Assert.NotNull(baosteel);
+        Assert.Equal(200.0, baosteel.BrandPremiumPerTon);
+
+        // 2. 验证 SeedSteelMills.AllMills 动态获取供应商库的钢厂
+        var allMills = SeedSteelMills.AllMills;
+        Assert.Contains(allMills, m => m.Id == "SUP-MILL-001");
+
+        // 3. 验证 SeedSteelMills.GetById 支持历史 ID "Baosteel" 映射至供应商库的宝钢
+        var millById = SeedSteelMills.GetById("Baosteel");
+        Assert.NotNull(millById);
+        Assert.Equal(200.0, millById.BrandPremiumPerTon);
+
+        // 4. 验证在供应商库中动态新增一家新钢厂，估值引擎能即时识别其基准溢价
+        var newMill = new SupplierItem
+        {
+            Name = "沙钢新特板智造基地",
+            ShortName = "沙钢特板",
+            Category = SupplierCategory.SteelMill,
+            SubCategory = "超宽中厚板",
+            CityRegion = "江苏张家港",
+            BenchmarkPremiumPerTon = 110.0
+        };
+        SupplierDatabase.AddSupplier(newMill);
+
+        try
+        {
+            var dynamicMill = SeedSteelMills.GetById(newMill.Code);
+            Assert.NotNull(dynamicMill);
+            Assert.Equal("沙钢新特板智造基地", dynamicMill.Name);
+            Assert.Equal(110.0, dynamicMill.BrandPremiumPerTon);
+
+            // 5. 验证 PlatePricingRuleEngine 自动调用新钢厂并计入溢价
+            var result = PlatePricingRuleEngine.Calculate(new PlatePricingParameters
+            {
+                Standard = StandardSystem.GB,
+                Grade = EngineeringApp.Shared.Material.SteelGrade.Q355B,
+                ThicknessMm = 20,
+                SteelMillId = newMill.Code
+            });
+            Assert.Equal(110.0, result.BenchmarkMillPremium);
+            Assert.Equal(110.0, result.MillPremiumPerTon);
+            Assert.Contains("沙钢新特板智造基地", result.FullDescription);
+        }
+        finally
+        {
+            SupplierDatabase.RemoveSupplier(newMill.Id);
+        }
+    }
 }

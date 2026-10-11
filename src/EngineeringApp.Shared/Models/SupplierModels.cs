@@ -77,6 +77,9 @@ public class SupplierItem
     /// <summary>资质等级、产能规模、主营优势及特别说明</summary>
     public string Remarks { get; set; } = "";
 
+    /// <summary>钢厂品牌基准溢价 (元/吨，用于估值引擎自动核算，如 +200, +150, +40)</summary>
+    public double BenchmarkPremiumPerTon { get; set; } = 0.0;
+
     /// <summary>入库建档时间</summary>
     public DateTime CreatedAt { get; set; } = DateTime.Now;
 

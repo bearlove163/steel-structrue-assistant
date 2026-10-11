@@ -281,8 +281,14 @@
                                 </td>
                                 <td>
                                     <div class="fw-bold @(Theme.IsDarkMode ? "text-white" : "text-dark")">@sup.Name</div>
-                                    <div class="text-xs text-secondary">
-                                        简称: <span class="fw-semibold text-primary">@sup.ShortName</span>
+                                    <div class="text-xs text-secondary d-flex align-items-center gap-1">
+                                        <span>简称: <strong class="text-primary">@sup.ShortName</strong></span>
+                                        @if (sup.Category == SupplierCategory.SteelMill)
+                                        {
+                                            <span class="badge @(sup.BenchmarkPremiumPerTon > 0 ? "bg-warning text-dark" : (sup.BenchmarkPremiumPerTon < 0 ? "bg-success" : "bg-secondary")) px-1 py-0">
+                                                基准溢价: @(sup.BenchmarkPremiumPerTon >= 0 ? "+" : "")@sup.BenchmarkPremiumPerTon 元/t
+                                            </span>
+                                        }
                                     </div>
                                 </td>
                                 <td>
@@ -359,9 +365,15 @@
 
                             <!-- 企业核心信息 -->
                             <h6 class="fw-bold mb-1 text-truncate" title="@sup.Name">@sup.Name</h6>
-                            <div class="text-xs text-secondary mb-2 d-flex justify-content-between">
+                            <div class="text-xs text-secondary mb-2 d-flex flex-wrap align-items-center justify-content-between gap-1">
                                 <span>简称: <strong class="text-primary">@sup.ShortName</strong></span>
                                 <span class="font-monospace text-muted">@sup.Code</span>
+                                @if (sup.Category == SupplierCategory.SteelMill)
+                                {
+                                    <span class="badge @(sup.BenchmarkPremiumPerTon > 0 ? "bg-warning text-dark" : (sup.BenchmarkPremiumPerTon < 0 ? "bg-success" : "bg-secondary")) px-1 py-0">
+                                        溢价: @(sup.BenchmarkPremiumPerTon >= 0 ? "+" : "")@sup.BenchmarkPremiumPerTon 元/t
+                                    </span>
+                                }
                             </div>
 
                             <!-- 业务与产品标签 -->
@@ -504,10 +516,24 @@
                             </div>
                         </div>
 
-                        <div class="mb-2">
-                            <label class="form-label fw-bold mb-1">主要生产基地 / 常驻城市 / 供货辐射区域:</label>
-                            <input type="text" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "")"
-                                   placeholder="如 上海宝山 / 广东湛江 / 华东枢纽仓" @bind="EditingSupplier.CityRegion" />
+                        <div class="row g-2 mb-2">
+                            <div class="col-md-7">
+                                <label class="form-label fw-bold mb-1">主要生产基地 / 常驻城市 / 供货辐射区域:</label>
+                                <input type="text" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "")"
+                                       placeholder="如 上海宝山 / 广东湛江 / 华东枢纽仓" @bind="EditingSupplier.CityRegion" />
+                            </div>
+                            <div class="col-md-5">
+                                <label class="form-label fw-bold mb-1">
+                                    @(EditingSupplier.Category == SupplierCategory.SteelMill ? "★ 钢厂基准品牌溢价 (元/吨):" : "基准价格浮动/溢价参考 (元/吨):")
+                                </label>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text @(Theme.IsDarkMode ? "bg-dark text-white-50 border-secondary" : "bg-light text-muted")">¥</span>
+                                    <input type="number" step="10" class="form-control form-control-sm @(EditingSupplier.Category == SupplierCategory.SteelMill ? "fw-bold text-primary" : "") @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "")"
+                                           placeholder="0" @bind="EditingSupplier.BenchmarkPremiumPerTon" />
+                                    <span class="input-group-text @(Theme.IsDarkMode ? "bg-dark text-white-50 border-secondary" : "bg-light text-muted")">元/t</span>
+                                </div>
+                                <span class="text-xs text-muted">与材料五维估值引擎实时联动自动核算</span>
+                            </div>
                         </div>
 
                         <div class="mb-2">

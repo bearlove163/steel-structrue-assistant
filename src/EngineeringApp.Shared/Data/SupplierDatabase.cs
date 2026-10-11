@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using EngineeringApp.Shared.Models;
+using EngineeringApp.Shared.Material.Pricing;
 
 namespace EngineeringApp.Shared.Data;
 
@@ -16,8 +18,8 @@ public static class SupplierDatabase
         {
             Id = 1,
             Code = "SUP-MILL-001",
-            Name = "宝山钢铁股份有限公司 (宝武集团)",
-            ShortName = "宝钢股份",
+            Name = "宝山钢铁股份有限公司 (宝钢股份/宝武集团)",
+            ShortName = "宝钢",
             Category = SupplierCategory.SteelMill,
             SubCategory = "中厚板/TMCP控轧/高建钢/Z向特厚板",
             ContactPerson = "王志强 (直供部处长)",
@@ -25,7 +27,8 @@ public static class SupplierDatabase
             Email = "direct_sales@baosteel.com",
             CityRegion = "上海宝山 / 广东湛江",
             CooperationStatus = "战略合作",
-            Remarks = "超高层公建与国家重大基建指定首选钢厂，探伤保级率最高，Z35级特厚板标杆"
+            Remarks = "超高层公建与国家重大基建指定首选钢厂，探伤保级率最高，Z35级特厚板标杆",
+            BenchmarkPremiumPerTon = 200.0
         },
         new SupplierItem
         {
@@ -40,7 +43,8 @@ public static class SupplierDatabase
             Email = "sales@nisco.cn",
             CityRegion = "江苏南京",
             CooperationStatus = "战略合作",
-            Remarks = "全国中厚板特钢龙头，高层建筑结构用钢Q390GJ/Q420GJ供货量领先"
+            Remarks = "全国中厚板特钢龙头，高层建筑结构用钢Q390GJ/Q420GJ供货量领先",
+            BenchmarkPremiumPerTon = 150.0
         },
         new SupplierItem
         {
@@ -55,7 +59,8 @@ public static class SupplierDatabase
             Email = "jinxi_steel@jinxi.com",
             CityRegion = "河北唐山迁西",
             CooperationStatus = "合格在册",
-            Remarks = "中国热轧H型钢规格最齐全的型钢专业厂，大盘型钢定价基准钢厂"
+            Remarks = "中国热轧H型钢规格最齐全的型钢专业厂，大盘型钢定价基准钢厂",
+            BenchmarkPremiumPerTon = 40.0
         },
         new SupplierItem
         {
@@ -70,7 +75,8 @@ public static class SupplierDatabase
             Email = "sales@masteel.com.cn",
             CityRegion = "安徽马鞍山",
             CooperationStatus = "优先推荐",
-            Remarks = "国内第一条重型H型钢生产线，全截面覆盖欧标美标国标轧制"
+            Remarks = "国内第一条重型H型钢生产线，全截面覆盖欧标美标国标轧制",
+            BenchmarkPremiumPerTon = 80.0
         },
         new SupplierItem
         {
@@ -85,13 +91,14 @@ public static class SupplierDatabase
             Email = "shagang_group@shagang.com",
             CityRegion = "江苏张家港",
             CooperationStatus = "合格在册",
-            Remarks = "特大型民营钢铁联合企业，普碳热轧卷板现货流通量巨大，交期灵活"
+            Remarks = "特大型民营钢铁联合企业，普碳热轧卷板现货流通量巨大，交期灵活",
+            BenchmarkPremiumPerTon = 0.0
         },
         new SupplierItem
         {
             Id = 6,
             Code = "SUP-MILL-006",
-            Name = "鞍钢股份有限公司",
+            Name = "鞍钢股份有限公司 (本钢集团)",
             ShortName = "鞍钢股份",
             Category = SupplierCategory.SteelMill,
             SubCategory = "极厚钢板/桥梁船用钢/低温韧性钢",
@@ -100,7 +107,56 @@ public static class SupplierDatabase
             Email = "angang_heavy@ansteel.cn",
             CityRegion = "辽宁鞍山 / 营口鲅鱼圈",
             CooperationStatus = "优先推荐",
-            Remarks = "东北特厚板与低温高韧性钢核心研发生产基地，具备超大宽厚板轧制实力"
+            Remarks = "东北特厚板与低温高韧性钢核心研发生产基地，具备超大宽厚板轧制实力",
+            BenchmarkPremiumPerTon = 80.0
+        },
+        new SupplierItem
+        {
+            Id = 7,
+            Code = "SUP-MILL-007",
+            Name = "湖南华菱湘潭钢铁有限公司 (湘钢)",
+            ShortName = "华菱湘钢",
+            Category = SupplierCategory.SteelMill,
+            SubCategory = "超宽厚板/高层建筑抗震钢/风电塔筒特厚板",
+            ContactPerson = "谭经理 (销售处)",
+            ContactPhone = "0731-58652222",
+            Email = "xiangsteel@hnsteel.cn",
+            CityRegion = "湖南湘潭",
+            CooperationStatus = "合格在册",
+            Remarks = "超宽厚板与海工高强钢龙头基地，高层抗震结构与桥梁专用板",
+            BenchmarkPremiumPerTon = 120.0
+        },
+        new SupplierItem
+        {
+            Id = 8,
+            Code = "SUP-MILL-008",
+            Name = "武汉钢铁有限公司 (宝武武钢)",
+            ShortName = "武钢有限",
+            Category = SupplierCategory.SteelMill,
+            SubCategory = "低合金高强板/结构重轨/桥梁耐候钢",
+            ContactPerson = "严主任 (华中直销中心)",
+            ContactPhone = "027-86802222",
+            Email = "wisco_sales@baosteel.com",
+            CityRegion = "湖北武汉",
+            CooperationStatus = "合格在册",
+            Remarks = "华中地区板材与重轨核心生产基地，桥梁工程结构用钢指定供应钢厂",
+            BenchmarkPremiumPerTon = 100.0
+        },
+        new SupplierItem
+        {
+            Id = 9,
+            Code = "SUP-MILL-009",
+            Name = "区域常规民营中小型钢厂 (集采直供)",
+            ShortName = "区域常规民营钢厂",
+            Category = SupplierCategory.SteelMill,
+            SubCategory = "常规普碳结构板材/热轧带钢/非定尺散料",
+            ContactPerson = "陈经理 (现货直供)",
+            ContactPhone = "0510-86991111",
+            Email = "local_mill@steelsupply.cn",
+            CityRegion = "本地冶炼产地 / 华东集散仓",
+            CooperationStatus = "考察备选",
+            Remarks = "通用普碳Q235B结构板材，无特殊探伤与性能要求工程集采低价直供",
+            BenchmarkPremiumPerTon = -50.0
         },
 
         // ================= 2. 钢材现货贸易商 (SteelTrader) =================
@@ -534,8 +590,34 @@ public static class SupplierDatabase
         target.CityRegion = item.CityRegion;
         target.CooperationStatus = item.CooperationStatus;
         target.Remarks = item.Remarks;
+        target.BenchmarkPremiumPerTon = item.BenchmarkPremiumPerTon;
         target.UpdatedAt = DateTime.Now;
         return true;
+    }
+
+    /// <summary>
+    /// 将供应商库中的钢厂实体动态转换为材料估值引擎所用的 SteelMillBrand 对象列表
+    /// 确保估值工作台下拉菜单、基准溢价与供应商数据库保持单源真实与动态联动
+    /// </summary>
+    public static List<SteelMillBrand> GetSteelMillsAsBrands()
+    {
+        var mills = _dynamicSuppliers
+            .Where(s => s.Category == SupplierCategory.SteelMill)
+            .Select(s => new SteelMillBrand
+            {
+                Id = s.Code, // 以系统唯一代码作为主键，如 SUP-MILL-001
+                Name = s.Name,
+                ShortName = s.ShortName,
+                ProductionBase = s.CityRegion,
+                Tier = s.BenchmarkPremiumPerTon > 100 ? 1 : (s.BenchmarkPremiumPerTon >= 0 ? 2 : 3),
+                BrandPremiumPerTon = s.BenchmarkPremiumPerTon,
+                SpecialtyDescription = $"{s.SubCategory} - {s.Remarks}",
+                SupportsThirdPartyCertification = true,
+                IsRecommended = s.CooperationStatus == "战略合作" || s.CooperationStatus == "优先推荐"
+            })
+            .ToList();
+
+        return mills;
     }
 
     public static bool RemoveSupplier(int id)
