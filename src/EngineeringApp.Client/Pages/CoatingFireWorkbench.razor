@@ -3,6 +3,7 @@
 @using EngineeringApp.Shared.Models
 @using EngineeringApp.Shared.Algorithms
 @using EngineeringApp.Shared.Data
+@using EngineeringApp.Shared.Pricing.Coating
 @using EngineeringApp.Client.Services
 @using EngineeringApp.Client.Shared.Components
 @inject NavigationManager Nav
@@ -44,7 +45,6 @@
                 <span>@(Theme.IsDarkMode ? "☀️ 亮色" : "🌙 暗黑")</span>
             </button>
 
-
             <button class="btn btn-outline-primary btn-sm" @onclick='() => Nav.NavigateTo("/material-pricing")' title="进入材料价格工作台">
                 🧱 材料价格
             </button>
@@ -54,10 +54,64 @@
         </div>
     </header>
 
-    <!-- ======================= 截面物性全局指标横幅 ======================= -->
-    <div class="@(Theme.IsDarkMode ? "bg-black bg-opacity-40 border-secondary" : "bg-white border-light-subtle shadow-sm") p-2 rounded border mb-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
-        <div class="d-flex align-items-center gap-3 flex-wrap">
-            @if (SectionInputMode == "standard")
+    <!-- ======================= 历史价格快照与工程调差常驻工具条 ======================= -->
+    <div class="card @(Theme.IsDarkMode ? "bg-black bg-opacity-40 border-secondary" : "bg-white border-light-subtle shadow-sm") p-2 mb-2">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <span class="badge bg-primary text-white d-flex align-items-center gap-1">
+                    <span>⏱️ 当前执行价格快照:</span>
+                </span>
+                <select class="form-select form-select-sm fw-bold @(Theme.IsDarkMode ? "bg-dark text-warning border-secondary" : "bg-white text-primary")"
+                        style="min-width: 290px; width: auto;"
+                        value="@ActiveSnapshotId"
+                        @onchange="OnSnapshotChanged">
+                    @foreach (var snap in SeedPaintPriceSnapshots.AllSnapshots)
+                    {
+                        <option value="@snap.SnapshotId">
+                            @(snap.IsLocked ? "🔒 " : "📊 ") @snap.SnapshotName (@snap.EffectiveDate.ToString("yyyy-MM"))
+                        </option>
+                    }
+                </select>
+                
+                <span class="badge @(CurrentSnapshot.IsLocked ? "bg-danger" : "bg-success") text-white text-xs">
+                    @(CurrentSnapshot.IsLocked ? "基准锁定" : "动态采样")
+                </span>
+                <span class="badge @(Theme.IsDarkMode ? "bg-secondary text-white" : "bg-light text-dark border") text-xs">
+                    基准日: @CurrentSnapshot.EffectiveDate.ToString("yyyy-MM-dd")
+                </span>
+                <span class="badge @(Theme.IsDarkMode ? "bg-secondary text-white" : "bg-light text-dark border") text-xs" title="@CurrentSnapshot.SourceSupplier">
+                    来源: @GetSourceTypeLabel(CurrentSnapshot.SourceType)
+                </span>
+                <span class="badge bg-info text-dark text-xs" title="该快照中包含的真实询价实体数量">
+                    询价实体: @CurrentSnapshot.BrandQuotations.Count 笔
+                </span>
+            </div>
+
+            <div class="d-flex align-items-center gap-2">
+                <button class="btn btn-outline-success btn-sm d-flex align-items-center gap-1"
+                        @onclick="OpenAddBrandModal" title="向当前快照录入真实询价明细">
+                    <span>➕</span>
+                    <span>录入新品牌询价</span>
+                </button>
+                <button class="btn btn-outline-warning btn-sm d-flex align-items-center gap-1"
+                        @onclick="SyncSnapshotPricesToCurrentLayers" title="将当前快照的大盘与品牌单价同步应用到算量方案">
+                    <span>🔄</span>
+                    <span>同步快照价到方案</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ======================= 截面物性全局指标横幅 (统一单行展示) ======================= -->
+    <div class="@(Theme.IsDarkMode ? "bg-black bg-opacity-40 border-secondary" : "bg-white border-light-subtle shadow-sm") p-2 rounded border mb-3 d-flex align-items-center justify-content-between gap-2 flex-nowrap overflow-x-auto text-nowrap">
+        <div class="d-flex align-items-center gap-2 flex-nowrap text-nowrap">
+            @if (SectionInputMode == "plate" || CurrentParams.Type == SectionType.Plate)
+            {
+                <span class="badge bg-warning text-dark fs-6 fw-bold">🇨🇳 国标 GB/T</span>
+                <span class="badge bg-primary fs-6 fw-bold font-monospace">@GetFormattedSectionDesignation()</span>
+                <span class="badge @(Theme.IsDarkMode ? "bg-secondary text-white" : "bg-light text-dark border") text-xs">GB/T 709 钢板</span>
+            }
+            else if (SectionInputMode == "standard")
             {
                 <span class="badge @GetStandardBadgeClass() fs-6 fw-bold">@GetStandardSystemDisplay()</span>
                 <span class="badge bg-primary fs-6 fw-bold font-monospace">@CurrentParams.StandardProfileName</span>
@@ -84,31 +138,35 @@
                 形状系数 F/V: <b class="text-primary">@CurrentPaintResult.SectionFactorFOverV.ToString("F1")</b> m⁻¹
             </div>
         </div>
-        <div class="d-flex align-items-center gap-2">
-            <span class="badge @(SectionInputMode == "standard" ? "bg-success" : "bg-primary") text-xs">
-                @(SectionInputMode == "standard" ? "📚 标准库驱动" : "✏️ 自定义参数")
+        <div class="d-flex align-items-center gap-2 flex-shrink-0">
+            <span class="badge @(SectionInputMode == "plate" ? "bg-success" : (SectionInputMode == "standard" ? "bg-info text-dark" : "bg-primary")) text-xs">
+                @(SectionInputMode == "plate" ? "📄 钢板板材" : (SectionInputMode == "standard" ? "📚 标准库驱动" : "✏️ 自定义参数"))
             </span>
         </div>
     </div>
 
-    <!-- ======================= 四大专属模块选项卡 ======================= -->
-    <div class="card @(Theme.IsDarkMode ? "bg-black bg-opacity-40 border-secondary" : "bg-white border-light-subtle shadow-sm") p-2 mb-3">
-        <div class="d-flex flex-wrap gap-2">
-            <button class="btn btn-sm py-2 px-3 fw-bold rounded @(ActiveTab == 1 ? "btn-primary shadow-sm" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-75" : "btn-outline-secondary text-dark"))"
+    <!-- ======================= 五大专属模块选项卡 (单行紧凑优化) ======================= -->
+    <div class="card @(Theme.IsDarkMode ? "bg-black bg-opacity-40 border-secondary" : "bg-white border-light-subtle shadow-sm") p-1 mb-3">
+        <div class="d-flex align-items-center gap-1 flex-nowrap overflow-x-auto text-nowrap">
+            <button class="btn btn-sm py-2 px-2 fw-bold rounded flex-fill text-center text-nowrap @(ActiveTab == 1 ? "btn-primary shadow-sm" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-75" : "btn-outline-secondary text-dark"))"
                     @onclick="() => ActiveTab = 1">
-                🎨 选项卡 1：油漆涂装与防火涂料核心算量
+                🎨 1. 涂装与防火算量
             </button>
-            <button class="btn btn-sm py-2 px-3 fw-bold rounded @(ActiveTab == 2 ? "btn-info text-dark shadow-sm" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-75" : "btn-outline-secondary text-dark"))"
+            <button class="btn btn-sm py-2 px-2 fw-bold rounded flex-fill text-center text-nowrap @(ActiveTab == 2 ? "btn-info text-dark shadow-sm" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-75" : "btn-outline-secondary text-dark"))"
                     @onclick="() => ActiveTab = 2">
-                ⚡ 选项卡 2：钢结构热浸镀锌 (HDG) 专项计算台
+                ⚡ 2. 热浸镀锌 (HDG)
             </button>
-            <button class="btn btn-sm py-2 px-3 fw-bold rounded @(ActiveTab == 3 ? "btn-success shadow-sm" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-75" : "btn-outline-secondary text-dark"))"
+            <button class="btn btn-sm py-2 px-2 fw-bold rounded flex-fill text-center text-nowrap @(ActiveTab == 3 ? "btn-success shadow-sm" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-75" : "btn-outline-secondary text-dark"))"
                     @onclick="() => ActiveTab = 3">
-                📐 选项卡 3：详细推导计算过程与工艺断面损耗分析
+                📐 3. 推导与断面损耗
             </button>
-            <button class="btn btn-sm py-2 px-3 fw-bold rounded @(ActiveTab == 4 ? "btn-danger shadow-sm" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-75" : "btn-outline-secondary text-dark"))"
+            <button class="btn btn-sm py-2 px-2 fw-bold rounded flex-fill text-center text-nowrap @(ActiveTab == 4 ? "btn-danger shadow-sm" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-75" : "btn-outline-secondary text-dark"))"
                     @onclick="() => ActiveTab = 4">
-                🏛️ 选项卡 4：全球名牌涂料与标准型号图鉴
+                🏛️ 4. 名牌涂料图鉴
+            </button>
+            <button class="btn btn-sm py-2 px-2 fw-bold rounded flex-fill text-center text-nowrap @(ActiveTab == 5 ? "btn-warning text-dark shadow-sm" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-75" : "btn-outline-secondary text-dark"))"
+                    @onclick="() => ActiveTab = 5">
+                ⏳ 5. 价格回溯与清单调差
             </button>
         </div>
     </div>
@@ -125,7 +183,7 @@
                         <span class="badge @(Theme.IsDarkMode ? "bg-secondary" : "bg-light text-dark border") text-xs">实时参数化</span>
                     </div>
 
-                    <!-- 截面输入模式切换选项卡：自定义截面 vs 标准库型钢 -->
+                    <!-- 截面输入模式切换选项卡：自定义截面 vs 标准库型钢 vs 钢板板材 -->
                     <div class="btn-group btn-group-sm w-100 mb-2">
                         <button class="btn @(SectionInputMode == "custom" ? "btn-primary fw-bold" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary"))"
                                 @onclick="SwitchToCustomMode">
@@ -133,11 +191,69 @@
                         </button>
                         <button class="btn @(SectionInputMode == "standard" ? "btn-primary fw-bold" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary"))"
                                 @onclick="SwitchToStandardMode">
-                            📚 全球标准型钢库
+                            📚 标准型钢库
+                        </button>
+                        <button class="btn @(SectionInputMode == "plate" ? "btn-primary fw-bold" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary"))"
+                                @onclick="SwitchToPlateMode">
+                            📄 钢板板材
                         </button>
                     </div>
 
-                    @if (SectionInputMode == "custom")
+                    @if (SectionInputMode == "plate")
+                    {
+                        <!-- 钢板板材常用厚度与尺寸录入 -->
+                        <div class="mb-2">
+                            <label class="form-label text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1 d-flex justify-content-between">
+                                <span>常用国标厚度快捷胶囊 (mm):</span>
+                                <span class="text-warning fw-bold">t = @PlateThickness mm</span>
+                            </label>
+                            <div class="d-flex flex-wrap gap-1 mb-2">
+                                @foreach (var t in StandardPlateThicknesses)
+                                {
+                                    <button class="btn btn-xs @(Math.Abs(PlateThickness - t) < 0.1 ? "btn-primary fw-bold" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-75" : "btn-outline-secondary"))"
+                                            style="min-width: 36px; padding: 2px 4px; font-size: 11px;"
+                                            @onclick="() => SelectPlateThickness(t)">
+                                        @t
+                                    </button>
+                                }
+                            </div>
+                        </div>
+
+                        <!-- 钢板精确几何参数 -->
+                        <div class="p-2 rounded border mb-2 @(Theme.IsDarkMode ? "bg-dark bg-opacity-50 border-secondary" : "bg-light border-light-subtle")"
+                             style="min-height: 142px;">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="text-xs fw-bold text-success">
+                                    <span class="badge bg-success py-0 px-1 me-1 text-xs">📄 钢板板材</span> 截面参数
+                                </span>
+                                <span class="badge bg-primary text-white text-xs font-monospace">
+                                    PL @PlateThickness.ToString("0.##")×@PlateWidth.ToString("0.##")
+                                </span>
+                            </div>
+                            <div class="row g-2 text-xs mb-2">
+                                <div class="col-6">
+                                    <label class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-0">板厚 t (mm)</label>
+                                    <input type="number" class="form-control form-control-sm text-center p-1 @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                           style="height: 26px;" @bind="PlateThickness" @bind:after="OnPlateParamsChanged" step="1" min="1" max="200" />
+                                </div>
+                                <div class="col-6">
+                                    <label class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-0">标称板宽 B (mm)</label>
+                                    <input type="number" class="form-control form-control-sm text-center p-1 @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                           style="height: 26px;" @bind="PlateWidth" @bind:after="OnPlateParamsChanged" step="100" min="100" />
+                                </div>
+                            </div>
+                            <div class="p-1 rounded bg-info bg-opacity-10 border border-info border-opacity-25 text-xs">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="text-info fw-bold">展开比表面积推导:</span>
+                                    <span class="text-warning fw-bold">@((254.777 / PlateThickness).ToString("F2")) m²/t</span>
+                                </div>
+                                <div class="text-muted" style="font-size: 10px;">
+                                    公式: S = 2000 / (7.85 × t) = 254.78 / @PlateThickness.ToString("0.##") m²/t
+                                </div>
+                            </div>
+                        </div>
+                    }
+                    else if (SectionInputMode == "custom")
                     {
                         <!-- 第一块：自定义截面类型选择按钮组 -->
                         <div class="mb-2">
@@ -1061,6 +1177,500 @@
         </div>
     }
 
+    <!-- ======================= TAB 5: 历史回溯与工程防腐清单调差台 ======================= -->
+    @if (ActiveTab == 5)
+    {
+        <div class="d-flex flex-column gap-3 flex-grow-1">
+            <!-- Part A: 双时期快照调差总控面板与大盘价差看板 -->
+            <div class="card @(Theme.IsDarkMode ? "bg-black bg-opacity-30 border-secondary" : "bg-white border-light-subtle shadow-sm") p-3">
+                <div class="d-flex flex-wrap align-items-center justify-content-between pb-2 mb-3 border-bottom @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle")">
+                    <div>
+                        <h6 class="fw-bold mb-1 d-flex align-items-center gap-2 @(Theme.IsDarkMode ? "text-warning" : "text-primary")">
+                            <span>⏳ 双时期历史价格快照调差总控看板</span>
+                            <span class="badge bg-warning text-dark text-xs">调差结算核心</span>
+                        </h6>
+                        <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">
+                            对比合同基期（投标锁价基准日）与施工现行期（大盘或询价日），实时核算吨钢与全工程防腐造价涨跌额
+                        </div>
+                    </div>
+
+                    <div class="d-flex align-items-center gap-2 flex-wrap mt-2 mt-md-0">
+                        <!-- 基期选择器 -->
+                        <div class="d-flex align-items-center gap-1">
+                            <span class="text-xs fw-bold text-muted">基期快照(定标日):</span>
+                            <select class="form-select form-select-xs fw-bold @(Theme.IsDarkMode ? "bg-dark text-warning border-secondary" : "bg-light text-primary")"
+                                    style="width: 220px; font-size: 11px; height: 28px;"
+                                    value="@BaselineSnapshotId"
+                                    @onchange="OnBaselineSnapshotChanged">
+                                @foreach (var snap in SeedPaintPriceSnapshots.AllSnapshots)
+                                {
+                                    <option value="@snap.SnapshotId">
+                                        @(snap.IsLocked ? "🔒" : "📊") @snap.SnapshotName
+                                    </option>
+                                }
+                            </select>
+                        </div>
+
+                        <span class="fw-bold text-muted">VS</span>
+
+                        <!-- 目标期选择器 -->
+                        <div class="d-flex align-items-center gap-1">
+                            <span class="text-xs fw-bold text-muted">目标期快照(结算日):</span>
+                            <select class="form-select form-select-xs fw-bold @(Theme.IsDarkMode ? "bg-dark text-info border-secondary" : "bg-light text-primary")"
+                                    style="width: 220px; font-size: 11px; height: 28px;"
+                                    value="@TargetSnapshotId"
+                                    @onchange="OnTargetSnapshotChanged">
+                                @foreach (var snap in SeedPaintPriceSnapshots.AllSnapshots)
+                                {
+                                    <option value="@snap.SnapshotId">
+                                        @(snap.IsLocked ? "🔒" : "📊") @snap.SnapshotName
+                                    </option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 大盘品类价差卡片组 -->
+                @{
+                    var bSnap = SeedPaintPriceSnapshots.GetById(BaselineSnapshotId);
+                    var tSnap = SeedPaintPriceSnapshots.GetById(TargetSnapshotId);
+                    double primerDiff = tSnap.EpoxyZincRichPrimerBase - bSnap.EpoxyZincRichPrimerBase;
+                    double primerDiffPct = bSnap.EpoxyZincRichPrimerBase > 0 ? (primerDiff / bSnap.EpoxyZincRichPrimerBase * 100.0) : 0;
+
+                    double mioDiff = tSnap.EpoxyMioIntermediateBase - bSnap.EpoxyMioIntermediateBase;
+                    double mioDiffPct = bSnap.EpoxyMioIntermediateBase > 0 ? (mioDiff / bSnap.EpoxyMioIntermediateBase * 100.0) : 0;
+
+                    double topcoatDiff = tSnap.PolyurethaneTopcoatBase - bSnap.PolyurethaneTopcoatBase;
+                    double topcoatDiffPct = bSnap.PolyurethaneTopcoatBase > 0 ? (topcoatDiff / bSnap.PolyurethaneTopcoatBase * 100.0) : 0;
+
+                    double fluoroDiff = tSnap.FluorocarbonTopcoatBase - bSnap.FluorocarbonTopcoatBase;
+                    double fluoroDiffPct = bSnap.FluorocarbonTopcoatBase > 0 ? (fluoroDiff / bSnap.FluorocarbonTopcoatBase * 100.0) : 0;
+
+                    double laborDiff = tSnap.AirlessSprayingLaborBase - bSnap.AirlessSprayingLaborBase;
+                    double laborDiffPct = bSnap.AirlessSprayingLaborBase > 0 ? (laborDiff / bSnap.AirlessSprayingLaborBase * 100.0) : 0;
+
+                    double zincDiff = tSnap.ZincIngotBasePerTon - bSnap.ZincIngotBasePerTon;
+                    double zincDiffPct = bSnap.ZincIngotBasePerTon > 0 ? (zincDiff / bSnap.ZincIngotBasePerTon * 100.0) : 0;
+                }
+                <div class="row g-2 mb-3">
+                    <div class="col-6 col-md-4 col-xl-2">
+                        <div class="p-2 rounded border @(Theme.IsDarkMode ? "bg-dark border-secondary" : "bg-light border-light-subtle") text-center">
+                            <div class="text-xs text-muted">环氧富锌底漆</div>
+                            <div class="fw-bold fs-6">¥@bSnap.EpoxyZincRichPrimerBase → ¥@tSnap.EpoxyZincRichPrimerBase</div>
+                            <div class="text-xs @(primerDiff >= 0 ? "text-danger" : "text-success") fw-bold">
+                                @(primerDiff >= 0 ? "+" : "")@primerDiff.ToString("F1") 元/kg (@(primerDiffPct >= 0 ? "+" : "")@primerDiffPct.ToString("F1")%)
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-4 col-xl-2">
+                        <div class="p-2 rounded border @(Theme.IsDarkMode ? "bg-dark border-secondary" : "bg-light border-light-subtle") text-center">
+                            <div class="text-xs text-muted">环氧云铁中间漆</div>
+                            <div class="fw-bold fs-6">¥@bSnap.EpoxyMioIntermediateBase → ¥@tSnap.EpoxyMioIntermediateBase</div>
+                            <div class="text-xs @(mioDiff >= 0 ? "text-danger" : "text-success") fw-bold">
+                                @(mioDiff >= 0 ? "+" : "")@mioDiff.ToString("F1") 元/kg (@(mioDiffPct >= 0 ? "+" : "")@mioDiffPct.ToString("F1")%)
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-4 col-xl-2">
+                        <div class="p-2 rounded border @(Theme.IsDarkMode ? "bg-dark border-secondary" : "bg-light border-light-subtle") text-center">
+                            <div class="text-xs text-muted">聚氨酯面漆</div>
+                            <div class="fw-bold fs-6">¥@bSnap.PolyurethaneTopcoatBase → ¥@tSnap.PolyurethaneTopcoatBase</div>
+                            <div class="text-xs @(topcoatDiff >= 0 ? "text-danger" : "text-success") fw-bold">
+                                @(topcoatDiff >= 0 ? "+" : "")@topcoatDiff.ToString("F1") 元/kg (@(topcoatDiffPct >= 0 ? "+" : "")@topcoatDiffPct.ToString("F1")%)
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-4 col-xl-2">
+                        <div class="p-2 rounded border @(Theme.IsDarkMode ? "bg-dark border-secondary" : "bg-light border-light-subtle") text-center">
+                            <div class="text-xs text-muted">氟碳树脂面漆</div>
+                            <div class="fw-bold fs-6">¥@bSnap.FluorocarbonTopcoatBase → ¥@tSnap.FluorocarbonTopcoatBase</div>
+                            <div class="text-xs @(fluoroDiff >= 0 ? "text-danger" : "text-success") fw-bold">
+                                @(fluoroDiff >= 0 ? "+" : "")@fluoroDiff.ToString("F1") 元/kg (@(fluoroDiffPct >= 0 ? "+" : "")@fluoroDiffPct.ToString("F1")%)
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-4 col-xl-2">
+                        <div class="p-2 rounded border @(Theme.IsDarkMode ? "bg-dark border-secondary" : "bg-light border-light-subtle") text-center">
+                            <div class="text-xs text-muted">喷涂人工费</div>
+                            <div class="fw-bold fs-6">¥@bSnap.AirlessSprayingLaborBase → ¥@tSnap.AirlessSprayingLaborBase</div>
+                            <div class="text-xs @(laborDiff >= 0 ? "text-danger" : "text-success") fw-bold">
+                                @(laborDiff >= 0 ? "+" : "")@laborDiff.ToString("F1") 元/m² (@(laborDiffPct >= 0 ? "+" : "")@laborDiffPct.ToString("F1")%)
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-4 col-xl-2">
+                        <div class="p-2 rounded border @(Theme.IsDarkMode ? "bg-dark border-secondary" : "bg-light border-light-subtle") text-center">
+                            <div class="text-xs text-muted">热浸锌锭基价</div>
+                            <div class="fw-bold fs-6">¥@(bSnap.ZincIngotBasePerTon/1000)k → ¥@(tSnap.ZincIngotBasePerTon/1000)k</div>
+                            <div class="text-xs @(zincDiff >= 0 ? "text-danger" : "text-success") fw-bold">
+                                @(zincDiff >= 0 ? "+" : "")@zincDiff.ToString("F0") 元/t (@(zincDiffPct >= 0 ? "+" : "")@zincDiffPct.ToString("F1")%)
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 品牌实体询价值对比折叠看板 -->
+                <div class="p-2 rounded border @(Theme.IsDarkMode ? "bg-secondary bg-opacity-10 border-secondary" : "bg-light border-light-subtle") text-xs">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="fw-bold text-info">🏢 真实询价品牌实体对比 (底漆/面漆实际报价):</span>
+                        <button class="btn btn-xs btn-outline-success py-0 px-2" @onclick="OpenAddBrandModal">➕ 登记新品牌报价</button>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2">
+                        @foreach (var brand in PaintProductDatabase.AllBrands.Take(6))
+                        {
+                            double basePrice = bSnap.GetPriceForBrandOrCategory(brand.NameCn, "底漆");
+                            double targetPrice = tSnap.GetPriceForBrandOrCategory(brand.NameCn, "底漆");
+                            double diff = targetPrice - basePrice;
+                            <div class="badge @(Theme.IsDarkMode ? "bg-dark border-secondary" : "bg-white border text-dark") p-1">
+                                <span class="fw-bold">@brand.NameCn:</span>
+                                <span>¥@basePrice.ToString("F0") → ¥@targetPrice.ToString("F0")</span>
+                                <span class="@(diff >= 0 ? "text-danger" : "text-success") ms-1">(@(diff >= 0 ? "+" : "")@diff.ToString("F1"))</span>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- Part B: 典型板材与型钢规格防腐用量速查矩阵 -->
+            <div class="card @(Theme.IsDarkMode ? "bg-black bg-opacity-30 border-secondary" : "bg-white border-light-subtle shadow-sm") p-3">
+                <div class="d-flex flex-wrap align-items-center justify-content-between pb-2 mb-2 border-bottom @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle")">
+                    <div>
+                        <h6 class="fw-bold mb-1 text-primary d-flex align-items-center gap-2">
+                            <span>📊 规格防腐用量速查矩阵 (定额物理量 × 双时期造价)</span>
+                            <span class="badge bg-primary text-xs">正交映射</span>
+                        </h6>
+                        <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">
+                            钢板比表面积严格遵循 S = 254.78/t 定律；型钢含断面几何及飞散损耗修正；支持一键加入工程防腐清单或调入主算量台
+                        </div>
+                    </div>
+
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-xs @(BacktrackingMatrixFilter == "plate" ? "btn-primary fw-bold" : "btn-outline-secondary")"
+                                @onclick='() => BacktrackingMatrixFilter = "plate"'>
+                            📄 钢板厚度系列 (6~80mm)
+                        </button>
+                        <button class="btn btn-xs @(BacktrackingMatrixFilter == "profile" ? "btn-primary fw-bold" : "btn-outline-secondary")"
+                                @onclick='() => BacktrackingMatrixFilter = "profile"'>
+                            🏗️ 典型型钢系列 (H型/箱型/圆管)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 矩阵表格 -->
+                <div class="table-responsive rounded border @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle")" style="max-height: 380px;">
+                    <table class="table table-sm @(Theme.IsDarkMode ? "table-dark table-hover" : "table-hover") align-middle mb-0 text-xs text-center">
+                        <thead class="@(Theme.IsDarkMode ? "table-secondary table-opacity-25" : "table-light") sticky-top">
+                            <tr>
+                                <th>规格代号</th>
+                                <th>分类</th>
+                                <th>主要厚度</th>
+                                <th>比表面积 (m²/t)</th>
+                                <th>涂料单耗 (kg/t)</th>
+                                <th>基期涂装造价 (元/t)</th>
+                                <th>现行涂装造价 (元/t)</th>
+                                <th>吨钢调差差额 (元/t)</th>
+                                <th>调差比例 (%)</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (BacktrackingMatrixFilter == "plate")
+                            {
+                                @foreach (var plateSpec in PaintPriceBacktrackingEngine.GetStandardPlateSpecs())
+                                {
+                                    var item = PaintPriceBacktrackingEngine.BuildScheduleItem("钢板板材", plateSpec.Name, plateSpec.Thickness, plateSpec.AreaPerTon, 10.0, SectionType.Plate, CurrentLayers, bSnap, tSnap, CurrentMethod);
+                                    <tr>
+                                        <td class="fw-bold text-start ps-3 text-info">@plateSpec.Name</td>
+                                        <td><span class="badge bg-secondary">钢板板材</span></td>
+                                        <td>@plateSpec.Thickness mm</td>
+                                        <td class="fw-bold text-danger">@plateSpec.AreaPerTon.ToString("F2")</td>
+                                        <td class="fw-bold">@item.PaintUsageKgPerTon.ToString("F2")</td>
+                                        <td>¥@item.BaseCostPerTon.ToString("F1")</td>
+                                        <td class="fw-bold text-primary">¥@item.TargetCostPerTon.ToString("F1")</td>
+                                        <td class="fw-bold @(item.VariancePerTon >= 0 ? "text-danger" : "text-success")">
+                                            @(item.VariancePerTon >= 0 ? "+" : "")@item.VariancePerTon.ToString("F1")
+                                        </td>
+                                        <td class="@(item.VariancePercentage >= 0 ? "text-danger" : "text-success")">
+                                            @(item.VariancePercentage >= 0 ? "+" : "")@item.VariancePercentage.ToString("F1")%
+                                        </td>
+                                        <td>
+                                            <div class="d-flex justify-content-center gap-1">
+                                                <button class="btn btn-xs btn-outline-success py-0 px-2"
+                                                        @onclick="() => AddScheduleItemFromSpec(item, plateSpec.Name)" title="加入工程防腐清单明细表">
+                                                    ➕ 加入清单
+                                                </button>
+                                                <button class="btn btn-xs btn-outline-primary py-0 px-2"
+                                                        @onclick="() => ApplyPlateToWorkbench(plateSpec.Thickness)" title="调入主算量台详细计算">
+                                                    🎯 调入算量台
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                @foreach (var prof in PaintPriceBacktrackingEngine.GetTypicalProfileSpecs())
+                                {
+                                    var item = PaintPriceBacktrackingEngine.BuildScheduleItem(prof.Category, prof.Name, prof.Thickness, prof.AreaPerTon, 10.0, prof.Type, CurrentLayers, bSnap, tSnap, CurrentMethod);
+                                    <tr>
+                                        <td class="fw-bold text-start ps-3 text-info">@prof.Name</td>
+                                        <td><span class="badge bg-secondary">@prof.Category</span></td>
+                                        <td>@prof.Thickness mm</td>
+                                        <td class="fw-bold text-danger">@prof.AreaPerTon.ToString("F2")</td>
+                                        <td class="fw-bold">@item.PaintUsageKgPerTon.ToString("F2")</td>
+                                        <td>¥@item.BaseCostPerTon.ToString("F1")</td>
+                                        <td class="fw-bold text-primary">¥@item.TargetCostPerTon.ToString("F1")</td>
+                                        <td class="fw-bold @(item.VariancePerTon >= 0 ? "text-danger" : "text-success")">
+                                            @(item.VariancePerTon >= 0 ? "+" : "")@item.VariancePerTon.ToString("F1")
+                                        </td>
+                                        <td class="@(item.VariancePercentage >= 0 ? "text-danger" : "text-success")">
+                                            @(item.VariancePercentage >= 0 ? "+" : "")@item.VariancePercentage.ToString("F1")%
+                                        </td>
+                                        <td>
+                                            <div class="d-flex justify-content-center gap-1">
+                                                <button class="btn btn-xs btn-outline-success py-0 px-2"
+                                                        @onclick="() => AddScheduleItemFromSpec(item, prof.Name)" title="加入工程防腐清单明细表">
+                                                    ➕ 加入清单
+                                                </button>
+                                                <button class="btn btn-xs btn-outline-primary py-0 px-2"
+                                                        @onclick="() => ApplyProfileToWorkbench(prof.Name, prof.Type)" title="调入主算量台详细计算">
+                                                    🎯 调入算量台
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Part C: 工程防腐清单明细表 (支持调差汇总与导出) -->
+            <div class="card @(Theme.IsDarkMode ? "bg-black bg-opacity-30 border-secondary" : "bg-white border-light-subtle shadow-sm") p-3">
+                <div class="d-flex flex-wrap align-items-center justify-content-between pb-2 mb-2 border-bottom @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle")">
+                    <div>
+                        <h6 class="fw-bold mb-1 text-success d-flex align-items-center gap-2">
+                            <span>📑 工程防腐清单明细表 (BOM 算量与历史调差汇总)</span>
+                            <span class="badge bg-success text-xs">@ProjectSchedule.Count 个构件行</span>
+                        </h6>
+                        <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">
+                            直接在表格中调整各构件工程吨数 (t)，系统实时重算油漆采购总量与双时期总调差金额；支持一键导出商业报表
+                        </div>
+                    </div>
+
+                    <div class="d-flex align-items-center gap-2 flex-wrap mt-2 mt-md-0">
+                        <button class="btn btn-xs btn-outline-info" @onclick="LoadDemoSchedule" title="一键导入典型工程构件示范清单">
+                            📥 加载示范清单
+                        </button>
+                        <button class="btn btn-xs btn-outline-success" @onclick="ExportScheduleToCsv" title="导出为 CSV 电子表格供 Excel / 商务造价软件使用">
+                            📋 导出清单 CSV
+                        </button>
+                        <button class="btn btn-xs btn-outline-danger" @onclick="() => ProjectSchedule.Clear()" title="清空清单所有记录">
+                            🗑️ 清空清单
+                        </button>
+                    </div>
+                </div>
+
+                @if (ProjectSchedule.Count == 0)
+                {
+                    <div class="p-4 text-center @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">
+                        <div class="fs-4 mb-2">📋</div>
+                        <div>当前工程防腐清单为空。</div>
+                        <div class="mt-2">
+                            <button class="btn btn-sm btn-primary me-2" @onclick="LoadDemoSchedule">📥 点击加载典型工程构件示范清单</button>
+                            <span class="text-xs">或者在上方规格矩阵点击【➕ 加入清单】添加构件。</span>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div class="table-responsive rounded border mb-3 @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle")">
+                        <table class="table table-sm @(Theme.IsDarkMode ? "table-dark table-hover" : "table-hover") align-middle mb-0 text-xs text-center">
+                            <thead class="@(Theme.IsDarkMode ? "table-secondary table-opacity-25" : "table-light")">
+                                <tr>
+                                    <th style="width: 40px;">#</th>
+                                    <th>构件部位/编号</th>
+                                    <th>规格分类</th>
+                                    <th>规格型号</th>
+                                    <th style="width: 100px;">工程吨数 (t)</th>
+                                    <th>比表面积 (m²/t)</th>
+                                    <th>涂装总面积 (m²)</th>
+                                    <th>油漆单耗 (kg/t)</th>
+                                    <th>计划采购量 (kg)</th>
+                                    <th>基期合价 (元)</th>
+                                    <th>现行合价 (元)</th>
+                                    <th>调差金额 (元)</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @{ int rowIdx = 1; }
+                                @foreach (var item in ProjectSchedule)
+                                {
+                                    <tr>
+                                        <td>@(rowIdx++)</td>
+                                        <td>
+                                            <input type="text" class="form-control form-control-xs p-1 text-center @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                                   style="height: 24px; font-size: 11px;"
+                                                   @bind="item.PartName" />
+                                        </td>
+                                        <td><span class="badge @(item.Category == "钢板板材" ? "bg-primary" : "bg-secondary")">@item.Category</span></td>
+                                        <td class="fw-bold text-info">@item.SpecName</td>
+                                        <td>
+                                            <input type="number" class="form-control form-control-xs p-1 text-center fw-bold @(Theme.IsDarkMode ? "bg-dark text-warning border-secondary" : "bg-white text-primary")"
+                                                   style="height: 24px; font-size: 11px;"
+                                                   @bind="item.ProjectTons" @bind:after="StateHasChanged" step="1" min="0.1" />
+                                        </td>
+                                        <td>@item.AreaPerTon.ToString("F2")</td>
+                                        <td class="fw-bold text-success">@item.TotalAreaM2.ToString("F1")</td>
+                                        <td>@item.PaintUsageKgPerTon.ToString("F2")</td>
+                                        <td class="fw-bold text-warning">@item.TotalPaintKg.ToString("F1")</td>
+                                        <td>¥@item.BaseTotalCost.ToString("F0")</td>
+                                        <td class="fw-bold text-primary">¥@item.TargetTotalCost.ToString("F0")</td>
+                                        <td class="fw-bold @(item.VarianceTotalCost >= 0 ? "text-danger" : "text-success")">
+                                            @(item.VarianceTotalCost >= 0 ? "+" : "")¥@item.VarianceTotalCost.ToString("F0")
+                                        </td>
+                                        <td>
+                                            <button class="btn btn-xs btn-outline-danger py-0 px-2"
+                                                    @onclick="() => ProjectSchedule.Remove(item)" title="移除此行">
+                                                ✕
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                            <tfoot class="@(Theme.IsDarkMode ? "table-dark border-top border-secondary" : "table-light border-top") fw-bold">
+                                <tr>
+                                    <td colspan="4" class="text-end">工程汇总合计:</td>
+                                    <td class="text-warning">@ProjectScheduleSumTons.ToString("F1") t</td>
+                                    <td>-</td>
+                                    <td class="text-success">@ProjectScheduleSumArea.ToString("F1") m²</td>
+                                    <td>-</td>
+                                    <td class="text-warning">@ProjectScheduleSumPaintKg.ToString("F1") kg</td>
+                                    <td>¥@ProjectScheduleSumBaseCost.ToString("F0")</td>
+                                    <td class="text-primary">¥@ProjectScheduleSumTargetCost.ToString("F0")</td>
+                                    <td class="@(ProjectScheduleSumVariance >= 0 ? "text-danger" : "text-success")">
+                                        @(ProjectScheduleSumVariance >= 0 ? "+" : "")¥@ProjectScheduleSumVariance.ToString("F0")
+                                    </td>
+                                    <td>-</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+
+                    <!-- 调差总结算总括卡片 -->
+                    <div class="p-3 rounded border @(Theme.IsDarkMode ? "bg-dark border-secondary" : "bg-light border-light-subtle") d-flex flex-wrap align-items-center justify-content-between gap-3">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="p-2 bg-warning rounded-circle text-dark fs-4">⚖️</div>
+                            <div>
+                                <h6 class="fw-bold mb-0">工程防腐调差终审结果:</h6>
+                                <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">
+                                    总吨位 @ProjectScheduleSumTons.ToString("F1") t · 涂装总面积 @ProjectScheduleSumArea.ToString("F1") m² · 油漆采购 @ProjectScheduleSumPaintKg.ToString("F1") kg
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex align-items-center gap-3 flex-wrap">
+                            <div class="text-end">
+                                <div class="text-xs text-muted">基期合同总造价:</div>
+                                <div class="fw-bold fs-6">¥@ProjectScheduleSumBaseCost.ToString("N0")</div>
+                            </div>
+                            <div class="text-end">
+                                <div class="text-xs text-muted">目标期核算总造价:</div>
+                                <div class="fw-bold fs-6 text-primary">¥@ProjectScheduleSumTargetCost.ToString("N0")</div>
+                            </div>
+                            <div class="p-2 px-3 rounded-pill @(ProjectScheduleSumVariance >= 0 ? "bg-danger text-white" : "bg-success text-white") text-center shadow-sm">
+                                <div class="text-xs" style="font-size: 10px;">调差补差总额</div>
+                                <div class="fw-bold fs-5">
+                                    @(ProjectScheduleSumVariance >= 0 ? "+" : "")¥@ProjectScheduleSumVariance.ToString("N0")
+                                    <span class="fs-6 fw-normal">(@(ProjectScheduleSumBaseCost > 0 ? (ProjectScheduleSumVariance / ProjectScheduleSumBaseCost * 100.0) : 0):F1%)</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    <!-- ======================= 弹窗：录入新品牌实体询价值 ======================= -->
+    @if (IsAddBrandModalOpen)
+    {
+        <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.6); z-index: 1055;">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content @(Theme.IsDarkMode ? "bg-dark text-white border-secondary shadow-lg" : "bg-white text-dark shadow-lg")">
+                    <div class="modal-header py-2 @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle")">
+                        <h6 class="modal-title fw-bold text-success d-flex align-items-center gap-2">
+                            <span>➕ 录入品牌实体真实询价明细</span>
+                        </h6>
+                        <button type="button" class="btn-close @(Theme.IsDarkMode ? "btn-close-white" : "")" @onclick="CloseAddBrandModal"></button>
+                    </div>
+                    <div class="modal-body p-3 text-xs">
+                        <div class="alert alert-info py-1 px-2 mb-3 text-xs">
+                            💡 录入的真实询价值将直接存入当前选中的价格快照 <b>(@CurrentSnapshot.SnapshotName)</b>，并立即参与算量与调差。
+                        </div>
+
+                        <div class="row g-2 mb-2">
+                            <div class="col-6">
+                                <label class="form-label @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1">品牌名称 *</label>
+                                <input type="text" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                       placeholder="例如: 宣伟 Sherwin / 兰陵"
+                                       @bind="NewQuoteBrandName" />
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1">所属涂料品类 *</label>
+                                <select class="form-select form-select-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                        @bind="NewQuoteCategory">
+                                    <option value="底漆">底漆 (环氧富锌/无机富锌)</option>
+                                    <option value="中间漆">中间漆 (环氧云铁 MIO)</option>
+                                    <option value="面漆">面漆 (聚氨酯/氟碳)</option>
+                                    <option value="防火涂料">防火涂料 (超薄/薄型/厚型)</option>
+                                    <option value="封闭漆">封闭漆 (环氧封闭底漆)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="row g-2 mb-2">
+                            <div class="col-6">
+                                <label class="form-label @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1">规格型号 / 代号</label>
+                                <input type="text" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                       placeholder="例如: EP-800 环氧富锌"
+                                       @bind="NewQuoteModel" />
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1">真实询价单价 (元/kg) *</label>
+                                <input type="number" class="form-control form-control-sm fw-bold text-success @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                       step="0.5" min="1"
+                                       @bind="NewQuotePrice" />
+                            </div>
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1">报价商 / 供应商全称</label>
+                            <input type="text" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                   placeholder="例如: 宣伟涂料华东直接代表处"
+                                   @bind="NewQuoteSupplier" />
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1">询价时间与备注说明</label>
+                            <input type="text" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                   placeholder="例如: 2026年秋季项目投标专属报价，含运费税票"
+                                   @bind="NewQuoteRemarks" />
+                        </div>
+                    </div>
+                    <div class="modal-footer py-2 @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle")">
+                        <button type="button" class="btn btn-secondary btn-sm" @onclick="CloseAddBrandModal">取消</button>
+                        <button type="button" class="btn btn-success btn-sm fw-bold" @onclick="SaveNewBrandQuote">✓ 保存并注入快照</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
     <!-- 全球标准型钢库检索弹窗 -->
     <SteelProfileModal @bind-IsOpen="IsSteelModalOpen"
                        OnSelectProfile="HandleStandardProfileSelected"
@@ -1073,11 +1683,41 @@
     private string SelectedBrandId = "Jotun";
     private bool IsSteelModalOpen = false;
 
+    // 历史快照状态
+    private string ActiveSnapshotId = "PAINT-SNAP-202610-LATEST";
+    private string BaselineSnapshotId = "PAINT-SNAP-202603-BASE";
+    private string TargetSnapshotId = "PAINT-SNAP-202610-LATEST";
+    private PaintPriceSnapshot CurrentSnapshot => SeedPaintPriceSnapshots.GetById(ActiveSnapshotId);
+
     // 截面模式与标准库状态
     private string SectionInputMode = "standard";
     private string SelectedStandardSystem = "GB/T (国标)";
     private string SelectedStandardCategory = "GB/T 11263 热轧H型钢(HW)";
     private string SelectedStandardDesignation = "HW 300×300×10×15";
+
+    // 钢板专属状态与国标厚度胶囊
+    private double PlateThickness = 10.0;
+    private double PlateWidth = 1000.0;
+    private static readonly double[] StandardPlateThicknesses = [6, 8, 10, 12, 14, 16, 18, 20, 22, 25, 28, 30, 35, 40, 50, 60, 80];
+
+    // 历史调差与清单工程数据状态
+    private string BacktrackingMatrixFilter = "plate";
+    private List<ProjectCoatingScheduleItem> ProjectSchedule = [];
+    private double ProjectScheduleSumTons => ProjectSchedule.Sum(x => x.ProjectTons);
+    private double ProjectScheduleSumArea => ProjectSchedule.Sum(x => x.TotalAreaM2);
+    private double ProjectScheduleSumPaintKg => ProjectSchedule.Sum(x => x.TotalPaintKg);
+    private double ProjectScheduleSumBaseCost => ProjectSchedule.Sum(x => x.BaseTotalCost);
+    private double ProjectScheduleSumTargetCost => ProjectSchedule.Sum(x => x.TargetTotalCost);
+    private double ProjectScheduleSumVariance => ProjectSchedule.Sum(x => x.VarianceTotalCost);
+
+    // 录入新品牌询价弹窗状态
+    private bool IsAddBrandModalOpen = false;
+    private string NewQuoteBrandName = "";
+    private string NewQuoteCategory = "底漆";
+    private string NewQuoteModel = "";
+    private double NewQuotePrice = 45.0;
+    private string NewQuoteSupplier = "";
+    private string NewQuoteRemarks = "";
 
     private IEnumerable<string> CurrentSystemCategories =>
         StructuralSteelLibrary.GetCategoriesBySystem(SelectedStandardSystem);
@@ -1117,6 +1757,7 @@
     {
         Theme.OnChange += StateHasChanged;
         CurrentLayers = PaintCoatingCalculator.CreatePreset(CurrentPresetName);
+        LoadDemoSchedule();
         var item = StructuralSteelLibrary.AllSections.FirstOrDefault(x => x.Designation == "HW 300×300×10×15");
         if (item != null) ApplyStandardProfile(item);
         else RecalculateAll();
@@ -1142,6 +1783,234 @@
                    ?? StructuralSteelLibrary.AllSections.First();
         ApplyStandardProfile(item);
     }
+
+    private void SwitchToPlateMode()
+    {
+        SectionInputMode = "plate";
+        CurrentParams.Type = SectionType.Plate;
+        CurrentParams.Height = PlateThickness;
+        CurrentParams.Width = PlateWidth;
+        CurrentParams.LegThickness = PlateThickness;
+        CurrentParams.StandardProfileName = $"PL {PlateThickness:0.##}×{PlateWidth:0.##}";
+        RecalculateAll();
+    }
+
+    private void SelectPlateThickness(double t)
+    {
+        PlateThickness = t;
+        CurrentParams.Type = SectionType.Plate;
+        CurrentParams.Height = t;
+        CurrentParams.Width = PlateWidth;
+        CurrentParams.LegThickness = t;
+        CurrentParams.StandardProfileName = $"PL {t:0.##}×{PlateWidth:0.##}";
+        RecalculateAll();
+    }
+
+    private void OnPlateParamsChanged()
+    {
+        PlateThickness = Math.Max(0.5, PlateThickness);
+        PlateWidth = Math.Max(10.0, PlateWidth);
+        CurrentParams.Type = SectionType.Plate;
+        CurrentParams.Height = PlateThickness;
+        CurrentParams.Width = PlateWidth;
+        CurrentParams.LegThickness = PlateThickness;
+        CurrentParams.StandardProfileName = $"PL {PlateThickness:0.##}×{PlateWidth:0.##}";
+        RecalculateAll();
+    }
+
+    private void OnSnapshotChanged(ChangeEventArgs e)
+    {
+        ActiveSnapshotId = e.Value?.ToString() ?? SeedPaintPriceSnapshots.Latest.SnapshotId;
+        TargetSnapshotId = ActiveSnapshotId;
+    }
+
+    private void OnBaselineSnapshotChanged(ChangeEventArgs e)
+    {
+        BaselineSnapshotId = e.Value?.ToString() ?? SeedPaintPriceSnapshots.BaseSnapshot.SnapshotId;
+        RefreshProjectSchedulePrices();
+    }
+
+    private void OnTargetSnapshotChanged(ChangeEventArgs e)
+    {
+        TargetSnapshotId = e.Value?.ToString() ?? SeedPaintPriceSnapshots.Latest.SnapshotId;
+        RefreshProjectSchedulePrices();
+    }
+
+    private void SyncSnapshotPricesToCurrentLayers()
+    {
+        PaintPriceBacktrackingEngine.ApplySnapshotPrices(CurrentLayers, CurrentSnapshot, CurrentMethod);
+        RecalculateAll();
+        CopyAlertMessage = $"✓ 已同步【{CurrentSnapshot.SnapshotName}】价格至当前涂装方案！";
+        _ = Task.Delay(3000).ContinueWith(_ =>
+        {
+            CopyAlertMessage = null;
+            InvokeAsync(StateHasChanged);
+        });
+    }
+
+    private void OpenAddBrandModal()
+    {
+        NewQuoteBrandName = "";
+        NewQuoteCategory = "底漆";
+        NewQuoteModel = "";
+        NewQuotePrice = 45.0;
+        NewQuoteSupplier = "";
+        NewQuoteRemarks = "";
+        IsAddBrandModalOpen = true;
+    }
+
+    private void CloseAddBrandModal()
+    {
+        IsAddBrandModalOpen = false;
+    }
+
+    private void SaveNewBrandQuote()
+    {
+        if (string.IsNullOrWhiteSpace(NewQuoteBrandName)) return;
+
+        var quote = new BrandQuoteItem
+        {
+            BrandName = NewQuoteBrandName.Trim(),
+            MaterialCategory = NewQuoteCategory,
+            ProductModel = string.IsNullOrWhiteSpace(NewQuoteModel) ? $"{NewQuoteBrandName} {NewQuoteCategory}" : NewQuoteModel.Trim(),
+            UnitPrice = Math.Max(0.1, NewQuotePrice),
+            SupplierName = string.IsNullOrWhiteSpace(NewQuoteSupplier) ? "自主实地询价录入" : NewQuoteSupplier.Trim(),
+            QuoteDate = DateTime.Today,
+            Remarks = NewQuoteRemarks
+        };
+
+        SeedPaintPriceSnapshots.RegisterBrandQuote(ActiveSnapshotId, quote);
+        IsAddBrandModalOpen = false;
+        RefreshProjectSchedulePrices();
+
+        CopyAlertMessage = $"✓ 品牌报价【{quote.BrandName} - {quote.MaterialCategory} (¥{quote.UnitPrice}/kg)】已成功录入快照！";
+        _ = Task.Delay(3000).ContinueWith(_ =>
+        {
+            CopyAlertMessage = null;
+            InvokeAsync(StateHasChanged);
+        });
+    }
+
+    private void AddScheduleItemFromSpec(ProjectCoatingScheduleItem item, string partName)
+    {
+        var clone = new ProjectCoatingScheduleItem
+        {
+            PartName = partName,
+            Category = item.Category,
+            SpecName = item.SpecName,
+            ThicknessMm = item.ThicknessMm,
+            AreaPerTon = item.AreaPerTon,
+            ProjectTons = 10.0,
+            PaintUsageKgPerTon = item.PaintUsageKgPerTon,
+            BaseCostPerTon = item.BaseCostPerTon,
+            TargetCostPerTon = item.TargetCostPerTon
+        };
+        ProjectSchedule.Add(clone);
+        CopyAlertMessage = $"✓ 已添加【{clone.SpecName}】至工程防腐清单！";
+        _ = Task.Delay(2500).ContinueWith(_ =>
+        {
+            CopyAlertMessage = null;
+            InvokeAsync(StateHasChanged);
+        });
+    }
+
+    private void ApplyPlateToWorkbench(double thickness)
+    {
+        ActiveTab = 1;
+        SwitchToPlateMode();
+        SelectPlateThickness(thickness);
+    }
+
+    private void ApplyProfileToWorkbench(string specName, SectionType type)
+    {
+        ActiveTab = 1;
+        var found = StructuralSteelLibrary.AllSections.FirstOrDefault(x => specName.Contains(x.Designation));
+        if (found != null)
+        {
+            SectionInputMode = "standard";
+            ApplyStandardProfile(found);
+        }
+        else
+        {
+            SectionInputMode = "custom";
+            ChangeSectionType(type);
+        }
+    }
+
+    private void RefreshProjectSchedulePrices()
+    {
+        var bSnap = SeedPaintPriceSnapshots.GetById(BaselineSnapshotId);
+        var tSnap = SeedPaintPriceSnapshots.GetById(TargetSnapshotId);
+
+        foreach (var item in ProjectSchedule)
+        {
+            var dummy = PaintPriceBacktrackingEngine.BuildScheduleItem(
+                item.Category, item.SpecName, item.ThicknessMm, item.AreaPerTon, item.ProjectTons,
+                item.Category == "钢板板材" ? SectionType.Plate : SectionType.HBeam,
+                CurrentLayers, bSnap, tSnap, CurrentMethod, item.PartName);
+            item.BaseCostPerTon = dummy.BaseCostPerTon;
+            item.TargetCostPerTon = dummy.TargetCostPerTon;
+            item.PaintUsageKgPerTon = dummy.PaintUsageKgPerTon;
+        }
+    }
+
+    private void LoadDemoSchedule()
+    {
+        var bSnap = SeedPaintPriceSnapshots.GetById(BaselineSnapshotId);
+        var tSnap = SeedPaintPriceSnapshots.GetById(TargetSnapshotId);
+
+        ProjectSchedule =
+        [
+            PaintPriceBacktrackingEngine.BuildScheduleItem("钢板板材", "t = 10mm 钢板 (主底板)", 10.0, 25.48, 85.0, SectionType.Plate, CurrentLayers, bSnap, tSnap, CurrentMethod, "基础底板/预埋件"),
+            PaintPriceBacktrackingEngine.BuildScheduleItem("钢板板材", "t = 20mm 钢板 (翼缘加劲)", 20.0, 12.74, 120.0, SectionType.Plate, CurrentLayers, bSnap, tSnap, CurrentMethod, "箱柱翼缘与节点板"),
+            PaintPriceBacktrackingEngine.BuildScheduleItem("热轧H型钢", "H 400×200×8×13 (主梁)", 13.0, 26.8, 160.0, SectionType.HBeam, CurrentLayers, bSnap, tSnap, CurrentMethod, "2~4层主框架梁"),
+            PaintPriceBacktrackingEngine.BuildScheduleItem("方矩管/箱型", "Box 500×500×20 (主柱)", 20.0, 6.7, 95.0, SectionType.RHS, CurrentLayers, bSnap, tSnap, CurrentMethod, "中庭核心钢管柱"),
+            PaintPriceBacktrackingEngine.BuildScheduleItem("圆管 CHS", "CHS Φ219×8 (空间桁架)", 8.0, 16.5, 40.0, SectionType.CHS, CurrentLayers, bSnap, tSnap, CurrentMethod, "屋顶大跨空间管桁架")
+        ];
+    }
+
+    private async Task ExportScheduleToCsv()
+    {
+        if (ProjectSchedule.Count == 0) return;
+
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("序号,构件部位,规格分类,规格代号,厚度(mm),比表面积(m2/t),工程吨位(t),涂装总面积(m2),油漆单耗(kg/t),计划采购量(kg),基期单价(元/t),现行单价(元/t),基期合价(元),现行合价(元),调差金额(元),调差率(%)");
+
+        int idx = 1;
+        foreach (var item in ProjectSchedule)
+        {
+            sb.AppendLine($"{idx++},\"{item.PartName}\",\"{item.Category}\",\"{item.SpecName}\",{item.ThicknessMm:F1},{item.AreaPerTon:F2},{item.ProjectTons:F2},{item.TotalAreaM2:F2},{item.PaintUsageKgPerTon:F2},{item.TotalPaintKg:F1},{item.BaseCostPerTon:F1},{item.TargetCostPerTon:F1},{item.BaseTotalCost:F1},{item.TargetTotalCost:F1},{item.VarianceTotalCost:F1},{item.VariancePercentage:F1}%");
+        }
+
+        sb.AppendLine($",合计,,,总计,{ProjectScheduleSumArea / Math.Max(0.1, ProjectScheduleSumTons):F2},{ProjectScheduleSumTons:F2},{ProjectScheduleSumArea:F2},,{ProjectScheduleSumPaintKg:F1},,,{ProjectScheduleSumBaseCost:F1},{ProjectScheduleSumTargetCost:F1},{ProjectScheduleSumVariance:F1},{(ProjectScheduleSumBaseCost > 0 ? (ProjectScheduleSumVariance / ProjectScheduleSumBaseCost * 100.0) : 0):F1}%");
+
+        var bytes = System.Text.Encoding.UTF8.GetPreamble().Concat(System.Text.Encoding.UTF8.GetBytes(sb.ToString())).ToArray();
+        var base64 = Convert.ToBase64String(bytes);
+        var fileName = $"工程防腐清单调差表_{DateTime.Now:yyyyMMdd_HHmm}.csv";
+        await JS.InvokeVoidAsync("eval", $@"
+            var a = document.createElement('a');
+            a.href = 'data:text/csv;charset=utf-8;base64,{base64}';
+            a.download = '{fileName}';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        ");
+        CopyAlertMessage = $"✓ 已成功导出清单: {fileName}";
+        _ = Task.Delay(3000).ContinueWith(_ =>
+        {
+            CopyAlertMessage = null;
+            InvokeAsync(StateHasChanged);
+        });
+    }
+
+    private string GetSourceTypeLabel(PaintPriceSourceType type) => type switch
+    {
+        PaintPriceSourceType.MarketWebIndex => "大盘指数",
+        PaintPriceSourceType.ContractLockedBaseline => "合同锁定",
+        PaintPriceSourceType.CorporateInternalRate => "集采框架",
+        PaintPriceSourceType.ManufacturerDirect => "厂家直供",
+        _ => "现场询价"
+    };
 
     private void OnStandardSystemChanged(ChangeEventArgs e)
     {
@@ -1264,6 +2133,11 @@
 
     private string GetFormattedSectionDesignation()
     {
+        if (SectionInputMode == "plate" || CurrentParams.Type == SectionType.Plate)
+        {
+            return $"PL {PlateThickness:0.##}×{PlateWidth:0.##}";
+        }
+
         if (SectionInputMode == "standard" && !string.IsNullOrWhiteSpace(CurrentParams.StandardProfileName))
         {
             return CurrentParams.StandardProfileName;
@@ -1271,6 +2145,8 @@
 
         return CurrentParams.Type switch
         {
+            SectionType.Plate =>
+                $"PL {PlateThickness:0.##}×{PlateWidth:0.##}",
             SectionType.HBeam =>
                 $"H {CurrentParams.Height:F0}×{CurrentParams.Width:F0}×{CurrentParams.WebThickness:F0}×{CurrentParams.FlangeThickness:F0}",
             SectionType.RHS =>

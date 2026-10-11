@@ -17,6 +17,9 @@ public class ParametricSectionCalculator : ISectionCalculator
             case SectionType.Rectangle:
                 CalculateRectangle(p, res, mat);
                 break;
+            case SectionType.Plate:
+                CalculatePlate(p, res, mat);
+                break;
             case SectionType.Circle:
                 CalculateCircle(p, res, mat);
                 break;
@@ -100,6 +103,54 @@ public class ParametricSectionCalculator : ISectionCalculator
             new(b, 0),
             new(b, h),
             new(0, h)
+        ];
+    }
+
+    private void CalculatePlate(SectionParameters p, SectionPropertiesResult res, MaterialProfile mat)
+    {
+        double t = Math.Max(0.5, p.LegThickness > 0 ? p.LegThickness : p.Height);
+        double b = Math.Max(10.0, p.Width > 0 ? p.Width : 1000.0);
+
+        res.Area = b * t;
+        res.OuterPerimeter = 2.0 * (b + t);
+        res.InnerPerimeter = 0;
+        res.Perimeter = res.OuterPerimeter;
+        res.TopSurfaceWidth = b;
+        res.BottomSurfaceWidth = b;
+        res.Ymin = 0; res.Ymax = b;
+        res.Zmin = 0; res.Zmax = t;
+        res.Yc = b / 2.0;
+        res.Zc = t / 2.0;
+
+        res.Iy = (1.0 / 12.0) * b * Math.Pow(t, 3);
+        res.Iz = (1.0 / 12.0) * t * Math.Pow(b, 3);
+        res.Iyz = 0.0;
+        res.I1 = Math.Max(res.Iy, res.Iz);
+        res.I2 = Math.Min(res.Iy, res.Iz);
+        res.PrincipalAngleDeg = 0.0;
+
+        res.WyTop = (1.0 / 6.0) * b * Math.Pow(t, 2);
+        res.WyBot = res.WyTop;
+        res.WzLeft = (1.0 / 6.0) * t * Math.Pow(b, 2);
+        res.WzRight = res.WzLeft;
+
+        var (wply, wplz) = PlasticModulusEngine.CalculateRectangle(b, t);
+        res.Wply = wply;
+        res.Wplz = wplz;
+
+        var (j, iw) = TorsionWarpingEngine.CalculateRectangle(b, t);
+        res.TorsionConstantJ = j;
+        res.WarpingConstantIw = iw;
+
+        res.ShearAreaY = (5.0 / 6.0) * res.Area;
+        res.ShearAreaZ = (5.0 / 6.0) * res.Area;
+
+        res.OuterContour =
+        [
+            new(0, 0),
+            new(b, 0),
+            new(b, t),
+            new(0, t)
         ];
     }
 

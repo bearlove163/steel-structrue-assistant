@@ -63,6 +63,7 @@ public static class SectionShapeLossConfig
     {
         SectionType.RHS => 1.00,       // 箱型/方管：平整垂直靶面宽阔，飞溅最少
         SectionType.Rectangle => 1.00, // 矩形平整面
+        SectionType.Plate => 1.00,     // 钢板双面平整面，飞溅损耗最少
         SectionType.HBeam => 1.15,     // H型钢/工字钢：腹板翼缘直角阴角气流涡流反弹
         SectionType.Channel => 1.20,   // 槽钢：单侧翼缘内凹
         SectionType.TSection => 1.22,  // T型钢
