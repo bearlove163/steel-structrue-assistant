@@ -1,0 +1,140 @@
+@using EngineeringApp.Shared.Material.Pricing
+@using EngineeringApp.Client.Services
+@inject ThemeState Theme
+
+<div class="card @(Theme.IsDarkMode ? "bg-black bg-opacity-30 border-secondary" : "bg-white border-light-subtle shadow-sm") p-3 flex-grow-1">
+    <!-- 模块说明与 Tab 4 引导横幅 -->
+    <div class="alert alert-info py-2 px-3 mb-3 d-flex flex-wrap align-items-center justify-content-between gap-2 @(Theme.IsDarkMode ? "bg-info bg-opacity-10 border-info border-opacity-25 text-white" : "")">
+        <div class="small">
+            ℹ️ <b>模块说明：</b>当前选项卡为【大盘基准网价调差模拟器】，仅用于宏观测算大盘基价在两个快照日期的宏观波动。
+            若需查看<b>钢板五维加价原则时序演进</b>、<b>询价时间差异分批组合</b>及<b>价格修改全过程审计履历（含版本 Rev 自增、变更原因明细、修改抽屉与时间线）</b>，请前往【选项卡 4】：
+        </div>
+        <button class="btn btn-sm btn-success text-nowrap d-flex align-items-center gap-1 shadow-sm" @onclick="() => OnNavigateToProvenance.InvokeAsync()">
+            <span>📚 前往工程物料出处库与审计履历 ➔</span>
+        </button>
+    </div>
+
+    <h6 class="fw-bold @(Theme.IsDarkMode ? "text-warning" : "text-dark") mb-3 d-flex align-items-center gap-2">
+        <span>📈 工程价格基准日 vs 当前结算日 调差比对模拟器 (仅大盘基价层级)</span>
+    </h6>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-5">
+            <label class="form-label small @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1">【合同基准日】锁价快照 (Base Date):</label>
+            <select class="form-select form-select-sm @(Theme.IsDarkMode ? "bg-dark text-warning border-secondary" : "bg-white text-dark border-secondary-subtle")"
+                    @bind="VarianceBaseSnapshotId" @bind:after="RecalculateVariance">
+                @foreach (var snap in AllSnapshots)
+                {
+                    <option value="@snap.SnapshotId">
+                        📅 @snap.EffectiveDate.ToString("yyyy-MM-dd") - @snap.SnapshotName
+                    </option>
+                }
+            </select>
+        </div>
+        <div class="col-md-5">
+            <label class="form-label small @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1">【当前结算日】生效快照 (Settlement Date):</label>
+            <select class="form-select form-select-sm @(Theme.IsDarkMode ? "bg-dark text-success border-secondary" : "bg-white text-dark border-secondary-subtle")"
+                    @bind="VarianceTargetSnapshotId" @bind:after="RecalculateVariance">
+                @foreach (var snap in AllSnapshots)
+                {
+                    <option value="@snap.SnapshotId">
+                        📅 @snap.EffectiveDate.ToString("yyyy-MM-dd") - @snap.SnapshotName
+                    </option>
+                }
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1">工程模拟用钢量 (吨):</label>
+            <input type="number" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-secondary-subtle")"
+                   @bind="SimulatedProjectTons" @bind:after="RecalculateVariance" />
+        </div>
+    </div>
+
+    <!-- 调差比对表格 -->
+    <div class="table-responsive mb-4">
+        <table class="table @(Theme.IsDarkMode ? "table-dark table-hover table-bordered" : "table-hover table-bordered bg-white shadow-sm") small align-middle">
+            <thead class="@(Theme.IsDarkMode ? "table-secondary text-white" : "table-light text-dark")">
+                <tr>
+                    <th>材料品种</th>
+                    <th>合同基准日单价 (元/t)</th>
+                    <th>当前结算日单价 (元/t)</th>
+                    <th>吨钢涨跌差价 (ΔP)</th>
+                    <th>涨跌幅 (%)</th>
+                    <th>项目调差总金额影响 (ΔCost)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="fw-bold">普碳钢板 Q235B (20mm)</td>
+                    <td>¥@BaseSnapshot.PlateBaseQ235B.ToString("0.##")</td>
+                    <td>¥@TargetSnapshot.PlateBaseQ235B.ToString("0.##")</td>
+                    <td class="@(TargetSnapshot.PlateBaseQ235B - BaseSnapshot.PlateBaseQ235B >= 0 ? "text-success fw-bold" : "text-danger fw-bold")">
+                        @(TargetSnapshot.PlateBaseQ235B - BaseSnapshot.PlateBaseQ235B >= 0 ? "+" : "")
+                        @((TargetSnapshot.PlateBaseQ235B - BaseSnapshot.PlateBaseQ235B).ToString("0.##")) 元/t
+                    </td>
+                    <td>@(((TargetSnapshot.PlateBaseQ235B - BaseSnapshot.PlateBaseQ235B) / BaseSnapshot.PlateBaseQ235B * 100).ToString("0.2f"))%</td>
+                    <td class="fw-bold">
+                        ¥@(((TargetSnapshot.PlateBaseQ235B - BaseSnapshot.PlateBaseQ235B) * SimulatedProjectTons * 0.4).ToString("N0"))
+                    </td>
+                </tr>
+                <tr>
+                    <td class="fw-bold text-primary">低合金高强板 Q355B (20mm)</td>
+                    <td>¥@BaseSnapshot.PlateBaseQ355B.ToString("0.##")</td>
+                    <td>¥@TargetSnapshot.PlateBaseQ355B.ToString("0.##")</td>
+                    <td class="@(TargetSnapshot.PlateBaseQ355B - BaseSnapshot.PlateBaseQ355B >= 0 ? "text-success fw-bold" : "text-danger fw-bold")">
+                        @(TargetSnapshot.PlateBaseQ355B - BaseSnapshot.PlateBaseQ355B >= 0 ? "+" : "")
+                        @((TargetSnapshot.PlateBaseQ355B - BaseSnapshot.PlateBaseQ355B).ToString("0.##")) 元/t
+                    </td>
+                    <td>@(((TargetSnapshot.PlateBaseQ355B - BaseSnapshot.PlateBaseQ355B) / BaseSnapshot.PlateBaseQ355B * 100).ToString("0.2f"))%</td>
+                    <td class="fw-bold text-warning">
+                        ¥@(((TargetSnapshot.PlateBaseQ355B - BaseSnapshot.PlateBaseQ355B) * SimulatedProjectTons * 0.6).ToString("N0"))
+                    </td>
+                </tr>
+                <tr>
+                    <td class="fw-bold">热轧H型钢 Q355B</td>
+                    <td>¥@BaseSnapshot.HBeamBaseQ355B.ToString("0.##")</td>
+                    <td>¥@TargetSnapshot.HBeamBaseQ355B.ToString("0.##")</td>
+                    <td class="@(TargetSnapshot.HBeamBaseQ355B - BaseSnapshot.HBeamBaseQ355B >= 0 ? "text-success fw-bold" : "text-danger fw-bold")">
+                        @(TargetSnapshot.HBeamBaseQ355B - BaseSnapshot.HBeamBaseQ355B >= 0 ? "+" : "")
+                        @((TargetSnapshot.HBeamBaseQ355B - BaseSnapshot.HBeamBaseQ355B).ToString("0.##")) 元/t
+                    </td>
+                    <td>@(((TargetSnapshot.HBeamBaseQ355B - BaseSnapshot.HBeamBaseQ355B) / BaseSnapshot.HBeamBaseQ355B * 100).ToString("0.2f"))%</td>
+                    <td class="fw-bold">
+                        ¥@(((TargetSnapshot.HBeamBaseQ355B - BaseSnapshot.HBeamBaseQ355B) * SimulatedProjectTons * 0.3).ToString("N0"))
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- 调差测算结论框 -->
+    <div class="p-3 @(Theme.IsDarkMode ? "bg-warning bg-opacity-10 border-warning text-white" : "bg-warning-subtle border-warning-subtle text-dark") border rounded">
+        <div class="fw-bold text-warning mb-1">📌 材料价格波动工程调差评估结论</div>
+        <div class="small @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">
+            在 @SimulatedProjectTons 吨工程模拟用量下，由于大盘价格随时间波动，材料采购成本预计变动
+            <b class="text-success fs-6">
+                ¥@(((TargetSnapshot.PlateBaseQ355B - BaseSnapshot.PlateBaseQ355B) * SimulatedProjectTons).ToString("N0"))
+            </b> 元。在锁价冻结模式下，该差价可作为竣工结算索赔及价差补偿签证依据。
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public List<MaterialPriceSnapshot> AllSnapshots { get; set; } = [];
+    [Parameter] public EventCallback OnNavigateToProvenance { get; set; }
+
+    private string VarianceBaseSnapshotId = "SNAP-20260315-BASE";
+    private string VarianceTargetSnapshotId = "SNAP-20261008-LATEST";
+    private double SimulatedProjectTons = 500.0;
+
+    private MaterialPriceSnapshot BaseSnapshot =>
+        AllSnapshots.FirstOrDefault(s => s.SnapshotId == VarianceBaseSnapshotId) ?? SeedPriceSnapshots.GetById(VarianceBaseSnapshotId);
+
+    private MaterialPriceSnapshot TargetSnapshot =>
+        AllSnapshots.FirstOrDefault(s => s.SnapshotId == VarianceTargetSnapshotId) ?? SeedPriceSnapshots.GetById(VarianceTargetSnapshotId);
+
+    private void RecalculateVariance()
+    {
+        StateHasChanged();
+    }
+}

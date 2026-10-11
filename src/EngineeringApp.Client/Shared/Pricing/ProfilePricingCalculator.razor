@@ -1,0 +1,237 @@
+@using EngineeringApp.Shared.Material
+@using EngineeringApp.Shared.Material.Pricing
+@using EngineeringApp.Client.Services
+@inject ThemeState Theme
+@inject IJSRuntime JS
+
+<div class="row g-3 flex-grow-1">
+    <div class="col-lg-7">
+        <div class="card @(Theme.IsDarkMode ? "bg-black bg-opacity-30 border-secondary" : "bg-white border-light-subtle shadow-sm") p-3 h-100">
+            <h6 class="fw-bold text-primary mb-3 d-flex align-items-center gap-2">
+                <span>⚙️ 型材品类、截面参数与成型工艺配置</span>
+                <span class="badge bg-info text-dark text-xs">含圆转方特种冷成型</span>
+            </h6>
+
+            <!-- 型材大类选择 -->
+            <div class="row g-2 mb-3">
+                <div class="col-md-6">
+                    <label class="form-label small @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1">型材品类划分 (Profile Category):</label>
+                    <select class="form-select form-select-sm @(Theme.IsDarkMode ? "bg-dark text-warning border-secondary" : "bg-white text-dark border-secondary-subtle") fw-bold"
+                            @bind="ProfileParams.Category" @bind:after="OnProfileCategoryChanged">
+                        <option value="@ProfileCategory.RoundToSquare_RHS">★ 方矩管 (圆转方特种冷成型)</option>
+                        <option value="@ProfileCategory.HotRolled_H">热轧H型钢 / 工字钢</option>
+                        <option value="@ProfileCategory.Seamless_CHS">无缝钢管 (热轧穿孔连轧)</option>
+                        <option value="@ProfileCategory.Welded_CHS">直缝高频焊管 (ERW)</option>
+                        <option value="@ProfileCategory.StandardColdFormed_RHS">常规冷弯方矩管</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1">材质牌号:</label>
+                    <select class="form-select form-select-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-secondary-subtle")"
+                            @bind="ProfileParams.Grade" @bind:after="RecalculateProfile">
+                        <option value="@SteelGrade.Q235B">Q235B 普碳结构钢</option>
+                        <option value="@SteelGrade.Q355B">Q355B 低合金高强度钢</option>
+                        <option value="@SteelGrade.Q355D">Q355D 低温高强钢</option>
+                        <option value="@SteelGrade.A992">ASTM A992 (美标型钢)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- 截面型号规格 -->
+            <div class="row g-2 mb-3">
+                <div class="col-md-6">
+                    <label class="form-label small @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1">截面型号标注:</label>
+                    <input type="text" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-secondary-subtle") fw-bold"
+                           @bind="ProfileParams.SectionDesignation" @bind:after="RecalculateProfile" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1">壁厚/翼缘 (mm):</label>
+                    <input type="number" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-secondary-subtle")"
+                           @bind="ProfileParams.WallThicknessMm" @bind:after="RecalculateProfile" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1">单根长度 (m):</label>
+                    <input type="number" class="form-control form-control-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-secondary-subtle")"
+                           @bind="ProfileParams.LengthMeter" @bind:after="RecalculateProfile" />
+                </div>
+            </div>
+
+            <!-- 钢厂与物流调运 -->
+            <div class="row g-2 mb-3">
+                <div class="col-md-6">
+                    <label class="form-label small @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1">制造钢厂/基料产地:</label>
+                    <select class="form-select form-select-sm @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark border-secondary-subtle")"
+                            @bind="ProfileParams.SteelMillId" @bind:after="RecalculateProfile">
+                        @foreach (var mill in AllMills)
+                        {
+                            <option value="@mill.Id">@mill.Name (@mill.ProductionBase)</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1">调运目的地:</label>
+                    <select class="form-select form-select-sm @(Theme.IsDarkMode ? "bg-dark text-warning border-secondary" : "bg-white text-primary border-secondary-subtle")"
+                            @bind="ProfileParams.DestinationRegion" @bind:after="RecalculateProfile">
+                        <option value="华东-浙江制造车间">华东-浙江制造车间</option>
+                        <option value="华南-广东工程现场">华南-广东工程现场</option>
+                        <option value="京津冀鲁本地项目">京津冀鲁本地项目</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- ★ 圆转方工艺特有说明与开关 -->
+            @if (ProfileParams.Category == ProfileCategory.RoundToSquare_RHS)
+            {
+                <div class="p-3 @(Theme.IsDarkMode ? "bg-info bg-opacity-10 border-info border-opacity-25" : "bg-info-subtle border-info-subtle") rounded border mb-3">
+                    <div class="d-flex align-items-center gap-2 text-primary fw-bold mb-1">
+                        <span>🌀 圆转方工艺特性解析</span>
+                    </div>
+                    <p class="small @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-2">
+                        将热卷纵剪焊接为圆管后，经特种多道次重型模具强压冷挤压成立体方管。对于厚壁大截面（如 □400×400×16），四角塑性变形剧烈，易产生加工硬化与微裂纹。
+                    </p>
+                    <div class="form-check form-switch small">
+                        <input class="form-check-input" type="checkbox" id="annealSwitch"
+                               @bind="ProfileParams.NeedsCornerStressReliefAnneal" @bind:after="RecalculateProfile" />
+                        <label class="form-check-label @(Theme.IsDarkMode ? "text-warning" : "text-danger") fw-bold" for="annealSwitch">
+                            开启角部去应力退火热处理附加 (+¥180/t)
+                        </label>
+                    </div>
+                </div>
+            }
+
+            <div class="form-check small @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">
+                <input class="form-check-input" type="checkbox" id="fixedLenCheck"
+                       @bind="ProfileParams.IsFixedLength" @bind:after="RecalculateProfile" />
+                <label class="form-check-label" for="fixedLenCheck">
+                    按定尺长度供货 (>12m 超长定尺加价 +¥60/t)
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <!-- 右侧：型材核算与 Describe 结果 -->
+    <div class="col-lg-5">
+        <div class="card @(Theme.IsDarkMode ? "bg-black bg-opacity-40 border-info" : "bg-white border-info shadow") p-3 h-100 shadow d-flex flex-column">
+            <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle")">
+                <span class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted") small">型材与工艺定价核算</span>
+                <span class="badge bg-info text-dark">实时求解</span>
+            </div>
+
+            <!-- 最终型材综合单价 -->
+            <div class="@(Theme.IsDarkMode ? "bg-info bg-opacity-10 border-info border-opacity-50" : "bg-info-subtle border-info") p-3 rounded-3 border text-center mb-3">
+                <div class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted") small mb-1">型材综合采购到货单价</div>
+                <div class="display-6 fw-bold text-primary tracking-tight">
+                    ¥ @CurrentProfilePrice.FinalPricePerTon.ToString("N2")
+                    <span class="fs-6 fw-normal @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">元/吨</span>
+                </div>
+                <div class="@(Theme.IsDarkMode ? "text-info" : "text-secondary") small mt-1">
+                    含热卷/型钢基料 + 成型工艺费 + 调运物流费
+                </div>
+            </div>
+
+            <!-- 明细分解 -->
+            <div class="table-responsive mb-3">
+                <table class="table table-sm @(Theme.IsDarkMode ? "table-dark table-borderless" : "table-light table-borderless") small mb-0">
+                    <tbody>
+                        <tr>
+                            <td class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">基料/型钢基价:</td>
+                            <td class="text-end fw-bold">¥@CurrentProfilePrice.BasePricePerTon.ToString("0.##")</td>
+                        </tr>
+                        <tr>
+                            <td class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">钢厂品牌溢价:</td>
+                            <td class="text-end text-primary">+¥@CurrentProfilePrice.MillPremiumPerTon.ToString("0.##")</td>
+                        </tr>
+                        <tr>
+                            <td class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">规格/厚卷加价:</td>
+                            <td class="text-end text-warning">+¥@CurrentProfilePrice.ThicknessSurchargePerTon.ToString("0.##")</td>
+                        </tr>
+                        <tr>
+                            <td class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">冷弯/圆转方成型工费:</td>
+                            <td class="text-end text-danger fw-bold">+¥@CurrentProfilePrice.ProcessSurchargePerTon.ToString("0.##")</td>
+                        </tr>
+                        <tr>
+                            <td class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">定尺超长加价:</td>
+                            <td class="text-end text-warning">+¥@CurrentProfilePrice.DimensionSurchargePerTon.ToString("0.##")</td>
+                        </tr>
+                        <tr class="border-top @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle")">
+                            <td class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">调运物流费:</td>
+                            <td class="text-end text-success fw-bold">+¥@CurrentProfilePrice.FreightPerTon.ToString("0.##")</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Describe 框 -->
+            <div class="mt-auto @(Theme.IsDarkMode ? "bg-black border-secondary" : "bg-light border-light-subtle") p-3 rounded border">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="badge @(Theme.IsDarkMode ? "bg-secondary" : "bg-secondary-subtle text-dark border") text-xs">型材标准化 Describe 输出</span>
+                    <button class="btn btn-xs btn-outline-info py-0 px-2" @onclick="CopyProfileDescribeToClipboard">
+                        📋 复制
+                    </button>
+                </div>
+                <div class="font-monospace small @(Theme.IsDarkMode ? "text-info bg-dark border-secondary" : "text-dark bg-white border-secondary-subtle") p-2 rounded border text-break user-select-all" style="font-size: 12px; line-height: 1.6;">
+                    @CurrentProfilePrice.FullDescription
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public MaterialPriceSnapshot CurrentSnapshot { get; set; } = null!;
+    [Parameter] public StandardSystem CurrentStandard { get; set; } = StandardSystem.GB;
+    [Parameter] public List<SteelMillBrand> AllMills { get; set; } = [];
+
+    private ProfilePricingParameters ProfileParams = new();
+    private StandardMaterialItemPrice CurrentProfilePrice = new();
+
+    protected override void OnInitialized()
+    {
+        RecalculateProfile();
+    }
+
+    protected override void OnParametersSet()
+    {
+        RecalculateProfile();
+    }
+
+    private void RecalculateProfile()
+    {
+        if (CurrentSnapshot == null) return;
+        ProfileParams.Standard = CurrentStandard;
+        CurrentProfilePrice = ProfilePricingRuleEngine.Calculate(ProfileParams, CurrentSnapshot);
+    }
+
+    private void OnProfileCategoryChanged()
+    {
+        if (ProfileParams.Category == ProfileCategory.RoundToSquare_RHS)
+        {
+            ProfileParams.SectionDesignation = "□400×400×16";
+            ProfileParams.WallThicknessMm = 16.0;
+            ProfileParams.Process = ProfileFormingProcess.RoundToSquareColdFormed;
+        }
+        else if (ProfileParams.Category == ProfileCategory.HotRolled_H)
+        {
+            ProfileParams.SectionDesignation = "HM 300x200x9x14";
+            ProfileParams.WallThicknessMm = 14.0;
+            ProfileParams.Process = ProfileFormingProcess.DirectHotRolled;
+        }
+        else if (ProfileParams.Category == ProfileCategory.Seamless_CHS)
+        {
+            ProfileParams.SectionDesignation = "Φ325×16";
+            ProfileParams.WallThicknessMm = 16.0;
+            ProfileParams.Process = ProfileFormingProcess.HotPiercedSeamless;
+        }
+
+        RecalculateProfile();
+    }
+
+    private async Task CopyProfileDescribeToClipboard()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", CurrentProfilePrice.FullDescription);
+        }
+        catch { }
+    }
+}

@@ -1,0 +1,133 @@
+@using EngineeringApp.Shared.Material.Pricing
+@using EngineeringApp.Client.Services
+@inject ThemeState Theme
+
+@if (IsVisible && Record != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.65); z-index: 1060;">
+        <div class="modal-dialog modal-xl modal-dialog-centered">
+            <div class="modal-content @(Theme.IsDarkMode ? "bg-dark text-white border-secondary shadow-lg" : "bg-white text-dark shadow-lg")">
+                <div class="modal-header @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle")">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="fs-5">🕒</span>
+                        <div>
+                            <h6 class="modal-title fw-bold text-info mb-0">价格修改全过程审计履历 (Audit Trail & Process Log)</h6>
+                            <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">
+                                物料: @Record.DisplayTitle | 批次: <b class="font-monospace text-primary">@Record.InquiryBatchId</b> | 累计修订: @Record.RevisionLogs.Count 次
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close @(Theme.IsDarkMode ? "btn-close-white" : "")" @onclick="HandleClose"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- 物料指纹信息栏 -->
+                    <div class="p-2 mb-3 rounded border @(Theme.IsDarkMode ? "bg-black bg-opacity-40 border-secondary" : "bg-light border-light-subtle") d-flex flex-wrap align-items-center justify-content-between gap-2 text-xs">
+                        <div>
+                            <span class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">物料特征指纹:</span>
+                            <span class="font-monospace text-info ms-1">@Record.MaterialTag</span>
+                        </div>
+                        <div>
+                            <span class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">首期询价时间:</span>
+                            <span class="fw-bold ms-1">@Record.InquiryDate.ToString("yyyy-MM-dd HH:mm")</span>
+                        </div>
+                        <div>
+                            <span class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">当前单价:</span>
+                            <span class="text-success fw-bold ms-1">¥@Record.FinalPricePerTon.ToString("0.##")/t (Rev @Record.RevisionNumber)</span>
+                        </div>
+                    </div>
+
+                    <!-- 审计履历时间线 / 列表 -->
+                    @if (Record.RevisionLogs == null || Record.RevisionLogs.Count == 0)
+                    {
+                        <div class="text-center py-4 @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">
+                            该物料处于初始建档阶段 (Rev 1)，尚无修改过程记录。
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-sm @(Theme.IsDarkMode ? "table-dark table-hover table-bordered border-secondary" : "table-hover table-bordered bg-white shadow-sm border-light-subtle") small align-middle mb-0">
+                                <thead class="@(Theme.IsDarkMode ? "table-secondary text-white" : "table-light text-dark")">
+                                    <tr>
+                                        <th style="width: 70px;">版本</th>
+                                        <th style="min-width: 130px;">修订时间</th>
+                                        <th style="min-width: 100px;">经办人</th>
+                                        <th style="min-width: 180px;">变更原因</th>
+                                        <th style="min-width: 160px;">适用加价原则依据</th>
+                                        <th class="text-end" style="min-width: 120px;">修订前后单价</th>
+                                        <th class="text-end" style="min-width: 80px;">差额 ΔP</th>
+                                        <th style="min-width: 220px;">变更明细详情</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var log in Record.RevisionLogs.OrderByDescending(l => l.RevisionNumber))
+                                    {
+                                        <tr>
+                                            <td>
+                                                <span class="badge @(log.RevisionNumber > 1 ? "bg-info text-dark" : "bg-secondary") font-monospace">
+                                                    Rev @log.RevisionNumber
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <div>@log.RevisedAt.ToString("yyyy-MM-dd")</div>
+                                                <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">@log.RevisedAt.ToString("HH:mm:ss")</div>
+                                            </td>
+                                            <td class="fw-bold">@log.RevisedBy</td>
+                                            <td>
+                                                <span class="badge @(Theme.IsDarkMode ? "bg-dark text-warning border border-secondary" : "bg-warning bg-opacity-25 text-dark border border-warning")">
+                                                    @log.Reason
+                                                </span>
+                                            </td>
+                                            <td class="text-truncate" style="max-width: 180px;" title="@log.AppliedPrinciple">
+                                                @log.AppliedPrinciple
+                                            </td>
+                                            <td class="text-end font-monospace">
+                                                @if (log.PreviousPricePerTon > 0)
+                                                {
+                                                    <span class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">¥@log.PreviousPricePerTon.ToString("0.##")</span>
+                                                    <span> ➔ </span>
+                                                }
+                                                <b class="text-success">¥@log.NewPricePerTon.ToString("0.##")</b>
+                                            </td>
+                                            <td class="text-end">
+                                                @if (log.PreviousPricePerTon > 0)
+                                                {
+                                                    <span class="badge @(log.PriceDelta >= 0 ? "bg-danger" : "bg-success")">
+                                                        @(log.PriceDelta >= 0 ? "+" : "")@log.PriceDelta.ToString("0.##")
+                                                    </span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-secondary">初始建档</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">
+                                                    @log.ChangeDetails
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle")">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="HandleClose">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsVisible { get; set; }
+    [Parameter] public MaterialProvenanceRecord? Record { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private async Task HandleClose()
+    {
+        await OnClose.InvokeAsync();
+    }
+}
