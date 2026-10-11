@@ -1086,118 +1086,119 @@
                 </div>
             }
 
-            <!-- 加价原则回溯模式控制器 (时序加价原则变更模式) -->
-            <div class="p-2 mb-3 rounded border @(Theme.IsDarkMode ? "bg-dark bg-opacity-50 border-secondary" : "bg-light border-light-subtle")">
-                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1">
-                    <div class="d-flex align-items-center gap-2">
-                        <span class="small fw-bold text-nowrap @(Theme.IsDarkMode ? "text-warning" : "text-primary")">⚖️ 回溯加价原则应用模式:</span>
-                        <select class="form-select form-select-sm @(Theme.IsDarkMode ? "bg-black text-info border-secondary" : "bg-white text-dark border-secondary-subtle") w-auto fw-bold"
-                                @bind="CurrentPrincipleMode" @bind:after="RecalculateRetrospection">
-                            <option value="@RetrospectionPrincipleMode.ContractFixedPrinciples">模式 A：合同锁定加价原则 (锁定建档加价约定，仅大盘基价波动)</option>
-                            <option value="@RetrospectionPrincipleMode.TargetDateCurrentPrinciples">模式 B：目标时序现行原则 (厚度/尺寸/运费按目标期最新规则重算)</option>
-                            <option value="@RetrospectionPrincipleMode.LatestRevisedOverride">模式 C：最新修订与实付议价 (采用各批次最新修改版本与议价记录)</option>
-                        </select>
-                    </div>
-                    <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">
-                        💡 3种模式均支持用户全要素自定义修改数据与调差推演
-                    </div>
-                </div>
-
-                <!-- 3种模式针对性参数微调条 -->
-                @if (CurrentPrincipleMode == RetrospectionPrincipleMode.ContractFixedPrinciples)
-                {
-                    <div class="p-2 rounded border @(Theme.IsDarkMode ? "bg-primary bg-opacity-10 border-primary border-opacity-25" : "bg-primary-subtle border-primary-subtle") d-flex flex-wrap align-items-center justify-content-between gap-2 text-xs mt-2">
-                        <div>
-                            🔒 <b>模式 A (合同锁定)</b>：适用于固定加工费合同。结算固定沿用合同初次建档加价，仅计算大盘基价波动。
-                            如需微调单项物料合同锁定的加价或基准价，可点击各行【✏️ 修订】进行调整。
-                        </div>
-                    </div>
-                }
-                else if (CurrentPrincipleMode == RetrospectionPrincipleMode.TargetDateCurrentPrinciples)
-                {
-                    <div class="p-2 rounded border @(Theme.IsDarkMode ? "bg-warning bg-opacity-10 border-warning border-opacity-25" : "bg-warning-subtle border-warning-subtle") d-flex flex-wrap align-items-center justify-content-between gap-2 text-xs mt-2">
-                        <div class="d-flex align-items-center gap-2 flex-wrap">
-                            ⚙️ <b>模式 B (目标时序现行规则重算)</b>：全要素按目标期最新规则重算。可直接微调目标大盘基价模拟行情：
-                            <span>目标Q355B基价:</span>
+            <!-- 目标大盘与调差基准控制条 (透明工程计算规则，无需复杂抽象模式) -->
+            <div class="p-2.5 mb-3 rounded border @(Theme.IsDarkMode ? "bg-dark bg-opacity-50 border-secondary" : "bg-light border-light-subtle")">
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <span class="small fw-bold text-nowrap @(Theme.IsDarkMode ? "text-warning" : "text-primary")">
+                            📊 目标大盘行情模拟与调差测算:
+                        </span>
+                        <div class="d-flex align-items-center gap-1">
+                            <span class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">Q355B目标基价:</span>
                             <div class="input-group input-group-sm" style="width: 110px;">
                                 <span class="input-group-text py-0 text-xs">¥</span>
                                 <input type="number" class="form-control form-control-sm py-0 text-xs @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "")"
                                        @bind="RetrospectionTargetSnapshot.PlateBaseQ355B" @bind:after="RecalculateRetrospection" />
                             </div>
-                            <span>目标Q235B基价:</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-1">
+                            <span class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">Q235B目标基价:</span>
                             <div class="input-group input-group-sm" style="width: 110px;">
                                 <span class="input-group-text py-0 text-xs">¥</span>
                                 <input type="number" class="form-control form-control-sm py-0 text-xs @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "")"
                                        @bind="RetrospectionTargetSnapshot.PlateBaseQ235B" @bind:after="RecalculateRetrospection" />
                             </div>
                         </div>
-                        <button class="btn btn-xs btn-outline-warning" @onclick="() => ActiveTab = 1">
-                            🛠️ 配置厚度/尺寸阶梯加价规则 ➔
-                        </button>
                     </div>
-                }
-                else
-                {
-                    <div class="p-2 rounded border @(Theme.IsDarkMode ? "bg-success bg-opacity-10 border-success border-opacity-25" : "bg-success-subtle border-success-subtle") d-flex flex-wrap align-items-center justify-content-between gap-2 text-xs mt-2">
-                        <div>
-                            📝 <b>模式 C (最新修订与实付议价)</b>：适用于批次议价合同。采用各批次最新修改的加价与协商折扣参与结算。
-                            点击各行【✏️ 修订】可全要素修改8项加价因子，系统将自动递增 Rev 版本并写入审计履历。
-                        </div>
+
+                    <!-- 统一透明工程计算公式指示 -->
+                    <div class="text-xs px-2 py-1 rounded border @(Theme.IsDarkMode ? "bg-black bg-opacity-30 border-secondary text-info" : "bg-white border-info-subtle text-primary")">
+                        <span>📐 <b>核算规则</b>: 目标期回溯价 = 目标大盘基价 + 执行版各项加价 | 吨钢调差 ΔP = 回溯价 - 合同基期底账价</span>
                     </div>
-                }
+                </div>
             </div>
 
-            <!-- 全项目调差与成本聚合看板 -->
+            <!-- 全项目调差与成本聚合看板 (5大核心工程造价指标) -->
             <div class="row g-2 mb-3">
-                <div class="col-sm-6 col-lg-3">
+                <div class="col-sm-6 col-lg">
                     <div class="p-2 rounded border @(Theme.IsDarkMode ? "bg-secondary bg-opacity-10 border-secondary" : "bg-light border-light-subtle")">
-                        <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1">归档物料品种数</div>
+                        <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1">① 归档物料品种数</div>
                         <div class="fs-5 fw-bold text-primary">@ProvenanceRecords.Count <span class="text-xs fw-normal @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">种独立特征</span></div>
                     </div>
                 </div>
-                <div class="col-sm-6 col-lg-3">
+                <div class="col-sm-6 col-lg">
                     <div class="p-2 rounded border @(Theme.IsDarkMode ? "bg-secondary bg-opacity-10 border-secondary" : "bg-light border-light-subtle")">
-                        <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1">关联工程用钢总量</div>
+                        <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1">② 关联用钢总量</div>
                         <div class="fs-5 fw-bold text-info">@GetTotalProjectTons().ToString("N1") <span class="text-xs fw-normal @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">吨 (t)</span></div>
                     </div>
                 </div>
-                <div class="col-sm-6 col-lg-3">
+                <div class="col-sm-6 col-lg">
                     <div class="p-2 rounded border @(Theme.IsDarkMode ? "bg-secondary bg-opacity-10 border-secondary" : "bg-light border-light-subtle")">
-                        <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1">合同基期出处总额 (锚点)</div>
+                        <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1">③ 合同基期底账总额</div>
                         <div class="fs-5 fw-bold @(Theme.IsDarkMode ? "text-white" : "text-dark")">¥ @GetTotalBaseRecordedCost().ToString("N0")</div>
+                        <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">不可变调差锚点</div>
                     </div>
                 </div>
-                <div class="col-sm-6 col-lg-3">
-                    <div class="p-2 rounded border @(GetTotalCostVariance() >= 0 ? (Theme.IsDarkMode ? "bg-danger bg-opacity-10 border-danger border-opacity-50" : "bg-danger-subtle border-danger-subtle") : (Theme.IsDarkMode ? "bg-success bg-opacity-10 border-success border-opacity-50" : "bg-success-subtle border-success-subtle"))">
-                        <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1">项目时序调差差额 (ΔCost)</div>
-                        <div class="fs-5 fw-bold @(GetTotalCostVariance() >= 0 ? "text-danger" : "text-success")">
-                            @(GetTotalCostVariance() >= 0 ? "+" : "")¥ @GetTotalCostVariance().ToString("N0")
+                <div class="col-sm-6 col-lg">
+                    <div class="p-2 rounded border @(Theme.IsDarkMode ? "bg-secondary bg-opacity-10 border-secondary" : "bg-light border-light-subtle")">
+                        <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1">④ 当前执行采购实付</div>
+                        <div class="fs-5 fw-bold text-warning">¥ @GetTotalExecutionCost().ToString("N0")</div>
+                        <div class="text-xs">
+                            较基期:
+                            <span class="@(GetTotalExecutionVariance() > 0 ? "text-danger fw-bold" : (GetTotalExecutionVariance() < 0 ? "text-success fw-bold" : "text-muted"))">
+                                @(GetTotalExecutionVariance() >= 0 ? "+" : "")¥@GetTotalExecutionVariance().ToString("N0")
+                                @(GetTotalExecutionVariance() > 0 ? "(超支)" : (GetTotalExecutionVariance() < 0 ? "(节约)" : "(持平)"))
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-lg">
+                    <div class="p-2 rounded border @(GetTotalClaimVariance() >= 0 ? (Theme.IsDarkMode ? "bg-danger bg-opacity-10 border-danger border-opacity-50" : "bg-danger-subtle border-danger-subtle") : (Theme.IsDarkMode ? "bg-success bg-opacity-10 border-success border-opacity-50" : "bg-success-subtle border-success-subtle"))">
+                        <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1">⑤ 目标期调差索赔总额</div>
+                        <div class="fs-5 fw-bold @(GetTotalClaimVariance() >= 0 ? "text-danger" : "text-success")">
+                            @(GetTotalClaimVariance() >= 0 ? "+" : "")¥ @GetTotalClaimVariance().ToString("N0")
+                        </div>
+                        <div class="text-xs @(GetTotalClaimVariance() >= 0 ? "text-danger" : "text-success")">
+                            @(GetTotalClaimVariance() >= 0 ? "▲ 应向业主主张调增" : "▼ 依合同应予核减")
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- 物料出处记录与跨时序回溯表格 -->
+            <!-- 物料出处记录与跨时序回溯表格 (造价三态并列：合同底账 / 当前执行 / 目标期回溯) -->
             <div class="table-responsive flex-grow-1 mb-3">
                 <table class="table table-sm @(Theme.IsDarkMode ? "table-dark table-hover table-bordered border-secondary" : "table-hover table-bordered bg-white shadow-sm border-light-subtle") small align-middle mb-0">
                     <thead class="@(Theme.IsDarkMode ? "table-secondary text-white" : "table-light text-dark")">
                         <tr>
                             <th style="width: 35px;">#</th>
-                            <th style="min-width: 260px;">物料、规格与特征指纹 (点击标签直接复制)</th>
-                            <th style="min-width: 140px;">询价时间与加价依据</th>
-                            <th class="text-end" style="min-width: 120px;">合同出处单价 (基准)</th>
-                            <th class="text-end" style="min-width: 130px;">回溯单价 (@RetrospectionTargetSnapshot.EffectiveDate.ToString("MM-dd"))</th>
+                            <th style="min-width: 250px;">物料规格与特征出处 (点击标签一键复制)</th>
+                            <th style="min-width: 135px;">询价批次与依据</th>
+                            <th class="text-end" style="min-width: 125px;">
+                                <div>合同基期单价</div>
+                                <div class="text-xs fw-normal @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">(不可变底账)</div>
+                            </th>
+                            <th class="text-end" style="min-width: 160px;">
+                                <div class="d-flex align-items-center justify-content-end gap-1">
+                                    <span>当前执行采购价</span>
+                                    <span class="badge bg-primary text-xs" title="可点击单元格快速微调">微调⚡</span>
+                                </div>
+                                <div class="text-xs fw-normal @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">(最新实付/谈判)</div>
+                            </th>
+                            <th class="text-end" style="min-width: 140px;">
+                                <div>目标期回溯单价</div>
+                                <div class="text-xs fw-normal @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">(@RetrospectionTargetSnapshot.EffectiveDate.ToString("MM-dd") 大盘)</div>
+                            </th>
                             <th class="text-end" style="min-width: 95px;">吨差 (ΔP)</th>
-                            <th style="width: 85px;">用量 (t)</th>
-                            <th class="text-end" style="min-width: 110px;">调差额 (ΔCost)</th>
-                            <th class="text-center" style="min-width: 135px;">操作与审计</th>
+                            <th style="width: 80px;">用量 (t)</th>
+                            <th class="text-end" style="min-width: 110px;">调差总额 (ΔCost)</th>
+                            <th class="text-center" style="min-width: 155px;">操作与审计</th>
                         </tr>
                     </thead>
                     <tbody>
                         @if (ProvenanceRecords.Count == 0)
                         {
                             <tr>
-                                <td colspan="9" class="text-center py-4 @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">
+                                <td colspan="10" class="text-center py-4 @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">
                                     暂无物料出处记录。请前往【钢板五维加价】配置钢板并点击“📌 登记入库”按钮添加。
                                 </td>
                             </tr>
@@ -1206,10 +1207,12 @@
                         {
                             @foreach (var rec in ProvenanceRecords)
                             {
-                                var retroPrice = rec.CalculateAtSnapshot(RetrospectionTargetSnapshot, ThicknessLadders, DimensionRules, CurrentPrincipleMode);
+                                var retroPrice = rec.CalculateAtSnapshot(RetrospectionTargetSnapshot, ThicknessLadders, DimensionRules);
                                 double deltaP = retroPrice.FinalPricePerTon - rec.ContractBaselinePrice;
                                 double tons = GetRecordTons(rec.Id);
                                 double deltaCost = deltaP * tons;
+                                double execVariance = rec.FinalPricePerTon - rec.ContractBaselinePrice;
+                                bool isQuickEditing = QuickEditingRecordId == rec.Id;
 
                                 <tr>
                                     <td>@rec.Id</td>
@@ -1240,7 +1243,7 @@
                                                 <span class="badge bg-warning text-dark text-xs p-0 px-1">@(rec.PlateParameters.UT == UltrasonicInspection.ClassI ? "UT-I" : "UT-II")</span>
                                             }
                                         </div>
-                                        <!-- Line 3: 物料指纹唯一标签 (点击直接复制，移入悬停变手型，无多余独立图标) -->
+                                        <!-- Line 3: 物料指纹唯一标签 (点击直接复制，移入悬停变手型) -->
                                         <div class="mt-1">
                                             <span class="badge font-monospace text-xs text-truncate clickable-tag @(Theme.IsDarkMode ? "bg-dark text-info border border-secondary" : "bg-light text-primary border border-primary-subtle")"
                                                   style="cursor: pointer; max-width: 100%; transition: all 0.2s;"
@@ -1252,48 +1255,100 @@
                                     </td>
                                     <td>
                                         <div class="fw-bold">📅 @rec.InquiryDate.ToString("yyyy-MM-dd")</div>
-                                        <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted") text-truncate" style="max-width: 140px;" title="@rec.InquiryVendor">
+                                        <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted") text-truncate" style="max-width: 135px;" title="@rec.InquiryVendor">
                                             @rec.InquiryVendor
                                         </div>
                                         <div class="mt-1 d-flex align-items-center gap-1">
                                             <span class="badge @(rec.RevisionNumber > 1 ? "bg-success text-white" : "bg-secondary text-white") text-xs">
                                                 Rev @rec.RevisionNumber
                                             </span>
-                                            <span class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted") text-truncate" style="max-width: 110px;" title="@rec.PricingPrincipleNote">
+                                            <span class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted") text-truncate" style="max-width: 100px;" title="@rec.PricingPrincipleNote">
                                                 @rec.PricingPrincipleNote
                                             </span>
                                         </div>
                                     </td>
+
+                                    <!-- 列 1: 合同基期底账单价 (不可变锚点) -->
                                     <td class="text-end">
-                                        <div class="fw-bold">¥@rec.ContractBaselinePrice.ToString("0.##")</div>
-                                        <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">@rec.EffectiveDate.ToString("yy-MM-dd") 基准</div>
-                                        @if (rec.RevisionNumber > 1 && Math.Abs(rec.FinalPricePerTon - rec.ContractBaselinePrice) > 0.01)
+                                        <div class="fw-bold fs-6">¥@rec.ContractBaselinePrice.ToString("0.##")</div>
+                                        <div class="text-xs text-success">🔒 锁定底账</div>
+                                    </td>
+
+                                    <!-- 列 2: 当前执行采购单价 (支持就地快捷微调) -->
+                                    <td class="text-end">
+                                        @if (isQuickEditing)
                                         {
-                                            <div class="text-xs text-warning mt-0.5">当前Rev: ¥@rec.FinalPricePerTon.ToString("0.##")</div>
+                                            <div class="p-1 rounded border @(Theme.IsDarkMode ? "bg-dark border-primary" : "bg-white border-primary shadow-sm") text-start" style="min-width: 155px;">
+                                                <div class="text-xs text-primary fw-bold mb-1">⚡ 快速微调执行价:</div>
+                                                <div class="input-group input-group-sm mb-1">
+                                                    <span class="input-group-text py-0 text-xs">¥</span>
+                                                    <input type="number" class="form-control form-control-sm py-0 text-xs fw-bold"
+                                                           @bind="QuickEditPriceInput" />
+                                                </div>
+                                                <input type="text" class="form-control form-control-sm py-0 text-xs mb-1"
+                                                       @bind="QuickEditReasonInput" placeholder="微调原因 (如谈判让利)" />
+                                                <div class="d-flex justify-content-end gap-1">
+                                                    <button class="btn btn-xs btn-outline-secondary py-0 px-1" @onclick="CancelQuickEdit">取消</button>
+                                                    <button class="btn btn-xs btn-primary py-0 px-2 fw-bold" @onclick="() => SaveQuickEdit(rec)">保存</button>
+                                                </div>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <div class="d-flex align-items-center justify-content-end gap-1" style="cursor: pointer;" @onclick="() => StartQuickEdit(rec)" title="点击快捷微调当前执行价">
+                                                <span class="fw-bold fs-6 @(rec.RevisionNumber > 1 ? "text-warning" : "")">¥@rec.FinalPricePerTon.ToString("0.##")</span>
+                                                <span class="text-xs text-primary" title="点击微调">✏️</span>
+                                            </div>
+                                            <div class="mt-0.5">
+                                                @if (Math.Abs(execVariance) < 0.01)
+                                                {
+                                                    <span class="badge @(Theme.IsDarkMode ? "bg-secondary text-white" : "bg-light text-muted border") text-xs">较底账持平</span>
+                                                }
+                                                else if (execVariance > 0)
+                                                {
+                                                    <span class="badge bg-warning text-dark text-xs" title="实际采购较合同底账超支">实付超支 +¥@execVariance.ToString("0.##")</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-success text-white text-xs" title="实际采购较合同底账节约">实付节约 -¥@(Math.Abs(execVariance).ToString("0.##"))</span>
+                                                }
+                                            </div>
                                         }
                                     </td>
+
+                                    <!-- 列 3: 目标期回溯单价 -->
                                     <td class="text-end">
-                                        <div class="fw-bold text-primary">¥@retroPrice.FinalPricePerTon.ToString("0.##")</div>
-                                        <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">@RetrospectionTargetSnapshot.SnapshotName</div>
+                                        <div class="fw-bold text-primary fs-6">¥@retroPrice.FinalPricePerTon.ToString("0.##")</div>
+                                        <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">
+                                            大盘¥@retroPrice.BasePricePerTon.ToString("0") + 加价¥@((retroPrice.FinalPricePerTon - retroPrice.BasePricePerTon).ToString("0"))
+                                        </div>
                                     </td>
+
+                                    <!-- 列 4: 吨钢调差 ΔP -->
                                     <td class="text-end">
-                                        <span class="badge @(deltaP >= 0 ? "bg-danger" : "bg-success")">
+                                        <span class="badge @(deltaP >= 0 ? "bg-danger" : "bg-success") fs-7">
                                             @(deltaP >= 0 ? "+" : "")@deltaP.ToString("0.##")
                                         </span>
                                     </td>
+
+                                    <!-- 列 5: 工程用量 (t) -->
                                     <td>
                                         <input type="number" class="form-control form-control-sm text-center py-0 px-1 @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
                                                value="@tons"
                                                @onchange="(e) => SetRecordTons(rec.Id, e.Value)"
                                                style="width: 75px;" />
                                     </td>
+
+                                    <!-- 列 6: 调差总额 ΔCost -->
                                     <td class="text-end fw-bold @(deltaCost >= 0 ? "text-danger" : "text-success")">
                                         @(deltaCost >= 0 ? "+" : "")¥@deltaCost.ToString("N0")
                                     </td>
+
+                                    <!-- 操作与审计 -->
                                     <td class="text-center">
                                         <div class="d-flex align-items-center justify-content-center gap-1">
-                                            <button class="btn btn-xs btn-outline-warning p-1 px-2" @onclick="() => OpenRevisionModal(rec)" title="修订单价/加价原则，写入过程审计记录">
-                                                ✏️ 修订
+                                            <button class="btn btn-xs btn-outline-warning p-1 px-2" @onclick="() => OpenRevisionModal(rec)" title="追加新询价批次或修改各加价项，生成新版本履历">
+                                                ✏️ 追加批次
                                             </button>
                                             <button class="btn btn-xs btn-outline-info p-1 px-2" @onclick="() => OpenAuditModal(rec)" title="查看过程变更审计履历 (@rec.RevisionLogs.Count 次)">
                                                 🕒 履历 (@rec.RevisionLogs.Count)
@@ -1313,15 +1368,16 @@
             <!-- 底部结论与索赔调差指引 -->
             <div class="p-3 rounded border @(Theme.IsDarkMode ? "bg-dark bg-opacity-50 border-secondary" : "bg-light border-light-subtle") d-flex flex-wrap align-items-center justify-content-between gap-2">
                 <div class="small">
-                    <b>💡 工程成本回溯结论:</b>
-                    当前基于回溯模式 <span class="badge bg-primary">@(CurrentPrincipleMode == RetrospectionPrincipleMode.ContractFixedPrinciples ? "模式A: 合同锁定" : (CurrentPrincipleMode == RetrospectionPrincipleMode.TargetDateCurrentPrinciples ? "模式B: 现行重算" : "模式C: 最新修订"))</span>，
-                    针对目标快照 <span class="text-primary fw-bold">@RetrospectionTargetSnapshot.SnapshotName</span>，
-                    全项目 @ProvenanceRecords.Count 种物料构件共计 <span class="fw-bold">@GetTotalProjectTons().ToString("N1")</span> 吨钢，
-                    产生的物料总调差额为
-                    <b class="@(GetTotalCostVariance() >= 0 ? "text-danger fs-6" : "text-success fs-6")">
-                        @(GetTotalCostVariance() >= 0 ? "+" : "")¥ @GetTotalCostVariance().ToString("N0") 元
+                    <b>💡 工程造价与索赔核算结论:</b>
+                    基于目标快照 <span class="text-primary fw-bold">@RetrospectionTargetSnapshot.SnapshotName (@RetrospectionTargetSnapshot.EffectiveDate.ToString("yyyy-MM-dd"))</span>，
+                    全项目 @ProvenanceRecords.Count 种物料构件共计 <span class="fw-bold">@GetTotalProjectTons().ToString("N1")</span> 吨钢：
+                    合同基期底账为 <span class="fw-bold">¥@GetTotalBaseRecordedCost().ToString("N0")</span> 元，
+                    当前执行采购实付为 <span class="fw-bold text-warning">¥@GetTotalExecutionCost().ToString("N0")</span> 元 (采购较基期@(GetTotalExecutionVariance() >= 0 ? "超支" : "节约") ¥@Math.Abs(GetTotalExecutionVariance()).ToString("N0") 元)，
+                    面向业主的目标期物料调差索赔总额为
+                    <b class="@(GetTotalClaimVariance() >= 0 ? "text-danger fs-6" : "text-success fs-6")">
+                        @(GetTotalClaimVariance() >= 0 ? "+" : "")¥ @GetTotalClaimVariance().ToString("N0") 元
                     </b>。
-                    具备完整的规格、批次、询价时间与加价原则变更全过程审计履历，可直接导出作为工程结算签证附件。
+                    全生命周期价格与批次变更具备不可篡改审计追踪，可直接导出作为工程结算签证核心依据。
                 </div>
                 <div class="d-flex align-items-center gap-2">
                     <button class="btn btn-sm btn-outline-secondary" @onclick="ResetRecordTons">
@@ -1484,25 +1540,6 @@
                                 </div>
                             </div>
 
-                            <!-- 模式 A 合同锁定项微调 (可选) -->
-                            <div class="row g-2 mt-1 pt-2 border-top @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle")">
-                                <div class="col-md-6">
-                                    <label class="form-label text-xs text-info mb-1">🔒 模式 A 合同锁定厚度加价基数:</label>
-                                    <div class="input-group input-group-sm">
-                                        <span class="input-group-text @(Theme.IsDarkMode ? "bg-dark text-white-50 border-secondary" : "") py-0">¥</span>
-                                        <input type="number" class="form-control @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "")"
-                                               @bind="EditContractThicknessSurcharge" />
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label text-xs text-info mb-1">🔒 模式 A 合同锁定调运费基数:</label>
-                                    <div class="input-group input-group-sm">
-                                        <span class="input-group-text @(Theme.IsDarkMode ? "bg-dark text-white-50 border-secondary" : "") py-0">¥</span>
-                                        <input type="number" class="form-control @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "")"
-                                               @bind="EditContractFreight" />
-                                    </div>
-                                </div>
-                            </div>
 
                             <!-- 直接包干一口价 -->
                             <div class="mt-2 pt-2 border-top @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle")">
@@ -1715,9 +1752,13 @@
     private List<MaterialProvenanceRecord> ProvenanceRecords = [];
     private string RetrospectionTargetSnapshotId = "SNAP-20261008-LATEST";
     private MaterialPriceSnapshot RetrospectionTargetSnapshot => SeedPriceSnapshots.GetById(RetrospectionTargetSnapshotId);
-    private RetrospectionPrincipleMode CurrentPrincipleMode = RetrospectionPrincipleMode.TargetDateCurrentPrinciples;
     private Dictionary<int, double> RecordTons = new();
     private string CurrentPlateTag => MaterialProvenanceTagBuilder.GeneratePlateTag(PlateParams);
+
+    // 就地快捷微调执行单价状态
+    private int? QuickEditingRecordId = null;
+    private double QuickEditPriceInput = 0;
+    private string QuickEditReasonInput = "商务议价让利微调";
 
     // 出处登记表单状态
     private string ProvenanceArchiveProjectInput = "粤港澳大湾区钢构主厂房项目";
@@ -2018,11 +2059,57 @@
 
     private double GetTotalBaseRecordedCost() => ProvenanceRecords.Sum(r => r.ContractBaselinePrice * GetRecordTons(r.Id));
 
-    private double GetTotalRetrospectiveCost() => ProvenanceRecords.Sum(r => r.CalculateAtSnapshot(RetrospectionTargetSnapshot, ThicknessLadders, DimensionRules, CurrentPrincipleMode).FinalPricePerTon * GetRecordTons(r.Id));
+    private double GetTotalExecutionCost() => ProvenanceRecords.Sum(r => r.FinalPricePerTon * GetRecordTons(r.Id));
 
-    private double GetTotalCostVariance() => GetTotalRetrospectiveCost() - GetTotalBaseRecordedCost();
+    private double GetTotalExecutionVariance() => GetTotalExecutionCost() - GetTotalBaseRecordedCost();
+
+    private double GetTotalRetrospectiveCost() => ProvenanceRecords.Sum(r => r.CalculateAtSnapshot(RetrospectionTargetSnapshot, ThicknessLadders, DimensionRules).FinalPricePerTon * GetRecordTons(r.Id));
+
+    private double GetTotalClaimVariance() => GetTotalRetrospectiveCost() - GetTotalBaseRecordedCost();
+
+    private double GetTotalCostVariance() => GetTotalClaimVariance();
 
     private void RecalculateRetrospection() => StateHasChanged();
+
+    private void StartQuickEdit(MaterialProvenanceRecord rec)
+    {
+        QuickEditingRecordId = rec.Id;
+        QuickEditPriceInput = rec.FinalPricePerTon;
+        QuickEditReasonInput = "商务议价让利微调";
+    }
+
+    private void CancelQuickEdit()
+    {
+        QuickEditingRecordId = null;
+    }
+
+    private async Task SaveQuickEdit(MaterialProvenanceRecord rec)
+    {
+        if (QuickEditingRecordId != rec.Id) return;
+        if (QuickEditPriceInput <= 0) return;
+
+        double oldPrice = rec.FinalPricePerTon;
+        double delta = QuickEditPriceInput - oldPrice;
+        string reason = string.IsNullOrWhiteSpace(QuickEditReasonInput) ? "快捷单价微调" : QuickEditReasonInput;
+        string details = $"执行单价快速微调: ¥{oldPrice:0.##} ➔ ¥{QuickEditPriceInput:0.##}/t (变动: {(delta >= 0 ? "+" : "")}{delta:0.##} 元/t)";
+
+        rec.AddRevision(
+            reason: reason,
+            revisedBy: "成本造价师",
+            newPricePerTon: QuickEditPriceInput,
+            changeDetails: details,
+            appliedPrinciple: rec.PricingPrincipleNote
+        );
+
+        try
+        {
+            await Http.PutAsJsonAsync($"/api/pricing/provenance-records/{rec.Id}", rec);
+        }
+        catch { }
+
+        QuickEditingRecordId = null;
+        StateHasChanged();
+    }
 
     private void OpenRevisionModal(MaterialProvenanceRecord rec)
     {

@@ -36,26 +36,6 @@ public static class MaterialProvenanceTagBuilder
     }
 }
 
-/// <summary>
-/// 跨时序回溯时加价原则应用模式 (Pricing Principle Retrospection Mode)
-/// </summary>
-public enum RetrospectionPrincipleMode
-{
-    /// <summary>
-    /// 【模式 A：合同锁定加价原则】：沿用原询价建档时约定的加价原则 (固定加价)，仅回溯大盘基价波动
-    /// </summary>
-    ContractFixedPrinciples,
-
-    /// <summary>
-    /// 【模式 B：目标时序现行原则】：厚度/定尺/公差等加价规则完全按照目标快照时期的最新规则矩阵重算
-    /// </summary>
-    TargetDateCurrentPrinciples,
-
-    /// <summary>
-    /// 【模式 C：最新修订与实付议价】：直接以该物料最新修订履历中的实付加价为准
-    /// </summary>
-    LatestRevisedOverride
-}
 
 /// <summary>
 /// 物料价格与加价原则变更履历 (Material Price & Principle Revision Audit Log)
@@ -172,69 +152,25 @@ public class MaterialProvenanceRecord
     public PlatePricingParameters PlateParameters { get; set; } = new();
 
     /// <summary>
-    /// 对当前物料出处记录，指定任意历史或未来价格快照及加价原则模式进行时序价格回溯核算
+    /// 对当前物料出处记录，指定目标价格快照进行时序调差回溯核算
+    /// 核心工程造价逻辑：目标期回溯单价 = 目标大盘基价 + 当前执行版的各项有效加价
     /// </summary>
     public StandardMaterialItemPrice CalculateAtSnapshot(
         MaterialPriceSnapshot targetSnapshot,
         IList<PlateThicknessLadder>? ladders = null,
-        IList<PlateDimensionRule>? dimRules = null,
-        RetrospectionPrincipleMode principleMode = RetrospectionPrincipleMode.TargetDateCurrentPrinciples)
+        IList<PlateDimensionRule>? dimRules = null)
     {
         ArgumentNullException.ThrowIfNull(targetSnapshot);
 
-        if (principleMode == RetrospectionPrincipleMode.ContractFixedPrinciples)
-        {
-            // 模式 A：合同锁价加价模式。加价项沿用原合同/初次询价时约定的固定加价，仅大盘基价随目标快照浮动
-            var calculated = PlatePricingRuleEngine.Calculate(PlateParameters, targetSnapshot, ladders, dimRules);
-            calculated.MillPremiumPerTon = MillPremiumPerTon;
-            calculated.ThicknessSurchargePerTon = ContractThicknessSurchargePerTon > 0 ? ContractThicknessSurchargePerTon : ThicknessSurchargePerTon;
-            calculated.DimensionSurchargePerTon = DimensionSurchargePerTon;
-            calculated.ToleranceSurchargePerTon = ToleranceSurchargePerTon;
-            calculated.PerformanceSurchargePerTon = PerformanceSurchargePerTon;
-            calculated.InspectionSurchargePerTon = InspectionSurchargePerTon;
-            calculated.FreightPerTon = ContractFreightPerTon > 0 ? ContractFreightPerTon : FreightPerTon;
-            return calculated;
-        }
-
-        if (principleMode == RetrospectionPrincipleMode.LatestRevisedOverride)
-        {
-            // 模式 C：最新修订与实付议价模式。直接以该物料最新修订履历中的实付加价与最新协商运费为准
-            var calculated = PlatePricingRuleEngine.Calculate(PlateParameters, targetSnapshot, ladders, dimRules);
-            calculated.MillPremiumPerTon = MillPremiumPerTon;
-            calculated.ThicknessSurchargePerTon = ThicknessSurchargePerTon;
-            calculated.DimensionSurchargePerTon = DimensionSurchargePerTon;
-            calculated.ToleranceSurchargePerTon = ToleranceSurchargePerTon;
-            calculated.PerformanceSurchargePerTon = PerformanceSurchargePerTon;
-            calculated.InspectionSurchargePerTon = InspectionSurchargePerTon;
-            calculated.FreightPerTon = FreightPerTon;
-            return calculated;
-        }
-
-        // 模式 B：目标时序现行原则模式。厚度/定尺等加价规则完全按照目标快照时期的最新规则矩阵重算
-        var dynamicParams = new PlatePricingParameters
-        {
-            Standard = PlateParameters.Standard,
-            Grade = PlateParameters.Grade,
-            ThicknessMm = PlateParameters.ThicknessMm,
-            WidthMm = PlateParameters.WidthMm,
-            LengthMm = PlateParameters.LengthMm,
-            CutType = PlateParameters.CutType,
-            Tolerance = PlateParameters.Tolerance,
-            Flatness = PlateParameters.Flatness,
-            Impact = PlateParameters.Impact,
-            ZDirection = PlateParameters.ZDirection,
-            Metallurgy = PlateParameters.Metallurgy,
-            UT = PlateParameters.UT,
-            Certificate = PlateParameters.Certificate,
-            SteelMillId = PlateParameters.SteelMillId,
-            Delivery = PlateParameters.Delivery,
-            DestinationRegion = PlateParameters.DestinationRegion,
-            CustomThicknessSurcharge = null,
-            CustomDimensionSurcharge = null,
-            CustomMillPremium = PlateParameters.CustomMillPremium,
-            CustomFreightPerTon = PlateParameters.CustomFreightPerTon
-        };
-        return PlatePricingRuleEngine.Calculate(dynamicParams, targetSnapshot, ladders, dimRules);
+        var calculated = PlatePricingRuleEngine.Calculate(PlateParameters, targetSnapshot, ladders, dimRules);
+        calculated.MillPremiumPerTon = MillPremiumPerTon;
+        calculated.ThicknessSurchargePerTon = ThicknessSurchargePerTon;
+        calculated.DimensionSurchargePerTon = DimensionSurchargePerTon;
+        calculated.ToleranceSurchargePerTon = ToleranceSurchargePerTon;
+        calculated.PerformanceSurchargePerTon = PerformanceSurchargePerTon;
+        calculated.InspectionSurchargePerTon = InspectionSurchargePerTon;
+        calculated.FreightPerTon = FreightPerTon;
+        return calculated;
     }
 
     /// <summary>
