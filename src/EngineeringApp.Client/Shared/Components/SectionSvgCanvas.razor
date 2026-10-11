@@ -70,6 +70,26 @@
                     @((MarkupString)$"<text x=\"{ToSvgX(Result.Yc):F1}\" y=\"{ToSvgY(slabLabelZ):F1}\" fill=\"#f97316\" font-size=\"{slabFontSize:F1}\" font-weight=\"bold\" text-anchor=\"middle\" dominant-baseline=\"middle\">{slabText}</text>")
                 }
 
+                <!-- 钢板板材上下双面防腐涂装指示标线 -->
+                @if (Parameters?.Type == SectionType.Plate)
+                {
+                    double topZ = Result.Zmax;
+                    double botZ = Result.Zmin;
+                    <line x1="@ToSvgX(Result.Ymin)" y1="@ToSvgY(topZ)" x2="@ToSvgX(Result.Ymax)" y2="@ToSvgY(topZ)"
+                          stroke="#10b981" stroke-width="@(StrokeWidth * 3.0)" stroke-dasharray="@(StrokeWidth * 4),@(StrokeWidth * 2)" />
+                    <line x1="@ToSvgX(Result.Ymin)" y1="@ToSvgY(botZ)" x2="@ToSvgX(Result.Ymax)" y2="@ToSvgY(botZ)"
+                          stroke="#10b981" stroke-width="@(StrokeWidth * 3.0)" stroke-dasharray="@(StrokeWidth * 4),@(StrokeWidth * 2)" />
+                    
+                    double plateLabelZ = topZ + FontSize * 1.4;
+                    string plateText = $"双面防腐涂装 (t={Result.TotalHeight:F0}mm)";
+                    double plateFontSize = FontSize * 0.85;
+                    double plateW = GetTextWidthApprox(plateText, plateFontSize);
+                    double platePad = FontSize * 0.3;
+                    <rect x="@(ToSvgX(Result.Yc) - plateW / 2.0 - platePad)" y="@(ToSvgY(plateLabelZ) - plateFontSize * 0.7)"
+                          width="@(plateW + platePad * 2.0)" height="@(plateFontSize * 1.4)" fill="@CanvasBgColor" fill-opacity="0.95" stroke="#10b981" stroke-width="@(StrokeWidth * 0.8)" rx="@(FontSize * 0.2)" />
+                    @((MarkupString)$"<text x=\"{ToSvgX(Result.Yc):F1}\" y=\"{ToSvgY(plateLabelZ):F1}\" fill=\"#10b981\" font-size=\"{plateFontSize:F1}\" font-weight=\"bold\" text-anchor=\"middle\" dominant-baseline=\"middle\">{plateText}</text>")
+                }
+
                 <!-- 应力云图点集展示 (当开启且存在应力计算) -->
                 @if (ShowStressMap && Result.StressResult != null && Result.StressResult.StressSamplePoints.Count > 0)
                 {
@@ -210,7 +230,7 @@
                     <line x1="@ToSvgX(Result.Ymax)" y1="@ToSvgY(Result.Zmax)" x2="@ToSvgX(dimYRight + FontSize * 0.35)" y2="@ToSvgY(Result.Zmax)"
                           stroke="@DimensionColor" stroke-opacity="0.4" stroke-width="@(StrokeWidth * 0.6)" stroke-dasharray="@(StrokeWidth * 2),@(StrokeWidth * 2)" />
                     
-                    string hText = $"H = {h:F1} mm";
+                    string hText = Parameters?.Type == SectionType.Plate ? $"t = {h:F1} mm" : $"H = {h:F1} mm";
                     double hW = GetTextWidthApprox(hText, FontSize);
                     double hPad = FontSize * 0.3;
                     double hTx = ToSvgX(dimYRight + FontSize * 0.45);
