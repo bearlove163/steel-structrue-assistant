@@ -1,0 +1,131 @@
+@using EngineeringApp.Shared.Models
+@using EngineeringApp.Shared.Data
+
+<div class="row g-3 flex-grow-1">
+    <!-- 品牌目录列表 -->
+    <div class="col-lg-4">
+        <div class="card @(IsDarkMode ? "bg-black bg-opacity-30 border-secondary" : "bg-white border-light-subtle shadow-sm") p-3 h-100">
+            <h6 class="fw-bold text-danger mb-2 d-flex align-items-center gap-2">
+                <span>🏛️ 全球与国内名牌涂料档案库</span>
+                <span class="badge bg-danger text-xs">@PaintProductDatabase.AllBrands.Count 大巨头</span>
+            </h6>
+            <div class="d-flex flex-column gap-2 overflow-auto" style="max-height: 520px;">
+                @foreach (var brand in PaintProductDatabase.AllBrands)
+                {
+                    <div class="p-2 rounded border cursor-pointer @(SelectedBrandId == brand.BrandId ? (IsDarkMode ? "bg-primary bg-opacity-25 border-primary" : "bg-primary-subtle border-primary") : (IsDarkMode ? "bg-dark border-secondary" : "bg-light border-light-subtle"))"
+                         style="cursor: pointer;"
+                         @onclick="() => SelectBrand(brand.BrandId)">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="fw-bold small @(SelectedBrandId == brand.BrandId ? "text-primary" : "")">
+                                @brand.LogoEmoji @brand.NameCn (@brand.NameEn)
+                            </span>
+                            <span class="badge @(IsDarkMode ? "bg-secondary" : "bg-light text-dark border") text-xs">@brand.Country.Split(' ')[0]</span>
+                        </div>
+                        <div class="text-xs text-muted text-truncate" title="@brand.Specialty">
+                            主打: @brand.Specialty
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- 选定品牌详情与旗下经典型号库 -->
+    <div class="col-lg-8">
+        @{
+            var currentBrand = PaintProductDatabase.GetBrandById(SelectedBrandId) ?? PaintProductDatabase.AllBrands.First();
+            var brandProducts = PaintProductDatabase.GetProductsByBrand(currentBrand.BrandId).ToList();
+        }
+        <div class="card @(IsDarkMode ? "bg-black bg-opacity-30 border-secondary" : "bg-white border-light-subtle shadow-sm") p-3 h-100 d-flex flex-column">
+            <!-- 品牌头部概览 -->
+            <div class="d-flex align-items-center gap-3 pb-3 mb-3 border-bottom @(IsDarkMode ? "border-secondary" : "border-light-subtle")">
+                <div class="p-3 bg-danger bg-opacity-10 rounded-3 text-danger fs-2">
+                    @currentBrand.LogoEmoji
+                </div>
+                <div>
+                    <h5 class="fw-bold mb-1">@currentBrand.NameCn <span class="fs-6 fw-normal @(IsDarkMode ? "text-white-50" : "text-muted")">(@currentBrand.NameEn)</span></h5>
+                    <div class="text-xs text-muted mb-1">总部基地: @currentBrand.Country | 特长领域: @currentBrand.Specialty</div>
+                    <p class="small @(IsDarkMode ? "text-white-75" : "text-dark") mb-0">
+                        @currentBrand.Description
+                    </p>
+                </div>
+            </div>
+
+            <!-- 品牌世界级代表工程 -->
+            <div class="mb-3">
+                <span class="text-xs fw-bold text-warning">🏆 典型代表工程业绩:</span>
+                <div class="d-flex flex-wrap gap-1 mt-1">
+                    @foreach (var proj in currentBrand.FamousProjects)
+                    {
+                        <span class="badge @(IsDarkMode ? "bg-secondary" : "bg-light text-dark border") text-xs">🏛️ @proj</span>
+                    }
+                </div>
+            </div>
+
+            <!-- 旗下经典型号表格 -->
+            <h6 class="fw-bold text-primary small mb-2">📦 旗下工业重防腐与防火主力型号库 (@brandProducts.Count 款):</h6>
+            <div class="table-responsive rounded border flex-grow-1 @(IsDarkMode ? "border-secondary" : "border-light-subtle")">
+                <table class="table table-sm @(IsDarkMode ? "table-dark table-hover" : "table-hover") align-middle mb-0 text-xs">
+                    <thead class="@(IsDarkMode ? "table-secondary table-opacity-25" : "table-light") text-center">
+                        <tr>
+                            <th>型号代号</th>
+                            <th>产品名称</th>
+                            <th>类别</th>
+                            <th>固含%</th>
+                            <th>比重</th>
+                            <th>推荐膜厚</th>
+                            <th>基准价(元/kg)</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var prod in brandProducts)
+                        {
+                            <tr>
+                                <td class="fw-bold text-info">@prod.ModelCode</td>
+                                <td class="fw-bold">
+                                    @prod.Name
+                                    <div class="text-muted text-xs fw-normal" style="font-size: 10px;">@prod.Features</div>
+                                </td>
+                                <td><span class="badge @GetLayerBadgeClass(prod.LayerType)">@prod.LayerType</span></td>
+                                <td class="text-end">@prod.VolumeSolidsPercent%</td>
+                                <td class="text-end">@prod.DensityKgL</td>
+                                <td class="text-end">@prod.DefaultDft @(prod.LayerType == CoatingLayerType.Fireproof ? "mm" : "μm")</td>
+                                <td class="text-end fw-bold text-success">¥@prod.MaterialUnitPricePerKg</td>
+                                <td class="text-center">
+                                    <button class="btn btn-xs btn-outline-primary text-nowrap"
+                                            @onclick="() => OnApplyProduct.InvokeAsync(prod)">
+                                        ✨ 应用到算量
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public string SelectedBrandId { get; set; } = "jotun";
+    [Parameter] public EventCallback<string> SelectedBrandIdChanged { get; set; }
+    [Parameter] public bool IsDarkMode { get; set; } = true;
+    [Parameter] public EventCallback<PaintProductItem> OnApplyProduct { get; set; }
+
+    private async Task SelectBrand(string id)
+    {
+        SelectedBrandId = id;
+        await SelectedBrandIdChanged.InvokeAsync(id);
+    }
+
+    private static string GetLayerBadgeClass(CoatingLayerType type) => type switch
+    {
+        CoatingLayerType.Primer => "bg-primary text-white",
+        CoatingLayerType.Intermediate => "bg-info text-dark",
+        CoatingLayerType.Topcoat => "bg-success text-white",
+        CoatingLayerType.Fireproof => "bg-danger text-white",
+        CoatingLayerType.Sealer => "bg-warning text-dark",
+        _ => "bg-secondary text-white"
+    };
+}

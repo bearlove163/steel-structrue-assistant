@@ -1,0 +1,894 @@
+@page "/coating-fire-calculation"
+@page "/painting-calculation"
+@using EngineeringApp.Shared.Models
+@using EngineeringApp.Shared.Algorithms
+@using EngineeringApp.Shared.Data
+@using EngineeringApp.Shared.Pricing.Coating
+@using EngineeringApp.Client.Services
+@using EngineeringApp.Client.Shared.Components
+@using EngineeringApp.Client.Shared.Components.Coating
+@using EngineeringApp.Client.Shared.Components.Coating.Tabs
+@using EngineeringApp.Client.Shared.Components.Coating.Modals
+@inject NavigationManager Nav
+@inject ThemeState Theme
+@inject IJSRuntime JS
+@implements IDisposable
+
+<PageTitle>防腐涂装、防火算量与热浸镀锌工程工作台</PageTitle>
+
+<div class="container-fluid py-2 px-3 workstation-root d-flex flex-column min-vh-100 @(Theme.IsDarkMode ? "bg-dark text-white" : "bg-light text-dark")"
+     data-theme="@(Theme.IsDarkMode ? "dark" : "light")">
+
+    <!-- ======================= 顶部导航与控制器 ======================= -->
+    <header class="d-flex flex-wrap align-items-center justify-content-between pb-2 mb-2 border-bottom @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle bg-white rounded p-2 shadow-sm")">
+        <div class="d-flex align-items-center gap-3">
+            <button class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1" @onclick='() => Nav.NavigateTo("/portal")' title="返回统一门户">
+                <span>←</span>
+                <span>门户中心</span>
+            </button>
+            <div class="p-2 bg-warning rounded-3 text-dark fw-bold d-flex align-items-center justify-content-center shadow-sm" style="width: 38px; height: 38px; font-size: 20px;">
+                🎨
+            </div>
+            <div>
+                <h5 class="mb-0 fw-bold tracking-tight d-flex align-items-center gap-2 @(Theme.IsDarkMode ? "text-white" : "text-dark")">
+                    <span>模块 3：防腐涂装、防火算量与热浸镀锌工程工作台</span>
+                    <span class="badge bg-warning text-dark text-xs">COATING & FIRE PRO</span>
+                </h5>
+                <div class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted") text-xs">
+                    截面自重与表面积参照 · 形状系数 F/V · 喷涂/滚涂工艺与断面损耗 · 输变电塔与重构件热浸锌 (HDG) · 全球名牌涂料图鉴
+                </div>
+            </div>
+        </div>
+
+        <!-- 顶部工具栏：暗黑/亮色、多国标准、跨模块快捷跳转 -->
+        <div class="d-flex align-items-center gap-2 mt-2 mt-md-0">
+            <!-- 暗黑/亮色主题切换按钮 -->
+            <button class="btn btn-sm d-flex align-items-center gap-1 @(Theme.IsDarkMode ? "btn-outline-warning" : "btn-outline-dark")"
+                    @onclick="Theme.ToggleTheme" title="切换暗黑/亮色主题">
+                <span>@(Theme.IsDarkMode ? "☀️ 亮色" : "🌙 暗黑")</span>
+            </button>
+
+            <button class="btn btn-outline-primary btn-sm" @onclick='() => Nav.NavigateTo("/material-pricing")' title="进入材料价格工作台">
+                🧱 材料价格
+            </button>
+            <button class="btn btn-outline-info btn-sm" @onclick='() => Nav.NavigateTo("/sections")' title="进入截面力学视窗">
+                📐 截面力学
+            </button>
+        </div>
+    </header>
+
+    <!-- ======================= 历史价格快照与工程调差常驻工具条 ======================= -->
+    <div class="card @(Theme.IsDarkMode ? "bg-black bg-opacity-40 border-secondary" : "bg-white border-light-subtle shadow-sm") p-2 mb-2">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <span class="badge bg-primary text-white d-flex align-items-center gap-1">
+                    <span>⏱️ 当前执行价格快照:</span>
+                </span>
+                <select class="form-select form-select-sm fw-bold @(Theme.IsDarkMode ? "bg-dark text-warning border-secondary" : "bg-white text-primary")"
+                        style="min-width: 290px; width: auto;"
+                        value="@ActiveSnapshotId"
+                        @onchange="OnSnapshotChanged">
+                    @foreach (var snap in SeedPaintPriceSnapshots.AllSnapshots)
+                    {
+                        <option value="@snap.SnapshotId">
+                            @(snap.IsLocked ? "🔒 " : "📊 ") @snap.SnapshotName (@snap.EffectiveDate.ToString("yyyy-MM"))
+                        </option>
+                    }
+                </select>
+                
+                <span class="badge @(CurrentSnapshot.IsLocked ? "bg-danger" : "bg-success") text-white text-xs">
+                    @(CurrentSnapshot.IsLocked ? "基准锁定" : "动态采样")
+                </span>
+                <span class="badge @(Theme.IsDarkMode ? "bg-secondary text-white" : "bg-light text-dark border") text-xs">
+                    基准日: @CurrentSnapshot.EffectiveDate.ToString("yyyy-MM-dd")
+                </span>
+                <span class="badge @(Theme.IsDarkMode ? "bg-secondary text-white" : "bg-light text-dark border") text-xs" title="@CurrentSnapshot.SourceSupplier">
+                    来源: @GetSourceTypeLabel(CurrentSnapshot.SourceType)
+                </span>
+                <span class="badge bg-info text-dark text-xs" title="该快照中包含的真实询价实体数量">
+                    询价实体: @CurrentSnapshot.BrandQuotations.Count 笔
+                </span>
+            </div>
+
+            <div class="d-flex align-items-center gap-2">
+                <button class="btn btn-outline-success btn-sm d-flex align-items-center gap-1"
+                        @onclick="OpenAddBrandModal" title="向当前快照录入真实询价明细">
+                    <span>➕</span>
+                    <span>录入新品牌询价</span>
+                </button>
+                <button class="btn btn-outline-warning btn-sm d-flex align-items-center gap-1"
+                        @onclick="SyncSnapshotPricesToCurrentLayers" title="将当前快照的大盘与品牌单价同步应用到算量方案">
+                    <span>🔄</span>
+                    <span>同步快照价到方案</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ======================= 截面物性全局指标横幅 (统一单行展示) ======================= -->
+    <CoatingMetricsBanner SectionInputMode="@SectionInputMode"
+                          CurrentParams="@CurrentParams"
+                          CurrentResult="@CurrentResult"
+                          CurrentPaintResult="@CurrentPaintResult"
+                          SectionDesignation="@GetFormattedSectionDesignation()"
+                          StandardBadgeClass="@GetStandardBadgeClass()"
+                          StandardSystemDisplay="@GetStandardSystemDisplay()"
+                          SelectedStandardCategory="@SelectedStandardCategory"
+                          IsDarkMode="@Theme.IsDarkMode" />
+
+    <!-- ======================= 五大专属模块选项卡 (单行紧凑优化) ======================= -->
+    <div class="card @(Theme.IsDarkMode ? "bg-black bg-opacity-40 border-secondary" : "bg-white border-light-subtle shadow-sm") p-1 mb-3">
+        <div class="d-flex align-items-center gap-1 flex-nowrap overflow-x-auto text-nowrap">
+            <button class="btn btn-sm py-2 px-2 fw-bold rounded flex-fill text-center text-nowrap @(ActiveTab == 1 ? "btn-primary shadow-sm" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-75" : "btn-outline-secondary text-dark"))"
+                    @onclick="() => ActiveTab = 1">
+                🎨 1. 涂装与防火算量
+            </button>
+            <button class="btn btn-sm py-2 px-2 fw-bold rounded flex-fill text-center text-nowrap @(ActiveTab == 2 ? "btn-info text-dark shadow-sm" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-75" : "btn-outline-secondary text-dark"))"
+                    @onclick="() => ActiveTab = 2">
+                ⚡ 2. 热浸镀锌 (HDG)
+            </button>
+            <button class="btn btn-sm py-2 px-2 fw-bold rounded flex-fill text-center text-nowrap @(ActiveTab == 3 ? "btn-success shadow-sm" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-75" : "btn-outline-secondary text-dark"))"
+                    @onclick="() => ActiveTab = 3">
+                📐 3. 推导与断面损耗
+            </button>
+            <button class="btn btn-sm py-2 px-2 fw-bold rounded flex-fill text-center text-nowrap @(ActiveTab == 4 ? "btn-danger shadow-sm" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-75" : "btn-outline-secondary text-dark"))"
+                    @onclick="() => ActiveTab = 4">
+                🏛️ 4. 名牌涂料图鉴
+            </button>
+            <button class="btn btn-sm py-2 px-2 fw-bold rounded flex-fill text-center text-nowrap @(ActiveTab == 5 ? "btn-warning text-dark shadow-sm" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-75" : "btn-outline-secondary text-dark"))"
+                    @onclick="() => ActiveTab = 5">
+                ⏳ 5. 价格回溯与清单调差
+            </button>
+        </div>
+    </div>
+
+    <!-- ======================= 选项卡内容区 (子组件动态加载) ======================= -->
+    @if (ActiveTab == 1)
+    {
+        <div class="row g-3 flex-grow-1">
+            <!-- 左侧：截面选型与特性参照视窗 -->
+            <div class="col-lg-4">
+                <SectionSelectorPanel @bind-SectionInputMode="SectionInputMode"
+                                      CurrentParams="@CurrentParams"
+                                      CurrentResult="@CurrentResult"
+                                      CurrentPaintResult="@CurrentPaintResult"
+                                      @bind-PlateThickness="PlateThickness"
+                                      @bind-PlateWidth="PlateWidth"
+                                      SectionDesignation="@GetFormattedSectionDesignation()"
+                                      SelectedStandardSystem="@SelectedStandardSystem"
+                                      OnStandardSystemChanged="OnStandardSystemChanged"
+                                      SelectedStandardCategory="@SelectedStandardCategory"
+                                      OnStandardCategoryChanged="OnStandardCategoryChanged"
+                                      SelectedStandardDesignation="@SelectedStandardDesignation"
+                                      OnStandardDesignationChanged="OnStandardDesignationChanged"
+                                      CurrentSystemCategories="@CurrentSystemCategories"
+                                      CurrentCategoryItems="@CurrentCategoryItems"
+                                      ExcludeTopSurface="@ExcludeTopSurface"
+                                      IsDarkMode="@Theme.IsDarkMode"
+                                      OnOpenSteelModal="() => IsSteelModalOpen = true"
+                                      OnChangeSectionType="ChangeSectionType"
+                                      OnParamsChanged="RecalculateAll"
+                                      OnSelectPlateThickness="SelectPlateThickness" />
+            </div>
+
+            <!-- 右侧：涂装与防火算量核心控制台 -->
+            <div class="col-lg-8">
+                <Tab1_CoatingFireCoreView @bind-CurrentMethod="CurrentMethod"
+                                          @bind-ExcludeTopSurface="ExcludeTopSurface"
+                                          @bind-ProjectTotalLengthM="ProjectTotalLengthM"
+                                          CurrentPresetName="@CurrentPresetName"
+                                          CurrentLayers="@CurrentLayers"
+                                          CurrentPaintResult="@CurrentPaintResult"
+                                          CurrentResult="@CurrentResult"
+                                          IsDarkMode="@Theme.IsDarkMode"
+                                          CopyAlertMessage="@CopyAlertMessage"
+                                          OnApplyPreset="ApplyPreset"
+                                          OnRecalculate="RecalculateAll"
+                                          OnSelectProductItem="HandleProductSelected"
+                                          OnCopyDescribe="CopyDescribeToClipboard" />
+            </div>
+        </div>
+    }
+    else if (ActiveTab == 2)
+    {
+        <Tab2_HotDipGalvanizingView HdgOptions="@HdgOptions"
+                                   CurrentHdgResult="@CurrentHdgResult"
+                                   IsDarkMode="@Theme.IsDarkMode"
+                                   OnRecalculate="RecalculateAll"
+                                   OnCopyText="CopyCustomText" />
+    }
+    else if (ActiveTab == 3)
+    {
+        <Tab3_CoatingTheoryLossView CurrentPaintResult="@CurrentPaintResult"
+                                   IsDarkMode="@Theme.IsDarkMode" />
+    }
+    else if (ActiveTab == 4)
+    {
+        <Tab4_BrandPaintAtlasView @bind-SelectedBrandId="SelectedBrandId"
+                                 IsDarkMode="@Theme.IsDarkMode"
+                                 OnApplyProduct="ApplyProductToCalculation" />
+    }
+    else if (ActiveTab == 5)
+    {
+        <Tab5_PriceHistoryAdjustmentView BaselineSnapshotId="@BaselineSnapshotId"
+                                        OnBaselineSnapshotChanged="OnBaselineSnapshotChanged"
+                                        TargetSnapshotId="@TargetSnapshotId"
+                                        OnTargetSnapshotChanged="OnTargetSnapshotChanged"
+                                        @bind-BacktrackingMatrixFilter="BacktrackingMatrixFilter"
+                                        CurrentLayers="@CurrentLayers"
+                                        CurrentMethod="@CurrentMethod"
+                                        ProjectSchedule="@ProjectSchedule"
+                                        ProjectScheduleSumTons="@ProjectScheduleSumTons"
+                                        ProjectScheduleSumArea="@ProjectScheduleSumArea"
+                                        ProjectScheduleSumPaintKg="@ProjectScheduleSumPaintKg"
+                                        ProjectScheduleSumBaseCost="@ProjectScheduleSumBaseCost"
+                                        ProjectScheduleSumTargetCost="@ProjectScheduleSumTargetCost"
+                                        ProjectScheduleSumVariance="@ProjectScheduleSumVariance"
+                                        IsDarkMode="@Theme.IsDarkMode"
+                                        OnOpenAddBrandModal="OpenAddBrandModal"
+                                        OnAddScheduleItem="HandleAddScheduleItem"
+                                        OnApplyProfileToWorkbench="HandleApplyProfileToWorkbench"
+                                        OnLoadDemoSchedule="LoadDemoSchedule"
+                                        OnExportScheduleCsv="ExportScheduleToCsv"
+                                        OnScheduleChanged="RefreshProjectSchedulePrices" />
+    }
+
+    <!-- 弹窗：录入新品牌实体询价值 -->
+    <BrandQuotationEntryModal @bind-IsOpen="IsAddBrandModalOpen"
+                              SnapshotName="@CurrentSnapshot.SnapshotName"
+                              IsDarkMode="@Theme.IsDarkMode"
+                              OnQuoteSaved="HandleNewBrandQuoteSaved" />
+
+    <!-- 全球标准型钢库检索弹窗 -->
+    <SteelProfileModal @bind-IsOpen="IsSteelModalOpen"
+                       OnSelectProfile="HandleStandardProfileSelected"
+                       IsDarkMode="@Theme.IsDarkMode" />
+
+</div>
+
+@code {
+    // ================= 子模块事件调度适配器 =================
+    private void HandleProductSelected((CoatingLayerConfig layer, ChangeEventArgs e) args)
+    {
+        OnSelectProductItem(args.layer, args.e);
+    }
+
+    private void HandleAddScheduleItem((ProjectCoatingScheduleItem item, string specName) args)
+    {
+        AddScheduleItemFromSpec(args.item, args.specName);
+    }
+
+    private void HandleApplyProfileToWorkbench((string specName, SectionType type) args)
+    {
+        ApplyProfileToWorkbench(args.specName, args.type);
+    }
+
+    private void HandleNewBrandQuoteSaved(BrandQuoteItem quote)
+    {
+        SeedPaintPriceSnapshots.RegisterBrandQuote(ActiveSnapshotId, quote);
+        IsAddBrandModalOpen = false;
+        RefreshProjectSchedulePrices();
+
+        CopyAlertMessage = $"✓ 品牌报价【{quote.BrandName} - {quote.MaterialCategory} (¥{quote.UnitPrice}/kg)】已成功录入快照！";
+        _ = Task.Delay(3000).ContinueWith(_ =>
+        {
+            CopyAlertMessage = null;
+            InvokeAsync(StateHasChanged);
+        });
+    }
+
+    private async Task CopyCustomText(string text)
+    {
+        await CopyText(text);
+    }
+
+    private int ActiveTab = 1;
+    private string SelectedBrandId = "Jotun";
+    private bool IsSteelModalOpen = false;
+
+    // 历史快照状态
+    private string ActiveSnapshotId = "PAINT-SNAP-202610-LATEST";
+    private string BaselineSnapshotId = "PAINT-SNAP-202603-BASE";
+    private string TargetSnapshotId = "PAINT-SNAP-202610-LATEST";
+    private PaintPriceSnapshot CurrentSnapshot => SeedPaintPriceSnapshots.GetById(ActiveSnapshotId);
+
+    // 截面模式与标准库状态
+    private string SectionInputMode = "standard";
+    private string SelectedStandardSystem = "GB/T (国标)";
+    private string SelectedStandardCategory = "GB/T 11263 热轧H型钢(HW)";
+    private string SelectedStandardDesignation = "HW 300×300×10×15";
+
+    // 钢板专属状态与国标厚度胶囊
+    private double PlateThickness = 10.0;
+    private double PlateWidth = 1000.0;
+    private static readonly double[] StandardPlateThicknesses = [6, 8, 10, 12, 14, 16, 18, 20, 22, 25, 28, 30, 35, 40, 50, 60, 80];
+
+    // 历史调差与清单工程数据状态
+    private string BacktrackingMatrixFilter = "plate";
+    private List<ProjectCoatingScheduleItem> ProjectSchedule = [];
+    private double ProjectScheduleSumTons => ProjectSchedule.Sum(x => x.ProjectTons);
+    private double ProjectScheduleSumArea => ProjectSchedule.Sum(x => x.TotalAreaM2);
+    private double ProjectScheduleSumPaintKg => ProjectSchedule.Sum(x => x.TotalPaintKg);
+    private double ProjectScheduleSumBaseCost => ProjectSchedule.Sum(x => x.BaseTotalCost);
+    private double ProjectScheduleSumTargetCost => ProjectSchedule.Sum(x => x.TargetTotalCost);
+    private double ProjectScheduleSumVariance => ProjectSchedule.Sum(x => x.VarianceTotalCost);
+
+    // 录入新品牌询价弹窗状态
+    private bool IsAddBrandModalOpen = false;
+    private string NewQuoteBrandName = "";
+    private string NewQuoteCategory = "底漆";
+    private string NewQuoteModel = "";
+    private double NewQuotePrice = 45.0;
+    private string NewQuoteSupplier = "";
+    private string NewQuoteRemarks = "";
+
+    private IEnumerable<string> CurrentSystemCategories =>
+        StructuralSteelLibrary.GetCategoriesBySystem(SelectedStandardSystem);
+
+    private IEnumerable<StandardSteelItem> CurrentCategoryItems =>
+        StructuralSteelLibrary.AllSections.Where(s => s.StandardSystem == SelectedStandardSystem && s.Category == SelectedStandardCategory);
+
+    // 截面与算量状态
+    private SectionParameters CurrentParams { get; set; } = new()
+    {
+        Type = SectionType.HBeam,
+        Height = 300,
+        Width = 300,
+        WebThickness = 10,
+        FlangeThickness = 15,
+        StandardProfileName = "HW 300×300×10×15"
+    };
+
+    private SectionPropertiesResult CurrentResult { get; set; } = new();
+    private ParametricSectionCalculator Calculator { get; } = new();
+
+    // 涂装方案状态
+    private CoatingApplicationMethod CurrentMethod = CoatingApplicationMethod.AirlessSpraying;
+    private string CurrentPresetName = "标准工业厂房重防腐";
+    private bool ExcludeTopSurface = false;
+    private double ProjectTotalLengthM = 1.0;
+    private List<CoatingLayerConfig> CurrentLayers = [];
+    private PaintSystemCalculationResult CurrentPaintResult = new();
+
+    // 热浸镀锌状态
+    private HotDipGalvanizingOptions HdgOptions = new();
+    private HotDipGalvanizingResult CurrentHdgResult = new();
+
+    private string? CopyAlertMessage;
+
+    protected override void OnInitialized()
+    {
+        Theme.OnChange += StateHasChanged;
+        CurrentLayers = PaintCoatingCalculator.CreatePreset(CurrentPresetName);
+        LoadDemoSchedule();
+        var item = StructuralSteelLibrary.AllSections.FirstOrDefault(x => x.Designation == "HW 300×300×10×15");
+        if (item != null) ApplyStandardProfile(item);
+        else RecalculateAll();
+    }
+
+    public void Dispose()
+    {
+        Theme.OnChange -= StateHasChanged;
+    }
+
+    private void SwitchToCustomMode()
+    {
+        SectionInputMode = "custom";
+        CurrentParams.StandardProfileName = null;
+        RecalculateAll();
+    }
+
+    private void SwitchToStandardMode()
+    {
+        SectionInputMode = "standard";
+        var item = StructuralSteelLibrary.AllSections.FirstOrDefault(x => x.Designation == SelectedStandardDesignation)
+                   ?? StructuralSteelLibrary.AllSections.FirstOrDefault(x => x.Designation == "HW 300×300×10×15")
+                   ?? StructuralSteelLibrary.AllSections.First();
+        ApplyStandardProfile(item);
+    }
+
+    private void SwitchToPlateMode()
+    {
+        SectionInputMode = "plate";
+        CurrentParams.Type = SectionType.Plate;
+        CurrentParams.Height = PlateThickness;
+        CurrentParams.Width = PlateWidth;
+        CurrentParams.LegThickness = PlateThickness;
+        CurrentParams.StandardProfileName = $"PL {PlateThickness:0.##}×{PlateWidth:0.##}";
+        RecalculateAll();
+    }
+
+    private void SelectPlateThickness(double t)
+    {
+        PlateThickness = t;
+        CurrentParams.Type = SectionType.Plate;
+        CurrentParams.Height = t;
+        CurrentParams.Width = PlateWidth;
+        CurrentParams.LegThickness = t;
+        CurrentParams.StandardProfileName = $"PL {t:0.##}×{PlateWidth:0.##}";
+        RecalculateAll();
+    }
+
+    private void OnPlateParamsChanged()
+    {
+        PlateThickness = Math.Max(0.5, PlateThickness);
+        PlateWidth = Math.Max(10.0, PlateWidth);
+        CurrentParams.Type = SectionType.Plate;
+        CurrentParams.Height = PlateThickness;
+        CurrentParams.Width = PlateWidth;
+        CurrentParams.LegThickness = PlateThickness;
+        CurrentParams.StandardProfileName = $"PL {PlateThickness:0.##}×{PlateWidth:0.##}";
+        RecalculateAll();
+    }
+
+    private void OnSnapshotChanged(ChangeEventArgs e)
+    {
+        ActiveSnapshotId = e.Value?.ToString() ?? SeedPaintPriceSnapshots.Latest.SnapshotId;
+        TargetSnapshotId = ActiveSnapshotId;
+    }
+
+    private void OnBaselineSnapshotChanged(ChangeEventArgs e)
+    {
+        BaselineSnapshotId = e.Value?.ToString() ?? SeedPaintPriceSnapshots.BaseSnapshot.SnapshotId;
+        RefreshProjectSchedulePrices();
+    }
+
+    private void OnTargetSnapshotChanged(ChangeEventArgs e)
+    {
+        TargetSnapshotId = e.Value?.ToString() ?? SeedPaintPriceSnapshots.Latest.SnapshotId;
+        RefreshProjectSchedulePrices();
+    }
+
+    private void SyncSnapshotPricesToCurrentLayers()
+    {
+        PaintPriceBacktrackingEngine.ApplySnapshotPrices(CurrentLayers, CurrentSnapshot, CurrentMethod);
+        RecalculateAll();
+        CopyAlertMessage = $"✓ 已同步【{CurrentSnapshot.SnapshotName}】价格至当前涂装方案！";
+        _ = Task.Delay(3000).ContinueWith(_ =>
+        {
+            CopyAlertMessage = null;
+            InvokeAsync(StateHasChanged);
+        });
+    }
+
+    private void OpenAddBrandModal()
+    {
+        NewQuoteBrandName = "";
+        NewQuoteCategory = "底漆";
+        NewQuoteModel = "";
+        NewQuotePrice = 45.0;
+        NewQuoteSupplier = "";
+        NewQuoteRemarks = "";
+        IsAddBrandModalOpen = true;
+    }
+
+    private void CloseAddBrandModal()
+    {
+        IsAddBrandModalOpen = false;
+    }
+
+    private void SaveNewBrandQuote()
+    {
+        if (string.IsNullOrWhiteSpace(NewQuoteBrandName)) return;
+
+        string supName = string.IsNullOrWhiteSpace(NewQuoteSupplier) ? "自主实地询价录入" : NewQuoteSupplier.Trim();
+        var matchedPaintSup = SupplierDatabase.AllSuppliers.FirstOrDefault(s =>
+            s.Category == SupplierCategory.PaintCoating && (
+                s.ShortName.Contains(NewQuoteBrandName.Trim(), StringComparison.OrdinalIgnoreCase) ||
+                s.Name.Contains(NewQuoteBrandName.Trim(), StringComparison.OrdinalIgnoreCase) ||
+                s.Name.Contains(supName, StringComparison.OrdinalIgnoreCase) ||
+                s.ShortName.Contains(supName, StringComparison.OrdinalIgnoreCase)));
+
+        var quote = new BrandQuoteItem
+        {
+            BrandName = NewQuoteBrandName.Trim(),
+            MaterialCategory = NewQuoteCategory,
+            ProductModel = string.IsNullOrWhiteSpace(NewQuoteModel) ? $"{NewQuoteBrandName} {NewQuoteCategory}" : NewQuoteModel.Trim(),
+            UnitPrice = Math.Max(0.1, NewQuotePrice),
+            SupplierName = supName,
+            SupplierId = matchedPaintSup?.Id,
+            QuoteDate = DateTime.Today,
+            Remarks = NewQuoteRemarks
+        };
+
+        SeedPaintPriceSnapshots.RegisterBrandQuote(ActiveSnapshotId, quote);
+        IsAddBrandModalOpen = false;
+        RefreshProjectSchedulePrices();
+
+        CopyAlertMessage = $"✓ 品牌报价【{quote.BrandName} - {quote.MaterialCategory} (¥{quote.UnitPrice}/kg)】已成功录入快照！";
+        _ = Task.Delay(3000).ContinueWith(_ =>
+        {
+            CopyAlertMessage = null;
+            InvokeAsync(StateHasChanged);
+        });
+    }
+
+    private void AddScheduleItemFromSpec(ProjectCoatingScheduleItem item, string partName)
+    {
+        var clone = new ProjectCoatingScheduleItem
+        {
+            PartName = partName,
+            Category = item.Category,
+            SpecName = item.SpecName,
+            ThicknessMm = item.ThicknessMm,
+            AreaPerTon = item.AreaPerTon,
+            ProjectTons = 10.0,
+            PaintUsageKgPerTon = item.PaintUsageKgPerTon,
+            BaseCostPerTon = item.BaseCostPerTon,
+            TargetCostPerTon = item.TargetCostPerTon
+        };
+        ProjectSchedule.Add(clone);
+        CopyAlertMessage = $"✓ 已添加【{clone.SpecName}】至工程防腐清单！";
+        _ = Task.Delay(2500).ContinueWith(_ =>
+        {
+            CopyAlertMessage = null;
+            InvokeAsync(StateHasChanged);
+        });
+    }
+
+    private void ApplyPlateToWorkbench(double thickness)
+    {
+        ActiveTab = 1;
+        SwitchToPlateMode();
+        SelectPlateThickness(thickness);
+    }
+
+    private void ApplyProfileToWorkbench(string specName, SectionType type)
+    {
+        ActiveTab = 1;
+        var found = StructuralSteelLibrary.AllSections.FirstOrDefault(x => specName.Contains(x.Designation));
+        if (found != null)
+        {
+            SectionInputMode = "standard";
+            ApplyStandardProfile(found);
+        }
+        else
+        {
+            SectionInputMode = "custom";
+            ChangeSectionType(type);
+        }
+    }
+
+    private void RefreshProjectSchedulePrices()
+    {
+        var bSnap = SeedPaintPriceSnapshots.GetById(BaselineSnapshotId);
+        var tSnap = SeedPaintPriceSnapshots.GetById(TargetSnapshotId);
+
+        foreach (var item in ProjectSchedule)
+        {
+            var dummy = PaintPriceBacktrackingEngine.BuildScheduleItem(
+                item.Category, item.SpecName, item.ThicknessMm, item.AreaPerTon, item.ProjectTons,
+                item.Category == "钢板板材" ? SectionType.Plate : SectionType.HBeam,
+                CurrentLayers, bSnap, tSnap, CurrentMethod, item.PartName);
+            item.BaseCostPerTon = dummy.BaseCostPerTon;
+            item.TargetCostPerTon = dummy.TargetCostPerTon;
+            item.PaintUsageKgPerTon = dummy.PaintUsageKgPerTon;
+        }
+    }
+
+    private void LoadDemoSchedule()
+    {
+        var bSnap = SeedPaintPriceSnapshots.GetById(BaselineSnapshotId);
+        var tSnap = SeedPaintPriceSnapshots.GetById(TargetSnapshotId);
+
+        ProjectSchedule =
+        [
+            PaintPriceBacktrackingEngine.BuildScheduleItem("钢板板材", "t = 10mm 钢板 (主底板)", 10.0, 25.48, 85.0, SectionType.Plate, CurrentLayers, bSnap, tSnap, CurrentMethod, "基础底板/预埋件"),
+            PaintPriceBacktrackingEngine.BuildScheduleItem("钢板板材", "t = 20mm 钢板 (翼缘加劲)", 20.0, 12.74, 120.0, SectionType.Plate, CurrentLayers, bSnap, tSnap, CurrentMethod, "箱柱翼缘与节点板"),
+            PaintPriceBacktrackingEngine.BuildScheduleItem("热轧H型钢", "H 400×200×8×13 (主梁)", 13.0, 26.8, 160.0, SectionType.HBeam, CurrentLayers, bSnap, tSnap, CurrentMethod, "2~4层主框架梁"),
+            PaintPriceBacktrackingEngine.BuildScheduleItem("方矩管/箱型", "Box 500×500×20 (主柱)", 20.0, 6.7, 95.0, SectionType.RHS, CurrentLayers, bSnap, tSnap, CurrentMethod, "中庭核心钢管柱"),
+            PaintPriceBacktrackingEngine.BuildScheduleItem("圆管 CHS", "CHS Φ219×8 (空间桁架)", 8.0, 16.5, 40.0, SectionType.CHS, CurrentLayers, bSnap, tSnap, CurrentMethod, "屋顶大跨空间管桁架")
+        ];
+    }
+
+    private async Task ExportScheduleToCsv()
+    {
+        if (ProjectSchedule.Count == 0) return;
+
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("序号,构件部位,规格分类,规格代号,厚度(mm),比表面积(m2/t),工程吨位(t),涂装总面积(m2),油漆单耗(kg/t),计划采购量(kg),基期单价(元/t),现行单价(元/t),基期合价(元),现行合价(元),调差金额(元),调差率(%)");
+
+        int idx = 1;
+        foreach (var item in ProjectSchedule)
+        {
+            sb.AppendLine($"{idx++},\"{item.PartName}\",\"{item.Category}\",\"{item.SpecName}\",{item.ThicknessMm:F1},{item.AreaPerTon:F2},{item.ProjectTons:F2},{item.TotalAreaM2:F2},{item.PaintUsageKgPerTon:F2},{item.TotalPaintKg:F1},{item.BaseCostPerTon:F1},{item.TargetCostPerTon:F1},{item.BaseTotalCost:F1},{item.TargetTotalCost:F1},{item.VarianceTotalCost:F1},{item.VariancePercentage:F1}%");
+        }
+
+        sb.AppendLine($",合计,,,总计,{ProjectScheduleSumArea / Math.Max(0.1, ProjectScheduleSumTons):F2},{ProjectScheduleSumTons:F2},{ProjectScheduleSumArea:F2},,{ProjectScheduleSumPaintKg:F1},,,{ProjectScheduleSumBaseCost:F1},{ProjectScheduleSumTargetCost:F1},{ProjectScheduleSumVariance:F1},{(ProjectScheduleSumBaseCost > 0 ? (ProjectScheduleSumVariance / ProjectScheduleSumBaseCost * 100.0) : 0):F1}%");
+
+        var bytes = System.Text.Encoding.UTF8.GetPreamble().Concat(System.Text.Encoding.UTF8.GetBytes(sb.ToString())).ToArray();
+        var base64 = Convert.ToBase64String(bytes);
+        var fileName = $"工程防腐清单调差表_{DateTime.Now:yyyyMMdd_HHmm}.csv";
+        await JS.InvokeVoidAsync("eval", $@"
+            var a = document.createElement('a');
+            a.href = 'data:text/csv;charset=utf-8;base64,{base64}';
+            a.download = '{fileName}';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        ");
+        CopyAlertMessage = $"✓ 已成功导出清单: {fileName}";
+        _ = Task.Delay(3000).ContinueWith(_ =>
+        {
+            CopyAlertMessage = null;
+            InvokeAsync(StateHasChanged);
+        });
+    }
+
+    private string GetSourceTypeLabel(PaintPriceSourceType type) => type switch
+    {
+        PaintPriceSourceType.MarketWebIndex => "大盘指数",
+        PaintPriceSourceType.ContractLockedBaseline => "合同锁定",
+        PaintPriceSourceType.CorporateInternalRate => "集采框架",
+        PaintPriceSourceType.ManufacturerDirect => "厂家直供",
+        _ => "现场询价"
+    };
+
+    private void OnStandardSystemChanged(ChangeEventArgs e)
+    {
+        SelectedStandardSystem = e.Value?.ToString() ?? "GB/T (国标)";
+        SelectedStandardCategory = CurrentSystemCategories.FirstOrDefault() ?? "";
+        var item = CurrentCategoryItems.FirstOrDefault();
+        if (item != null) ApplyStandardProfile(item);
+    }
+
+    private void OnStandardCategoryChanged(ChangeEventArgs e)
+    {
+        SelectedStandardCategory = e.Value?.ToString() ?? "";
+        var item = CurrentCategoryItems.FirstOrDefault();
+        if (item != null) ApplyStandardProfile(item);
+    }
+
+    private void OnStandardDesignationChanged(ChangeEventArgs e)
+    {
+        string des = e.Value?.ToString() ?? "";
+        var item = CurrentCategoryItems.FirstOrDefault(x => x.Designation == des);
+        if (item != null) ApplyStandardProfile(item);
+    }
+
+    private void ApplyStandardProfile(StandardSteelItem item)
+    {
+        SelectedStandardSystem = item.StandardSystem;
+        SelectedStandardCategory = item.Category;
+        SelectedStandardDesignation = item.Designation;
+
+        CurrentParams.Type = item.SectionType;
+        CurrentParams.StandardProfileName = item.Designation;
+        CurrentParams.Height = item.Height;
+        CurrentParams.Width = item.Width;
+        CurrentParams.WebThickness = item.WebThickness;
+        CurrentParams.FlangeThickness = item.FlangeThickness;
+        CurrentParams.LegWidth1 = item.LegWidth1;
+        CurrentParams.LegWidth2 = item.LegWidth2;
+        CurrentParams.LegThickness = item.LegThickness;
+        CurrentParams.OuterDiameter = item.OuterDiameter;
+        CurrentParams.WallThickness = item.WallThickness;
+
+        RecalculateAll();
+    }
+
+    private void ChangeSectionType(SectionType type)
+    {
+        CurrentParams.Type = type;
+        CurrentParams.StandardProfileName = null;
+
+        switch (type)
+        {
+            case SectionType.HBeam:
+                CurrentParams.Height = 300;
+                CurrentParams.Width = 300;
+                CurrentParams.WebThickness = 10;
+                CurrentParams.FlangeThickness = 15;
+                break;
+            case SectionType.RHS:
+                CurrentParams.Height = 250;
+                CurrentParams.Width = 250;
+                CurrentParams.WallThickness = 10;
+                break;
+            case SectionType.CHS:
+                CurrentParams.OuterDiameter = 219;
+                CurrentParams.WallThickness = 8;
+                break;
+            case SectionType.Channel:
+                CurrentParams.Height = 200;
+                CurrentParams.Width = 75;
+                CurrentParams.WebThickness = 7;
+                CurrentParams.FlangeThickness = 11;
+                break;
+            case SectionType.Angle:
+                CurrentParams.LegWidth1 = 100;
+                CurrentParams.LegWidth2 = 100;
+                CurrentParams.LegThickness = 10;
+                break;
+            case SectionType.Cruciform:
+                CurrentParams.Height = 300;
+                CurrentParams.Width = 300;
+                CurrentParams.WebThickness = 12;
+                CurrentParams.FlangeThickness = 12;
+                break;
+        }
+
+        RecalculateAll();
+    }
+
+    private void HandleStandardProfileSelected(StandardSteelItem item)
+    {
+        SectionInputMode = "standard";
+        ApplyStandardProfile(item);
+    }
+
+    private (string cn, string en) GetLayerNames(CoatingLayerType type) => type switch
+    {
+        CoatingLayerType.Primer => ("底漆", "Primer"),
+        CoatingLayerType.Intermediate => ("中间漆", "Intermediate"),
+        CoatingLayerType.Sealer => ("封闭漆", "Sealer"),
+        CoatingLayerType.Topcoat => ("面漆", "Topcoat"),
+        CoatingLayerType.Fireproof => ("防火涂料", "Fireproof"),
+        _ => (type.ToString(), "")
+    };
+
+    private string GetStandardSystemDisplay()
+    {
+        if (SelectedStandardSystem.Contains("国标")) return "🇨🇳 国标 GB/T";
+        if (SelectedStandardSystem.Contains("欧标")) return "🇪🇺 欧标 EN";
+        if (SelectedStandardSystem.Contains("美标")) return "🇺🇸 美标 AISC";
+        return SelectedStandardSystem;
+    }
+
+    private string GetStandardBadgeClass()
+    {
+        if (SelectedStandardSystem.Contains("国标")) return "bg-warning text-dark";
+        if (SelectedStandardSystem.Contains("欧标")) return "bg-info text-dark";
+        if (SelectedStandardSystem.Contains("美标")) return "bg-danger text-white";
+        return "bg-secondary text-white";
+    }
+
+    private string GetFormattedSectionDesignation()
+    {
+        if (SectionInputMode == "plate" || CurrentParams.Type == SectionType.Plate)
+        {
+            return $"PL {PlateThickness:0.##}×{PlateWidth:0.##}";
+        }
+
+        if (SectionInputMode == "standard" && !string.IsNullOrWhiteSpace(CurrentParams.StandardProfileName))
+        {
+            return CurrentParams.StandardProfileName;
+        }
+
+        return CurrentParams.Type switch
+        {
+            SectionType.Plate =>
+                $"PL {PlateThickness:0.##}×{PlateWidth:0.##}",
+            SectionType.HBeam =>
+                $"H {CurrentParams.Height:F0}×{CurrentParams.Width:F0}×{CurrentParams.WebThickness:F0}×{CurrentParams.FlangeThickness:F0}",
+            SectionType.RHS =>
+                $"BOX {CurrentParams.Height:F0}×{CurrentParams.Width:F0}×{CurrentParams.WallThickness:F0}",
+            SectionType.CHS =>
+                $"CHS {CurrentParams.OuterDiameter:F0}×{CurrentParams.WallThickness:F0}",
+            SectionType.Channel =>
+                $"[ {CurrentParams.Height:F0}×{CurrentParams.Width:F0}×{CurrentParams.WebThickness:F0}×{CurrentParams.FlangeThickness:F0}",
+            SectionType.Angle =>
+                Math.Abs(CurrentParams.LegWidth1 - CurrentParams.LegWidth2) < 0.1
+                    ? $"L {CurrentParams.LegWidth1:F0}×{CurrentParams.LegThickness:F0}"
+                    : $"L {CurrentParams.LegWidth1:F0}×{CurrentParams.LegWidth2:F0}×{CurrentParams.LegThickness:F0}",
+            SectionType.Cruciform =>
+                $"+ {CurrentParams.Height:F0}×{CurrentParams.Width:F0}×{CurrentParams.WebThickness:F0}×{CurrentParams.FlangeThickness:F0}",
+            SectionType.Rectangle =>
+                $"REC {CurrentParams.Height:F0}×{CurrentParams.Width:F0}",
+            SectionType.Circle =>
+                $"Φ {CurrentParams.OuterDiameter:F0}",
+            _ => $"{CurrentParams.Type} 自定义"
+        };
+    }
+
+    private void ChangeApplicationMethod(CoatingApplicationMethod method)
+    {
+        CurrentMethod = method;
+        RecalculateAll();
+    }
+
+    private void ApplyPreset(string preset)
+    {
+        CurrentPresetName = preset;
+        CurrentLayers = PaintCoatingCalculator.CreatePreset(preset);
+        RecalculateAll();
+    }
+
+    private void OnSelectProductItem(CoatingLayerConfig layer, ChangeEventArgs e)
+    {
+        string? name = e.Value?.ToString();
+        if (string.IsNullOrWhiteSpace(name)) return;
+
+        var product = PaintProductDatabase.AllProducts.FirstOrDefault(p => p.Name == name);
+        if (product != null)
+        {
+            layer.BrandId = product.BrandId;
+            layer.ModelCode = product.ModelCode;
+            layer.ProductName = product.Name;
+            layer.Dft = product.DefaultDft;
+            layer.VolumeSolids = product.VolumeSolidsPercent;
+            layer.Density = product.DensityKgL;
+            layer.LossRate = product.LossRatePercent;
+            layer.MaterialPrice = product.MaterialUnitPricePerKg;
+            layer.LaborPrice = product.LaborUnitPricePerM2;
+            RecalculateAll();
+        }
+    }
+
+    private void ApplyProductToCalculation(PaintProductItem prod)
+    {
+        var targetLayer = CurrentLayers.FirstOrDefault(l => l.LayerType == prod.LayerType);
+        if (targetLayer != null)
+        {
+            targetLayer.IsEnabled = true;
+            targetLayer.BrandId = prod.BrandId;
+            targetLayer.ModelCode = prod.ModelCode;
+            targetLayer.ProductName = prod.Name;
+            targetLayer.Dft = prod.DefaultDft;
+            targetLayer.VolumeSolids = prod.VolumeSolidsPercent;
+            targetLayer.Density = prod.DensityKgL;
+            targetLayer.LossRate = prod.LossRatePercent;
+            targetLayer.MaterialPrice = prod.MaterialUnitPricePerKg;
+            targetLayer.LaborPrice = prod.LaborUnitPricePerM2;
+        }
+        ActiveTab = 1; // 切换回算量选项卡
+        RecalculateAll();
+    }
+
+    private void RecalculateAll()
+    {
+        // 1. 计算截面几何特性
+        CurrentResult = Calculator.Calculate(CurrentParams);
+
+        // 2. 算量涂装与防火
+        CurrentPaintResult = PaintCoatingCalculator.Calculate(
+            CurrentResult,
+            CurrentLayers,
+            excludeTopSurface: ExcludeTopSurface,
+            projectLengthM: ProjectTotalLengthM,
+            method: CurrentMethod,
+            sectionType: CurrentParams.Type);
+
+        // 3. 热浸镀锌同步算量
+        RecalculateHdg();
+    }
+
+    private void RecalculateHdg()
+    {
+        HdgOptions.ProjectLengthM = ProjectTotalLengthM;
+        CurrentHdgResult = PaintCoatingCalculator.CalculateHotDipGalvanizing(CurrentResult, HdgOptions);
+    }
+
+    private async Task CopyDescribeToClipboard()
+    {
+        await CopyText(CurrentPaintResult.FullTechnicalDescribe);
+    }
+
+    private async Task CopyText(string text)
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", text);
+            CopyAlertMessage = "✓ 已成功复制到系统剪贴板！";
+            _ = Task.Delay(3000).ContinueWith(_ =>
+            {
+                CopyAlertMessage = null;
+                InvokeAsync(StateHasChanged);
+            });
+        }
+        catch
+        {
+            CopyAlertMessage = "复制失败，请手工选中复制。";
+        }
+    }
+
+    private string GetLayerBadgeClass(CoatingLayerType type) => type switch
+    {
+        CoatingLayerType.Primer => "bg-primary",
+        CoatingLayerType.Intermediate => "bg-info text-dark",
+        CoatingLayerType.Sealer => "bg-secondary",
+        CoatingLayerType.Topcoat => "bg-success",
+        CoatingLayerType.Fireproof => "bg-danger",
+        _ => "bg-secondary"
+    };
+}

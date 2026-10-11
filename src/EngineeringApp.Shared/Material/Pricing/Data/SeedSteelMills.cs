@@ -117,8 +117,54 @@ public static class SeedSteelMills
         }
     ];
 
-    public static List<SteelMillBrand> AllMills => _mills;
+    /// <summary>
+    /// 动态获取钢厂品牌名录：优先与全国工程供应链与供应商库 (SupplierDatabase) 动态拉通！
+    /// 若供应商库中存在钢厂，则实时反映供应商库中用户增删改的钢厂与基准溢价，实现估值引擎与供应商库单源统一。
+    /// </summary>
+    public static List<SteelMillBrand> AllMills
+    {
+        get
+        {
+            var dynamicMills = EngineeringApp.Shared.Data.SupplierDatabase.GetSteelMillsAsBrands();
+            return dynamicMills.Count > 0 ? dynamicMills : _mills;
+        }
+    }
 
-    public static SteelMillBrand GetById(string id) =>
-        _mills.FirstOrDefault(m => string.Equals(m.Id, id, StringComparison.OrdinalIgnoreCase)) ?? _mills[0];
+    /// <summary>
+    /// 根据钢厂标识（支持 SUP-MILL-xxx 代码、历史ID如 Baosteel、或钢厂名称/简称）获取钢厂品牌配置与基准溢价
+    /// </summary>
+    public static SteelMillBrand GetById(string id)
+    {
+        var mills = AllMills;
+        if (string.IsNullOrWhiteSpace(id))
+            return mills[0];
+
+        // 1. 精确匹配 Id (如 SUP-MILL-001 或 Baosteel)
+        var match = mills.FirstOrDefault(m => string.Equals(m.Id, id, StringComparison.OrdinalIgnoreCase));
+        if (match != null) return match;
+
+        // 2. 尝试按历史代码映射（如 Baosteel 映射至 宝钢股份，或 SUP-MILL-001 映射至 Baosteel）
+        var aliasMatch = id.ToLowerInvariant() switch
+        {
+            "baosteel" or "sup-mill-001" => mills.FirstOrDefault(m => m.Id == "Baosteel" || m.Name.Contains("宝钢") || m.ShortName.Contains("宝钢")),
+            "nisco" or "sup-mill-002" => mills.FirstOrDefault(m => m.Id == "NISCO" || m.Name.Contains("南钢") || m.ShortName.Contains("南钢")),
+            "jinxi" or "sup-mill-003" => mills.FirstOrDefault(m => m.Id == "Jinxi" || m.Name.Contains("津西") || m.ShortName.Contains("津西")),
+            "masteel" or "sup-mill-004" => mills.FirstOrDefault(m => m.Id == "MaSteel" || m.Name.Contains("马钢") || m.ShortName.Contains("马钢")),
+            "shagang" or "sup-mill-005" => mills.FirstOrDefault(m => m.Id == "Shagang" || m.Name.Contains("沙钢") || m.ShortName.Contains("沙钢")),
+            "ansteel" or "sup-mill-006" => mills.FirstOrDefault(m => m.Id == "Ansteel" || m.Name.Contains("鞍钢") || m.ShortName.Contains("鞍钢")),
+            "xiangsteel" or "sup-mill-007" => mills.FirstOrDefault(m => m.Id == "Xiangsteel" || m.Name.Contains("湘钢") || m.ShortName.Contains("湘钢")),
+            "wisco" or "sup-mill-008" => mills.FirstOrDefault(m => m.Id == "WISCO" || m.Name.Contains("武钢") || m.ShortName.Contains("武钢")),
+            "generalmill" or "sup-mill-009" => mills.FirstOrDefault(m => m.Id == "GeneralMill" || m.Name.Contains("民营") || m.ShortName.Contains("民营")),
+            _ => null
+        };
+        if (aliasMatch != null) return aliasMatch;
+
+        // 3. 模糊匹配 Name 或 ShortName
+        var nameMatch = mills.FirstOrDefault(m => m.Name.Contains(id, StringComparison.OrdinalIgnoreCase) ||
+                                                  m.ShortName.Contains(id, StringComparison.OrdinalIgnoreCase));
+        if (nameMatch != null) return nameMatch;
+
+        // 4. 回退到备用静态库首项
+        return mills[0];
+    }
 }

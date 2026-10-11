@@ -1,0 +1,171 @@
+@using EngineeringApp.Shared.Models
+@using EngineeringApp.Shared.Algorithms
+
+<div class="row g-3 flex-grow-1">
+    <div class="col-lg-5">
+        <div class="card @(IsDarkMode ? "bg-black bg-opacity-30 border-secondary" : "bg-white border-light-subtle shadow-sm") p-3 h-100">
+            <h6 class="fw-bold text-info mb-2 d-flex align-items-center gap-2">
+                <span>⚡ 热浸镀锌 (HDG) 工艺参数配置</span>
+                <span class="badge bg-info text-dark text-xs">GB/T 13912-2020</span>
+            </h6>
+            <p class="small @(IsDarkMode ? "text-white-50" : "text-muted") mb-3">
+                热浸镀锌在商业上按<b>“元/吨”</b>报价结算，但物理成本核心由<b>“截面比表面积 (m²/t) 与锌层附着增重”</b>决定。
+            </p>
+
+            <!-- 国标锌锭纯度等级 -->
+            <div class="mb-3">
+                <label class="form-label small @(IsDarkMode ? "text-white-50" : "text-muted") mb-1">国标锌锭纯度等级 (GB/T 470):</label>
+                <select class="form-select form-select-sm @(IsDarkMode ? "bg-dark text-warning border-secondary" : "bg-white text-dark") fw-bold"
+                        @bind="HdgOptions.ZincGrade" @bind:after="NotifyRecalculate">
+                    <option value="@ZincIngotGrade.Grade0_HighPurity_99995">★ 0# 特级高纯锌 (Zn ≥ 99.995%, 特高压/外贸特级, +¥500/t)</option>
+                    <option value="@ZincIngotGrade.Grade1_Standard_9999">1# 优质结构纯锌 (Zn ≥ 99.99%, 工业重防腐基准价)</option>
+                    <option value="@ZincIngotGrade.Secondary_CrudeZinc">再生粗锌 / 次级配比 (Zn 98.5%~99.5%, -¥800/t)</option>
+                </select>
+            </div>
+
+            <!-- 锌锭基准现货大盘网价 -->
+            <div class="row g-2 mb-3">
+                <div class="col-6">
+                    <label class="form-label small @(IsDarkMode ? "text-white-50" : "text-muted") mb-1">锌锭现货网价 (元/吨锌):</label>
+                    <input type="number" class="form-control form-control-sm @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                           @bind="HdgOptions.ZincPricePerTon" @bind:after="NotifyRecalculate" step="500" />
+                </div>
+                <div class="col-6">
+                    <label class="form-label small @(IsDarkMode ? "text-white-50" : "text-muted") mb-1">设计镀锌层厚度 (μm):</label>
+                    <select class="form-select form-select-sm @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                            @bind="HdgOptions.DftMicrons" @bind:after="NotifyRecalculate">
+                        <option value="55">55 μm (轻薄件，约 390 g/m²)</option>
+                        <option value="70">70 μm (普通件，约 500 g/m²)</option>
+                        <option value="85">85 μm (国标6mm以上标配，约 610 g/m²)</option>
+                        <option value="100">100 μm (高耐蚀加重型，约 714 g/m²)</option>
+                        <option value="120">120 μm (沿海特重防腐，约 857 g/m²)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- 工艺选项开关 -->
+            <div class="p-3 rounded border mb-3 @(IsDarkMode ? "bg-dark bg-opacity-50 border-secondary" : "bg-light border-light-subtle")">
+                <div class="form-check form-switch mb-2">
+                    <input class="form-check-input" type="checkbox" id="checkBothSides"
+                           @bind="HdgOptions.IsBothSidesGalvanized" @bind:after="NotifyRecalculate" />
+                    <label class="form-check-label small" for="checkBothSides">
+                        内外表面双面全浸锌 (角钢、开孔钢管内外全浸)
+                    </label>
+                </div>
+                <div class="form-check form-switch mb-2">
+                    <input class="form-check-input" type="checkbox" id="checkDoubleDip"
+                           @bind="HdgOptions.IsDoubleDipOverlength" @bind:after="NotifyRecalculate" />
+                    <label class="form-check-label small text-warning fw-bold" for="checkDoubleDip">
+                        单根长度超限 (&gt;12.5m) 需倒头进行二次双浸 (+25% 工艺费)
+                    </label>
+                </div>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="checkCavity"
+                           @bind="HdgOptions.HasComplexCavities" @bind:after="NotifyRecalculate" />
+                    <label class="form-check-label small" for="checkCavity">
+                        复杂闭腔构件 (需开设工艺排气防爆孔 +15% 难度费)
+                    </label>
+                </div>
+            </div>
+
+            <!-- 批量工程总长 -->
+            <div class="mb-3">
+                <label class="form-label small @(IsDarkMode ? "text-white-50" : "text-muted") mb-1">工程批量构件总长度 (m):</label>
+                <input type="number" class="form-control form-control-sm @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                       @bind="HdgOptions.ProjectLengthM" @bind:after="NotifyRecalculate" min="0.1" step="1" />
+            </div>
+        </div>
+    </div>
+
+    <!-- 右侧：热浸锌综合造价大盘与行业物理机理解析 -->
+    <div class="col-lg-7">
+        <div class="card @(IsDarkMode ? "bg-black bg-opacity-40 border-info" : "bg-white border-info shadow") p-3 h-100 d-flex flex-column">
+            <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom @(IsDarkMode ? "border-secondary" : "border-light-subtle")">
+                <span class="small @(IsDarkMode ? "text-white-50" : "text-muted")">热浸锌核算模式：吨单价 + 延米造价双轨联动</span>
+                <span class="badge bg-info text-dark">即时精确计算</span>
+            </div>
+
+            <!-- 最终吨加工费大徽章 -->
+            <div class="@(IsDarkMode ? "bg-info bg-opacity-10 border-info border-opacity-50" : "bg-info-subtle border-info") p-3 rounded-3 border text-center mb-3">
+                <div class="@(IsDarkMode ? "text-white-50" : "text-muted") small mb-1">热浸镀锌综合加工到厂单价</div>
+                <div class="display-6 fw-bold text-primary tracking-tight">
+                    ¥ @CurrentHdgResult.TotalPricePerTon.ToString("N0")
+                    <span class="fs-6 fw-normal @(IsDarkMode ? "text-white-50" : "text-muted")">元/吨钢</span>
+                </div>
+                <div class="d-flex justify-content-center gap-3 small mt-2">
+                    <span>折合延米价: <b class="text-warning">¥@CurrentHdgResult.LinearPricePerMeter.ToString("F2")</b> 元/m</span>
+                    <span>折合平米表面积: <b class="text-success">¥@CurrentHdgResult.PricePerM2.ToString("F2")</b> 元/m²</span>
+                </div>
+            </div>
+
+            <!-- 成本构成瀑布明细 -->
+            <div class="table-responsive mb-3">
+                <table class="table table-sm @(IsDarkMode ? "table-dark table-borderless" : "table-light table-borderless") small mb-0">
+                    <tbody>
+                        <tr>
+                            <td class="@(IsDarkMode ? "text-white-50" : "text-muted")">1. 截面吨钢比表面积 S_ton:</td>
+                            <td class="text-end fw-bold">@CurrentHdgResult.SpecificSurfaceAreaTon.ToString("F1") m²/t</td>
+                        </tr>
+                        <tr>
+                            <td class="@(IsDarkMode ? "text-white-50" : "text-muted")">2. 每吨钢耗锌量 (含18%损耗):</td>
+                            <td class="text-end text-warning fw-bold">@CurrentHdgResult.ZincConsumptionKgPerTon.ToString("F1") kg/t (增重 +@CurrentHdgResult.WeightIncreasePercent.ToString("F1")%)</td>
+                        </tr>
+                        <tr>
+                            <td class="@(IsDarkMode ? "text-white-50" : "text-muted")">3. 纯锌材料消耗费用贡献:</td>
+                            <td class="text-end text-danger fw-bold">+¥@CurrentHdgResult.ZincMaterialCostPerTon.ToString("F0") /吨</td>
+                        </tr>
+                        <tr>
+                            <td class="@(IsDarkMode ? "text-white-50" : "text-muted")">4. 基础酸洗助镀与天然气能耗工费:</td>
+                            <td class="text-end fw-bold">+¥@CurrentHdgResult.BaseProcessingCostPerTon.ToString("F0") /吨</td>
+                        </tr>
+                        @if (CurrentHdgResult.OverlengthSurchargePerTon > 0)
+                        {
+                            <tr>
+                                <td class="@(IsDarkMode ? "text-white-50" : "text-muted")">5. 超长双浸倒头与工艺难度溢价:</td>
+                                <td class="text-end text-warning fw-bold">+¥@CurrentHdgResult.OverlengthSurchargePerTon.ToString("F0") /吨</td>
+                            </tr>
+                        }
+                        <tr class="border-top @(IsDarkMode ? "border-secondary" : "border-light-subtle")">
+                            <td class="@(IsDarkMode ? "text-white-50" : "text-muted")">工程批量总造价 (@HdgOptions.ProjectLengthM.ToString("F0")m, @CurrentHdgResult.ProjectTotalTons.ToString("F1")吨钢):</td>
+                            <td class="text-end text-success fw-bold fs-6">¥@CurrentHdgResult.ProjectTotalCostYuan.ToString("N2")</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 行业机理与数据对比卡片 -->
+            <div class="p-3 rounded border mb-3 @(IsDarkMode ? "bg-dark bg-opacity-75 border-secondary" : "bg-light border-light-subtle")">
+                <div class="fw-bold text-info small mb-1">💡 输变电轻构件 vs 重型构件机理剖析:</div>
+                <p class="small @(IsDarkMode ? "text-white-75" : "text-muted") mb-0" style="line-height: 1.6;">
+                    @CurrentHdgResult.MechanismExplanation
+                </p>
+            </div>
+
+            <!-- Describe 输出 -->
+            <div class="mt-auto @(IsDarkMode ? "bg-black border-secondary" : "bg-light border-light-subtle") p-2 rounded border">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="badge @(IsDarkMode ? "bg-secondary" : "bg-secondary-subtle text-dark border") text-xs">热浸镀锌 Describe 契约接口</span>
+                    <button class="btn btn-xs btn-outline-success py-0 px-2" @onclick="() => OnCopyText.InvokeAsync(CurrentHdgResult.FullDescribeText)">
+                        📋 复制
+                    </button>
+                </div>
+                <div class="font-monospace small @(IsDarkMode ? "text-info bg-dark border-secondary" : "text-dark bg-white border-secondary-subtle") p-2 rounded border text-break" style="font-size: 11px;">
+                    @CurrentHdgResult.FullDescribeText
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public HotDipGalvanizingOptions HdgOptions { get; set; } = new();
+    [Parameter] public HotDipGalvanizingResult CurrentHdgResult { get; set; } = new();
+    [Parameter] public bool IsDarkMode { get; set; } = true;
+    [Parameter] public EventCallback OnRecalculate { get; set; }
+    [Parameter] public EventCallback<string> OnCopyText { get; set; }
+
+    private async Task NotifyRecalculate()
+    {
+        await OnRecalculate.InvokeAsync();
+    }
+}

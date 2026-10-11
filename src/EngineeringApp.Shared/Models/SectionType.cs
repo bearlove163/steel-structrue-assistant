@@ -33,5 +33,8 @@ public enum SectionType
     Cruciform,
 
     /// <summary>任意多边形 (Arbitrary Polygon / Composite)</summary>
-    Polygon
+    Polygon,
+
+    /// <summary>钢板板材 (Steel Plate)</summary>
+    Plate
 }

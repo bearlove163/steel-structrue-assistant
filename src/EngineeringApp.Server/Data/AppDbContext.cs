@@ -37,6 +37,7 @@ public class PaintProductEntity
     public CoatingLayerType LayerType { get; set; }
     public string Name { get; set; } = "";
     public string Brand { get; set; } = "";
+    public int? SupplierId { get; set; }
     public string Description { get; set; } = "";
     public double VolumeSolidsPercent { get; set; }
     public double DensityKgL { get; set; }
@@ -162,6 +163,7 @@ public class MaterialProvenanceRecordEntity
     public string InquiryBatchId { get; set; } = "INQ-LOT-01";
     public DateTime InquiryDate { get; set; } = DateTime.Today;
     public string InquiryVendor { get; set; } = "";
+    public int? SupplierId { get; set; }
     public int RevisionNumber { get; set; } = 1;
     public string PricingPrincipleNote { get; set; } = "";
     public string RevisionLogsJson { get; set; } = "";
@@ -220,6 +222,7 @@ public class MaterialProvenanceRecordEntity
             InquiryBatchId = InquiryBatchId,
             InquiryDate = InquiryDate,
             InquiryVendor = InquiryVendor,
+            SupplierId = SupplierId,
             RevisionNumber = RevisionNumber,
             PricingPrincipleNote = PricingPrincipleNote,
             RevisionLogs = logs,
@@ -258,6 +261,7 @@ public class MaterialProvenanceRecordEntity
         InquiryBatchId = string.IsNullOrWhiteSpace(r.InquiryBatchId) ? "INQ-LOT-01" : r.InquiryBatchId,
         InquiryDate = r.InquiryDate == default ? DateTime.Today : r.InquiryDate,
         InquiryVendor = r.InquiryVendor,
+        SupplierId = r.SupplierId,
         RevisionNumber = r.RevisionNumber <= 0 ? 1 : r.RevisionNumber,
         PricingPrincipleNote = r.PricingPrincipleNote,
         RevisionLogsJson = System.Text.Json.JsonSerializer.Serialize(r.RevisionLogs ?? []),
@@ -279,6 +283,66 @@ public class MaterialProvenanceRecordEntity
 }
 
 /// <summary>
+/// 基础数据实体：供应商企业资质档案与名录持久化模型
+/// </summary>
+public class SupplierEntity
+{
+    public int Id { get; set; }
+    public string Code { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string ShortName { get; set; } = "";
+    public SupplierCategory Category { get; set; } = SupplierCategory.SteelTrader;
+    public string SubCategory { get; set; } = "";
+    public string ContactPerson { get; set; } = "";
+    public string ContactPhone { get; set; } = "";
+    public string Email { get; set; } = "";
+    public string CityRegion { get; set; } = "";
+    public string CooperationStatus { get; set; } = "合格在册";
+    public string Remarks { get; set; } = "";
+    public double BenchmarkPremiumPerTon { get; set; } = 0.0;
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
+    public DateTime UpdatedAt { get; set; } = DateTime.Now;
+
+    public SupplierItem ToDomain() => new()
+    {
+        Id = Id,
+        Code = Code,
+        Name = Name,
+        ShortName = ShortName,
+        Category = Category,
+        SubCategory = SubCategory,
+        ContactPerson = ContactPerson,
+        ContactPhone = ContactPhone,
+        Email = Email,
+        CityRegion = CityRegion,
+        CooperationStatus = CooperationStatus,
+        Remarks = Remarks,
+        BenchmarkPremiumPerTon = BenchmarkPremiumPerTon,
+        CreatedAt = CreatedAt,
+        UpdatedAt = UpdatedAt
+    };
+
+    public static SupplierEntity FromDomain(SupplierItem item) => new()
+    {
+        Id = item.Id,
+        Code = item.Code,
+        Name = item.Name,
+        ShortName = item.ShortName,
+        Category = item.Category,
+        SubCategory = item.SubCategory,
+        ContactPerson = item.ContactPerson,
+        ContactPhone = item.ContactPhone,
+        Email = item.Email,
+        CityRegion = item.CityRegion,
+        CooperationStatus = item.CooperationStatus,
+        Remarks = item.Remarks,
+        BenchmarkPremiumPerTon = item.BenchmarkPremiumPerTon,
+        CreatedAt = item.CreatedAt,
+        UpdatedAt = item.UpdatedAt
+    };
+}
+
+/// <summary>
 /// SQLite 数据库上下文
 /// </summary>
 public class AppDbContext : DbContext
@@ -287,6 +351,7 @@ public class AppDbContext : DbContext
     {
     }
 
+    public DbSet<SupplierEntity> Suppliers => Set<SupplierEntity>();
     public DbSet<StandardSteelEntity> StandardSteels => Set<StandardSteelEntity>();
     public DbSet<PaintProductEntity> PaintProducts => Set<PaintProductEntity>();
     public DbSet<MaterialPriceSnapshotEntity> MaterialPriceSnapshots => Set<MaterialPriceSnapshotEntity>();
@@ -357,14 +422,30 @@ public class AppDbContext : DbContext
             e.HasIndex(x => x.MaterialTag);
             e.HasIndex(x => x.SnapshotId);
         });
+
+        modelBuilder.Entity<SupplierEntity>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.Code).IsUnique();
+            e.HasIndex(x => x.Category);
+            e.HasIndex(x => x.Name);
+        });
     }
 
     /// <summary>
-    /// 初始化并自动填充基准数据 (型钢、油漆、材料快照、厚度阶梯、尺寸规则、钢厂溢价、物流路线)
+    /// 初始化并自动填充基准数据 (供应商、型钢、油漆、材料快照、厚度阶梯、尺寸规则、钢厂溢价、物流路线)
     /// </summary>
     public static void SeedData(AppDbContext db)
     {
         db.Database.EnsureCreated();
+
+        // 0. 填充供应链基准供应商库 (含钢厂、贸易商、吊机商、紧固件螺栓、特种材料[拉索/支座/楼承板]、油漆涂料)
+        if (!db.Suppliers.Any())
+        {
+            var seedSuppliers = SupplierDatabase.AllSuppliers.Select(s => SupplierEntity.FromDomain(s)).ToList();
+            db.Suppliers.AddRange(seedSuppliers);
+            db.SaveChanges();
+        }
 
         // 1. 填充油漆基准价格数据库
         if (!db.PaintProducts.Any())
@@ -375,6 +456,15 @@ public class AppDbContext : DbContext
                 LayerType = p.LayerType,
                 Name = p.Name,
                 Brand = p.Brand,
+                SupplierId = p.BrandId switch
+                {
+                    "Jotun" => 24,
+                    "AkzoNobel" => 25,
+                    "Kansai" => 26,
+                    "Hempel" => 27,
+                    "Sherwin" => 28,
+                    _ => null
+                },
                 Description = p.Description,
                 VolumeSolidsPercent = p.VolumeSolidsPercent,
                 DensityKgL = p.DensityKgL,
@@ -525,7 +615,21 @@ public class AppDbContext : DbContext
         // 8. 填充物料出处记录库 (Seed Provenance Records)
         if (!db.MaterialProvenanceRecords.Any())
         {
-            var seedRecords = SeedProvenanceRecords.AllRecords.Select(r => MaterialProvenanceRecordEntity.FromDomain(r)).ToList();
+            var seedRecords = SeedProvenanceRecords.AllRecords.Select(r =>
+            {
+                var ent = MaterialProvenanceRecordEntity.FromDomain(r);
+                ent.SupplierId = r.MillName switch
+                {
+                    var m when m.Contains("宝钢") || m.Contains("宝武") => 1,
+                    var m when m.Contains("南钢") => 2,
+                    var m when m.Contains("津西") => 3,
+                    var m when m.Contains("马钢") => 4,
+                    var m when m.Contains("沙钢") => 5,
+                    var m when m.Contains("鞍钢") => 6,
+                    _ => 7
+                };
+                return ent;
+            }).ToList();
 
             db.MaterialProvenanceRecords.AddRange(seedRecords);
             db.SaveChanges();

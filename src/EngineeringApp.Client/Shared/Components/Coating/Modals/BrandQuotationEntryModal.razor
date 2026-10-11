@@ -1,0 +1,116 @@
+@using EngineeringApp.Shared.Pricing.Coating
+
+@if (IsOpen)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.6); z-index: 1055;">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content @(IsDarkMode ? "bg-dark text-white border-secondary shadow-lg" : "bg-white text-dark shadow-lg")">
+                <div class="modal-header py-2 @(IsDarkMode ? "border-secondary" : "border-light-subtle")">
+                    <h6 class="modal-title fw-bold text-success d-flex align-items-center gap-2">
+                        <span>➕ 录入品牌实体真实询价明细</span>
+                    </h6>
+                    <button type="button" class="btn-close @(IsDarkMode ? "btn-close-white" : "")" @onclick="CloseModal"></button>
+                </div>
+                <div class="modal-body p-3 text-xs">
+                    <div class="alert alert-info py-1 px-2 mb-3 text-xs">
+                        💡 录入的真实询价值将直接存入当前选中的价格快照 <b>(@SnapshotName)</b>，并立即参与算量与调差。
+                    </div>
+
+                    <div class="row g-2 mb-2">
+                        <div class="col-6">
+                            <label class="form-label @(IsDarkMode ? "text-white-50" : "text-muted") mb-1">品牌名称 *</label>
+                            <input type="text" class="form-control form-control-sm @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                   placeholder="例如: 宣伟 Sherwin / 兰陵"
+                                   @bind="BrandName" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label @(IsDarkMode ? "text-white-50" : "text-muted") mb-1">所属涂料品类 *</label>
+                            <select class="form-select form-select-sm @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                    @bind="Category">
+                                <option value="底漆">底漆 (环氧富锌/无机富锌)</option>
+                                <option value="中间漆">中间漆 (环氧云铁 MIO)</option>
+                                <option value="面漆">面漆 (聚氨酯/氟碳)</option>
+                                <option value="防火涂料">防火涂料 (超薄/薄型/厚型)</option>
+                                <option value="封闭漆">封闭漆 (环氧封闭底漆)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row g-2 mb-2">
+                        <div class="col-6">
+                            <label class="form-label @(IsDarkMode ? "text-white-50" : "text-muted") mb-1">规格型号 / 代号</label>
+                            <input type="text" class="form-control form-control-sm @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                   placeholder="例如: EP-800 环氧富锌"
+                                   @bind="Model" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label @(IsDarkMode ? "text-white-50" : "text-muted") mb-1">真实询价单价 (元/kg) *</label>
+                            <input type="number" class="form-control form-control-sm fw-bold text-success @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                   step="0.5" min="1"
+                                   @bind="Price" />
+                        </div>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label @(IsDarkMode ? "text-white-50" : "text-muted") mb-1">报价商 / 供应商全称</label>
+                        <input type="text" class="form-control form-control-sm @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                                   placeholder="例如: 宣伟涂料华东直接代表处"
+                                   @bind="Supplier" />
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label @(IsDarkMode ? "text-white-50" : "text-muted") mb-1">询价时间与备注说明</label>
+                        <input type="text" class="form-control form-control-sm @(IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white")"
+                               placeholder="例如: 2026年秋季项目投标专属报价，含运费税票"
+                               @bind="Remarks" />
+                    </div>
+                </div>
+                <div class="modal-footer py-2 @(IsDarkMode ? "border-secondary" : "border-light-subtle")">
+                    <button type="button" class="btn btn-secondary btn-sm" @onclick="CloseModal">取消</button>
+                    <button type="button" class="btn btn-success btn-sm fw-bold" @onclick="SaveQuote">✓ 保存并注入快照</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsOpen { get; set; } = false;
+    [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
+    [Parameter] public string SnapshotName { get; set; } = "";
+    [Parameter] public bool IsDarkMode { get; set; } = true;
+    [Parameter] public EventCallback<BrandQuoteItem> OnQuoteSaved { get; set; }
+
+    private string BrandName = "";
+    private string Category = "底漆";
+    private string Model = "";
+    private double Price = 28.0;
+    private string Supplier = "";
+    private string Remarks = "";
+
+    private async Task CloseModal()
+    {
+        IsOpen = false;
+        await IsOpenChanged.InvokeAsync(false);
+    }
+
+    private async Task SaveQuote()
+    {
+        if (string.IsNullOrWhiteSpace(BrandName)) return;
+
+        var newItem = new BrandQuoteItem
+        {
+            BrandName = BrandName.Trim(),
+            MaterialCategory = Category,
+            ProductModel = string.IsNullOrWhiteSpace(Model) ? $"{Category} 标准通用型" : Model.Trim(),
+            UnitPrice = Math.Max(0.1, Price),
+            SupplierName = string.IsNullOrWhiteSpace(Supplier) ? $"{BrandName} 认证经销商" : Supplier.Trim(),
+            Remarks = string.IsNullOrWhiteSpace(Remarks) ? "现场真实询价录入" : Remarks.Trim(),
+            QuoteDate = DateTime.Today,
+            IsCustomAdded = true
+        };
+
+        await OnQuoteSaved.InvokeAsync(newItem);
+        await CloseModal();
+    }
+}
