@@ -1116,33 +1116,33 @@
 
                     <!-- 统一透明工程计算公式指示 -->
                     <div class="text-xs px-2 py-1 rounded border @(Theme.IsDarkMode ? "bg-black bg-opacity-30 border-secondary text-info" : "bg-white border-info-subtle text-primary")">
-                        <span>📐 <b>核算规则</b>: 目标期回溯价 = 目标大盘基价 + 执行版各项加价 | 吨钢调差 ΔP = 回溯价 - 合同基期底账价</span>
+                        <span>📐 <b>核算规则</b>: 目标期回溯价 = 目标大盘基价 + 执行加价 | 业主调差 ΔP = 回溯价 - 基期底账价 | ★ 采办经营创效 = 业主补价 - 实付增量</span>
                     </div>
                 </div>
             </div>
 
-            <!-- 全项目调差与成本聚合看板 (5大核心工程造价指标) -->
+            <!-- 全项目调差与成本聚合看板 (6大核心工程造价与商务经营指标) -->
             <div class="row g-2 mb-3">
-                <div class="col-sm-6 col-lg">
+                <div class="col-6 col-md-4 col-xl-2">
                     <div class="p-2 rounded border @(Theme.IsDarkMode ? "bg-secondary bg-opacity-10 border-secondary" : "bg-light border-light-subtle")">
                         <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1">① 归档物料品种数</div>
                         <div class="fs-5 fw-bold text-primary">@ProvenanceRecords.Count <span class="text-xs fw-normal @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">种独立特征</span></div>
                     </div>
                 </div>
-                <div class="col-sm-6 col-lg">
+                <div class="col-6 col-md-4 col-xl-2">
                     <div class="p-2 rounded border @(Theme.IsDarkMode ? "bg-secondary bg-opacity-10 border-secondary" : "bg-light border-light-subtle")">
                         <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1">② 关联用钢总量</div>
                         <div class="fs-5 fw-bold text-info">@GetTotalProjectTons().ToString("N1") <span class="text-xs fw-normal @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">吨 (t)</span></div>
                     </div>
                 </div>
-                <div class="col-sm-6 col-lg">
+                <div class="col-6 col-md-4 col-xl-2">
                     <div class="p-2 rounded border @(Theme.IsDarkMode ? "bg-secondary bg-opacity-10 border-secondary" : "bg-light border-light-subtle")">
                         <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1">③ 合同基期底账总额</div>
                         <div class="fs-5 fw-bold @(Theme.IsDarkMode ? "text-white" : "text-dark")">¥ @GetTotalBaseRecordedCost().ToString("N0")</div>
                         <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">不可变调差锚点</div>
                     </div>
                 </div>
-                <div class="col-sm-6 col-lg">
+                <div class="col-6 col-md-4 col-xl-2">
                     <div class="p-2 rounded border @(Theme.IsDarkMode ? "bg-secondary bg-opacity-10 border-secondary" : "bg-light border-light-subtle")">
                         <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1">④ 当前执行采购实付</div>
                         <div class="fs-5 fw-bold text-warning">¥ @GetTotalExecutionCost().ToString("N0")</div>
@@ -1155,53 +1155,77 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-sm-6 col-lg">
+                <div class="col-6 col-md-4 col-xl-2">
                     <div class="p-2 rounded border @(GetTotalClaimVariance() >= 0 ? (Theme.IsDarkMode ? "bg-danger bg-opacity-10 border-danger border-opacity-50" : "bg-danger-subtle border-danger-subtle") : (Theme.IsDarkMode ? "bg-success bg-opacity-10 border-success border-opacity-50" : "bg-success-subtle border-success-subtle"))">
                         <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1">⑤ 目标期调差索赔总额</div>
                         <div class="fs-5 fw-bold @(GetTotalClaimVariance() >= 0 ? "text-danger" : "text-success")">
                             @(GetTotalClaimVariance() >= 0 ? "+" : "")¥ @GetTotalClaimVariance().ToString("N0")
                         </div>
                         <div class="text-xs @(GetTotalClaimVariance() >= 0 ? "text-danger" : "text-success")">
-                            @(GetTotalClaimVariance() >= 0 ? "▲ 应向业主主张调增" : "▼ 依合同应予核减")
+                            @(GetTotalClaimVariance() >= 0 ? "▲ 应向业主索赔调增" : "▼ 依合同应予核减")
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-4 col-xl-2">
+                    <div class="p-2 rounded border @(GetTotalCommercialSpread() >= 0 ? (Theme.IsDarkMode ? "bg-success bg-opacity-15 border-success" : "bg-success-subtle border-success border-opacity-75 shadow-sm") : (Theme.IsDarkMode ? "bg-danger bg-opacity-10 border-danger" : "bg-danger-subtle border-danger-subtle"))">
+                        <div class="d-flex align-items-center justify-content-between mb-1">
+                            <div class="text-xs fw-bold @(GetTotalCommercialSpread() >= 0 ? "text-success" : "text-danger")">⑥ 采办经营净创效</div>
+                            <span class="badge @(GetTotalCommercialSpread() >= 0 ? "bg-success" : "bg-danger") text-xs p-0 px-1">剪刀差利润</span>
+                        </div>
+                        <div class="fs-5 fw-bold @(GetTotalCommercialSpread() >= 0 ? "text-success" : "text-danger")">
+                            @(GetTotalCommercialSpread() >= 0 ? "+" : "")¥ @GetTotalCommercialSpread().ToString("N0")
+                        </div>
+                        <div class="text-xs @(GetTotalCommercialSpread() >= 0 ? "text-success" : "text-danger") fw-semibold">
+                            @(GetTotalCommercialSpread() >= 0 ? "🏆 净盈余: " : "⚠️ 净亏损: ")@(GetAverageCommercialSpreadPerTon() >= 0 ? "+" : "")@GetAverageCommercialSpreadPerTon().ToString("0.##") 元/t
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- 物料出处记录与跨时序回溯表格 (造价三态并列：合同底账 / 当前执行 / 目标期回溯) -->
+            <!-- 物料出处记录与跨时序回溯表格 (造价三态并列：合同底账 / 当前执行 / 目标期回溯 / 采办剪刀差创效) -->
             <div class="table-responsive flex-grow-1 mb-3">
                 <table class="table table-sm @(Theme.IsDarkMode ? "table-dark table-hover table-bordered border-secondary" : "table-hover table-bordered bg-white shadow-sm border-light-subtle") small align-middle mb-0">
                     <thead class="@(Theme.IsDarkMode ? "table-secondary text-white" : "table-light text-dark")">
                         <tr>
                             <th style="width: 35px;">#</th>
-                            <th style="min-width: 250px;">物料规格与特征出处 (点击标签一键复制)</th>
-                            <th style="min-width: 135px;">询价批次与依据</th>
-                            <th class="text-end" style="min-width: 125px;">
+                            <th style="min-width: 240px;">物料规格与特征出处 (点击标签一键复制)</th>
+                            <th style="min-width: 130px;">询价批次与依据</th>
+                            <th class="text-end" style="min-width: 115px;">
                                 <div>合同基期单价</div>
                                 <div class="text-xs fw-normal @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">(不可变底账)</div>
                             </th>
-                            <th class="text-end" style="min-width: 160px;">
+                            <th class="text-end" style="min-width: 155px;">
                                 <div class="d-flex align-items-center justify-content-end gap-1">
                                     <span>当前执行采购价</span>
                                     <span class="badge bg-primary text-xs" title="可点击单元格快速微调">微调⚡</span>
                                 </div>
                                 <div class="text-xs fw-normal @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">(最新实付/谈判)</div>
                             </th>
-                            <th class="text-end" style="min-width: 140px;">
+                            <th class="text-end" style="min-width: 135px;">
                                 <div>目标期回溯单价</div>
                                 <div class="text-xs fw-normal @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">(@RetrospectionTargetSnapshot.EffectiveDate.ToString("MM-dd") 大盘)</div>
                             </th>
-                            <th class="text-end" style="min-width: 95px;">吨差 (ΔP)</th>
-                            <th style="width: 80px;">用量 (t)</th>
-                            <th class="text-end" style="min-width: 110px;">调差总额 (ΔCost)</th>
-                            <th class="text-center" style="min-width: 155px;">操作与审计</th>
+                            <th class="text-end" style="min-width: 90px;">吨差 (ΔP)</th>
+                            <th style="width: 75px;">用量 (t)</th>
+                            <th class="text-end" style="min-width: 105px;">
+                                <div>业主调差额</div>
+                                <div class="text-xs fw-normal @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">(向业主索赔)</div>
+                            </th>
+                            <th class="text-end" style="min-width: 150px;">
+                                <div class="d-flex align-items-center justify-content-end gap-1 text-success fw-bold">
+                                    <span>★ 采办经营创效</span>
+                                    <span class="badge bg-success text-xs">剪刀差利润</span>
+                                </div>
+                                <div class="text-xs fw-normal @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">(业主补 - 实多付)</div>
+                            </th>
+                            <th class="text-center" style="min-width: 145px;">操作与审计</th>
                         </tr>
                     </thead>
                     <tbody>
                         @if (ProvenanceRecords.Count == 0)
                         {
                             <tr>
-                                <td colspan="10" class="text-center py-4 @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">
+                                <td colspan="11" class="text-center py-4 @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">
                                     暂无物料出处记录。请前往【钢板五维加价】配置钢板并点击“📌 登记入库”按钮添加。
                                 </td>
                             </tr>
@@ -1215,6 +1239,8 @@
                                 double tons = GetRecordTons(rec.Id);
                                 double deltaCost = deltaP * tons;
                                 double execVariance = rec.FinalPricePerTon - rec.ContractBaselinePrice;
+                                double spreadPerTon = retroPrice.FinalPricePerTon - rec.FinalPricePerTon; // 剪刀差 = 回溯价 - 执行价 = 补130 - 实多付50 = +80
+                                double spreadCost = spreadPerTon * tons;
                                 bool isQuickEditing = QuickEditingRecordId == rec.Id;
 
                                 <tr>
@@ -1309,11 +1335,11 @@
                                                 }
                                                 else if (execVariance > 0)
                                                 {
-                                                    <span class="badge bg-warning text-dark text-xs" title="实际采购较合同底账超支">实付超支 +¥@execVariance.ToString("0.##")</span>
+                                                    <span class="badge bg-warning text-dark text-xs" title="实际采购较合同底账超支">实付多付 +¥@execVariance.ToString("0.##")</span>
                                                 }
                                                 else
                                                 {
-                                                    <span class="badge bg-success text-white text-xs" title="实际采购较合同底账节约">实付节约 -¥@(Math.Abs(execVariance).ToString("0.##"))</span>
+                                                    <span class="badge bg-success text-white text-xs" title="实际采购较合同底账节约">实付节省 -¥@(Math.Abs(execVariance).ToString("0.##"))</span>
                                                 }
                                             </div>
                                         }
@@ -1327,7 +1353,7 @@
                                         </div>
                                     </td>
 
-                                    <!-- 列 4: 吨钢调差 ΔP -->
+                                    <!-- 列 4: 吨钢调差 ΔP (对业主) -->
                                     <td class="text-end">
                                         <span class="badge @(deltaP >= 0 ? "bg-danger" : "bg-success") fs-7">
                                             @(deltaP >= 0 ? "+" : "")@deltaP.ToString("0.##")
@@ -1342,9 +1368,30 @@
                                                style="width: 75px;" />
                                     </td>
 
-                                    <!-- 列 6: 调差总额 ΔCost -->
+                                    <!-- 列 6: 业主调差额 ΔCost -->
                                     <td class="text-end fw-bold @(deltaCost >= 0 ? "text-danger" : "text-success")">
                                         @(deltaCost >= 0 ? "+" : "")¥@deltaCost.ToString("N0")
+                                    </td>
+
+                                    <!-- 列 7: ★ 采办经营创效 (剪刀差利润) -->
+                                    <td class="text-end">
+                                        <div class="fw-bold @(spreadPerTon >= 0 ? "text-success" : "text-danger") fs-6 d-flex align-items-center justify-content-end gap-1">
+                                            <span>@(spreadPerTon >= 0 ? "+" : "")¥@spreadPerTon.ToString("0.##")/t</span>
+                                            @if (spreadPerTon > 0)
+                                            {
+                                                <span class="badge bg-success text-white text-xs px-1" title="采办经营净盈利">盈</span>
+                                            }
+                                            else if (spreadPerTon < 0)
+                                            {
+                                                <span class="badge bg-danger text-white text-xs px-1" title="采办经营亏损">亏</span>
+                                            }
+                                        </div>
+                                        <div class="text-xs">
+                                            净额: <b class="@(spreadCost >= 0 ? "text-success" : "text-danger")">@(spreadCost >= 0 ? "+" : "")¥@spreadCost.ToString("N0")</b>
+                                        </div>
+                                        <div class="text-xs text-muted" style="font-size: 10px;" title="核算拆解：业主索赔补 ¥@deltaP:0.## - 实际采购多付 ¥@execVariance:0.##">
+                                            (补@deltaP.ToString("0") - 实多@execVariance.ToString("0"))
+                                        </div>
                                     </td>
 
                                     <!-- 操作与审计 -->
@@ -1371,16 +1418,16 @@
             <!-- 底部结论与索赔调差指引 -->
             <div class="p-3 rounded border @(Theme.IsDarkMode ? "bg-dark bg-opacity-50 border-secondary" : "bg-light border-light-subtle") d-flex flex-wrap align-items-center justify-content-between gap-2">
                 <div class="small">
-                    <b>💡 工程造价与索赔核算结论:</b>
+                    <b>💡 工程造价调差与采办经营创效结论:</b>
                     基于目标快照 <span class="text-primary fw-bold">@RetrospectionTargetSnapshot.SnapshotName (@RetrospectionTargetSnapshot.EffectiveDate.ToString("yyyy-MM-dd"))</span>，
                     全项目 @ProvenanceRecords.Count 种物料构件共计 <span class="fw-bold">@GetTotalProjectTons().ToString("N1")</span> 吨钢：
-                    合同基期底账为 <span class="fw-bold">¥@GetTotalBaseRecordedCost().ToString("N0")</span> 元，
-                    当前执行采购实付为 <span class="fw-bold text-warning">¥@GetTotalExecutionCost().ToString("N0")</span> 元 (采购较基期@(GetTotalExecutionVariance() >= 0 ? "超支" : "节约") ¥@Math.Abs(GetTotalExecutionVariance()).ToString("N0") 元)，
-                    面向业主的目标期物料调差索赔总额为
-                    <b class="@(GetTotalClaimVariance() >= 0 ? "text-danger fs-6" : "text-success fs-6")">
-                        @(GetTotalClaimVariance() >= 0 ? "+" : "")¥ @GetTotalClaimVariance().ToString("N0") 元
-                    </b>。
-                    全生命周期价格与批次变更具备不可篡改审计追踪，可直接导出作为工程结算签证核心依据。
+                    <br />
+                    ① <b>合同基期底账</b>：<span class="fw-bold">¥@GetTotalBaseRecordedCost().ToString("N0")</span> 元 (锁价基期原点)；
+                    ② <b>当前采购实付</b>：<span class="fw-bold text-warning">¥@GetTotalExecutionCost().ToString("N0")</span> 元 (实付较基期@(GetTotalExecutionVariance() >= 0 ? "多付" : "节省") ¥@Math.Abs(GetTotalExecutionVariance()).ToString("N0") 元)；
+                    ③ <b>对业主索赔调差</b>：<b class="@(GetTotalClaimVariance() >= 0 ? "text-danger" : "text-success")">@(GetTotalClaimVariance() >= 0 ? "+" : "")¥ @GetTotalClaimVariance().ToString("N0") 元</b>；
+                    <br />
+                    ④ <span class="badge bg-success me-1">★ 商务采办净创效</span>：施工单位合规实现的<b>剪刀差经营利润为 <span class="@(GetTotalCommercialSpread() >= 0 ? "text-success fs-6" : "text-danger fs-6") fw-bold">@(GetTotalCommercialSpread() >= 0 ? "+" : "")¥ @GetTotalCommercialSpread().ToString("N0") 元</span></b>
+                    (业主调差补价扣除实际采购多付，平均为施工单位创效盈利 <b>@(GetAverageCommercialSpreadPerTon() >= 0 ? "+" : "")@GetAverageCommercialSpreadPerTon().ToString("0.##") 元/t</b>)！
                 </div>
                 <div class="d-flex align-items-center gap-2">
                     <button class="btn btn-sm btn-outline-secondary" @onclick="ResetRecordTons">
@@ -2071,6 +2118,12 @@
     private double GetTotalClaimVariance() => GetTotalRetrospectiveCost() - GetTotalBaseRecordedCost();
 
     private double GetTotalCostVariance() => GetTotalClaimVariance();
+
+    /// <summary>★ 施工单位采办经营净创效总额 (剪刀差利润 = 业主索赔总额 - 采购实付变动总额)</summary>
+    private double GetTotalCommercialSpread() => GetTotalClaimVariance() - GetTotalExecutionVariance();
+
+    /// <summary>★ 平均每吨钢采办经营创效净利 (元/吨)</summary>
+    private double GetAverageCommercialSpreadPerTon() => GetTotalProjectTons() > 0 ? GetTotalCommercialSpread() / GetTotalProjectTons() : 0;
 
     private void RecalculateRetrospection() => StateHasChanged();
 

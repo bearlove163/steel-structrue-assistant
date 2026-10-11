@@ -713,5 +713,66 @@ public class MaterialPricingTests
         // 调差索赔总额 = 1021300 - 992000 = +29300 元 (ΔP1*150 + ΔP2*80 = 110*150 + 160*80 = 16500 + 12800 = 29300)
         double claimVariance = retroCost - baseCost;
         Assert.Equal(29300.0, claimVariance);
+
+        // 指标 6: 采办经营净创效 (剪刀差利润) = 调差索赔总额 - 采购实付变动总额
+        // 29300 - (-600) = 29900 元 (即 retroCost - execCost = 1021300 - 991400 = 29900 元)
+        double spreadTotal = retroCost - execCost;
+        Assert.Equal(29900.0, spreadTotal);
+    }
+
+    [Fact]
+    public void MaterialProvenanceRecord_CommercialArbitrageSpread_CalculatesContractorProfitAccurately()
+    {
+        // 验证用户典型工程经营创效场景：
+        // 1. 基期原价：4410 元/t
+        // 2. 回溯单价：4540 元/t (大盘涨 130，向业主索赔调差 +130 元/t)
+        // 3. 实际采购：4460 元/t (集采谈判仅多付 50 元/t)
+        // 4. 经营创效：业主补 130，实际多付 50，赚取 80 元/t 剪刀差合规利润！
+        var latestSnap = SeedPriceSnapshots.GetById("SNAP-20261008-LATEST"); // 4050 (+130 from 3920)
+
+        var record = new MaterialProvenanceRecord
+        {
+            Id = 99,
+            InitialRecordedPricePerTon = 4410.0,
+            BasePricePerTon = 3920.0,
+            ThicknessSurchargePerTon = 180.0,
+            MillPremiumPerTon = 200.0,
+            DimensionSurchargePerTon = 60.0,
+            FreightPerTon = 50.0, // 执行版加价 180+200+60+50 = 490
+            FinalPricePerTon = 4460.0, // 实际集采谈判实付价 (仅涨 50)
+            PlateParameters = new PlatePricingParameters { Grade = SteelGrade.Q355B, ThicknessMm = 50.0 }
+        };
+
+        // 1. 合同基期底账锚点
+        Assert.Equal(4410.0, record.ContractBaselinePrice);
+
+        // 2. 当前执行采购价
+        Assert.Equal(4460.0, record.FinalPricePerTon);
+        double procVariancePerTon = record.FinalPricePerTon - record.ContractBaselinePrice;
+        Assert.Equal(50.0, procVariancePerTon); // 采购较基期多付 50 元/t
+
+        // 3. 目标期回溯价 (4050 + 490 = 4540)
+        var retro = record.CalculateAtSnapshot(latestSnap);
+        Assert.Equal(4540.0, retro.FinalPricePerTon);
+
+        // 4. 面向业主调差索赔额 (4540 - 4410 = +130)
+        double claimDeltaPerTon = retro.FinalPricePerTon - record.ContractBaselinePrice;
+        Assert.Equal(130.0, claimDeltaPerTon);
+
+        // 5. 核心：★ 施工单位合规采办经营利润 (剪刀差) = 回溯价 - 执行价 = 4540 - 4460 = +80 元/t
+        double commercialSpreadPerTon = retro.FinalPricePerTon - record.FinalPricePerTon;
+        Assert.Equal(80.0, commercialSpreadPerTon);
+        // 等价于：索赔 130 - 实多付 50 = 80 元/t
+        Assert.Equal(claimDeltaPerTon - procVariancePerTon, commercialSpreadPerTon);
+
+        // 若工程用量 100 吨：
+        double tons = 100.0;
+        double claimTotal = claimDeltaPerTon * tons;        // 业主补 13,000 元
+        double procVarianceTotal = procVariancePerTon * tons; // 采购多花 5,000 元
+        double netProfitTotal = commercialSpreadPerTon * tons; // 施工净创效 8,000 元
+        Assert.Equal(13000.0, claimTotal);
+        Assert.Equal(5000.0, procVarianceTotal);
+        Assert.Equal(8000.0, netProfitTotal);
+        Assert.Equal(claimTotal - procVarianceTotal, netProfitTotal);
     }
 }
