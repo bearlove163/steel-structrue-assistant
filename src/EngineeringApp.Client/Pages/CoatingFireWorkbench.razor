@@ -9,6 +9,7 @@
 @using EngineeringApp.Client.Shared.Components.Coating
 @using EngineeringApp.Client.Shared.Components.Coating.Tabs
 @using EngineeringApp.Client.Shared.Components.Coating.Modals
+@using EngineeringApp.Client.Shared.Components.Common
 @inject NavigationManager Nav
 @inject ThemeState Theme
 @inject IJSRuntime JS
@@ -19,43 +20,22 @@
 <div class="container-fluid py-2 px-3 workstation-root d-flex flex-column min-vh-100 @(Theme.IsDarkMode ? "bg-dark text-white" : "bg-light text-dark")"
      data-theme="@(Theme.IsDarkMode ? "dark" : "light")">
 
-    <!-- ======================= 顶部导航与控制器 ======================= -->
-    <header class="d-flex flex-wrap align-items-center justify-content-between pb-2 mb-2 border-bottom @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle bg-white rounded p-2 shadow-sm")">
-        <div class="d-flex align-items-center gap-3">
-            <button class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1" @onclick='() => Nav.NavigateTo("/portal")' title="返回统一门户">
-                <span>←</span>
-                <span>门户中心</span>
-            </button>
-            <div class="p-2 bg-warning rounded-3 text-dark fw-bold d-flex align-items-center justify-content-center shadow-sm" style="width: 38px; height: 38px; font-size: 20px;">
-                🎨
-            </div>
-            <div>
-                <h5 class="mb-0 fw-bold tracking-tight d-flex align-items-center gap-2 @(Theme.IsDarkMode ? "text-white" : "text-dark")">
-                    <span>模块 3：防腐涂装、防火算量与热浸镀锌工程工作台</span>
-                    <span class="badge bg-warning text-dark text-xs">COATING & FIRE PRO</span>
-                </h5>
-                <div class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted") text-xs">
-                    截面自重与表面积参照 · 形状系数 F/V · 喷涂/滚涂工艺与断面损耗 · 输变电塔与重构件热浸锌 (HDG) · 全球名牌涂料图鉴
-                </div>
-            </div>
-        </div>
-
-        <!-- 顶部工具栏：暗黑/亮色、多国标准、跨模块快捷跳转 -->
-        <div class="d-flex align-items-center gap-2 mt-2 mt-md-0">
-            <!-- 暗黑/亮色主题切换按钮 -->
-            <button class="btn btn-sm d-flex align-items-center gap-1 @(Theme.IsDarkMode ? "btn-outline-warning" : "btn-outline-dark")"
-                    @onclick="Theme.ToggleTheme" title="切换暗黑/亮色主题">
-                <span>@(Theme.IsDarkMode ? "☀️ 亮色" : "🌙 暗黑")</span>
-            </button>
-
+    <!-- ======================= 1. 统一全局工作台顶栏 ======================= -->
+    <WorkstationHeader IconBadge="🎨"
+                       Title="防腐涂装、防火算量与热浸镀锌工程工作台"
+                       TagBadge="COATING & FIRE PRO"
+                       Subtitle="截面自重与表面积参照 · 形状系数 F/V · 喷涂/滚涂工艺与断面损耗 · 输变电塔与重构件热浸锌 (HDG) · 全球名牌涂料图鉴"
+                       ShowStandardSelector="false"
+                       ShowInspectorToggle="false">
+        <ActionButtons>
             <button class="btn btn-outline-primary btn-sm" @onclick='() => Nav.NavigateTo("/material-pricing")' title="进入材料价格工作台">
                 🧱 材料价格
             </button>
             <button class="btn btn-outline-info btn-sm" @onclick='() => Nav.NavigateTo("/sections")' title="进入截面力学视窗">
                 📐 截面力学
             </button>
-        </div>
-    </header>
+        </ActionButtons>
+    </WorkstationHeader>
 
     <!-- ======================= 历史价格快照与工程调差常驻工具条 ======================= -->
     <div class="card @(Theme.IsDarkMode ? "bg-black bg-opacity-40 border-secondary" : "bg-white border-light-subtle shadow-sm") p-2 mb-2">

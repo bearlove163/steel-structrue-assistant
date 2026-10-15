@@ -1,0 +1,123 @@
+@namespace EngineeringApp.Client.Shared.Components.Common
+@using EngineeringApp.Shared.Material.Pricing
+@using EngineeringApp.Client.Services
+@inject NavigationManager Nav
+@inject ThemeState Theme
+@inject WorkstationStateMediator Mediator
+@implements IDisposable
+
+<header class="d-flex flex-wrap align-items-center justify-content-between pb-2 mb-2 border-bottom @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle bg-white rounded p-2 shadow-sm")">
+    <!-- 左侧：返回门户导航 + 专业图标徽章 + 模块主副标题 -->
+    <div class="d-flex align-items-center gap-3">
+        @if (ShowHomeBack)
+        {
+            <button class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1"
+                    @onclick='() => Nav.NavigateTo("/portal")'
+                    title="返回统一门户中心">
+                <span>←</span>
+                <span>门户中心</span>
+            </button>
+        }
+
+        <div class="p-2 bg-gradient bg-primary rounded-3 text-white fw-bold d-flex align-items-center justify-content-center shadow-sm"
+             style="width: 38px; height: 38px; font-size: 18px;">
+            @IconBadge
+        </div>
+
+        <div>
+            <h5 class="mb-0 fw-bold tracking-tight d-flex align-items-center gap-2 @(Theme.IsDarkMode ? "text-white" : "text-dark")">
+                <span>@Title</span>
+                @if (!string.IsNullOrWhiteSpace(TagBadge))
+                {
+                    <span class="badge bg-primary text-xs">@TagBadge</span>
+                }
+            </h5>
+            @if (!string.IsNullOrWhiteSpace(Subtitle))
+            {
+                <div class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted") text-xs">
+                    @Subtitle
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- 右侧：全局标准体系切换、暗黑模式切换、基准日快照、右侧向导开关与扩展槽位 -->
+    <div class="d-flex align-items-center gap-2 mt-2 mt-md-0 flex-wrap">
+        <!-- 扩展按钮区 -->
+        @if (ActionButtons != null)
+        {
+            @ActionButtons
+        }
+
+        <!-- 暗黑/亮色主题切换按钮 -->
+        <button class="btn btn-sm d-flex align-items-center gap-1 @(Theme.IsDarkMode ? "btn-outline-warning" : "btn-outline-dark")"
+                @onclick="Theme.ToggleTheme" title="切换暗黑/亮色主题界面类型">
+            <span>@(Theme.IsDarkMode ? "☀️ 亮色" : "🌙 暗黑")</span>
+        </button>
+
+        <!-- 标准体系切换器 (GB / EN / ASTM) -->
+        @if (ShowStandardSelector)
+        {
+            <div class="btn-group btn-group-sm">
+                <button class="btn @(Mediator.CurrentStandard == StandardSystem.GB ? "btn-primary fw-bold" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary"))"
+                        @onclick="() => SetStandard(StandardSystem.GB)">
+                    🇨🇳 国标 GB
+                </button>
+                <button class="btn @(Mediator.CurrentStandard == StandardSystem.EN ? "btn-primary fw-bold" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary"))"
+                        @onclick="() => SetStandard(StandardSystem.EN)">
+                    🇪🇺 欧标 EN
+                </button>
+                <button class="btn @(Mediator.CurrentStandard == StandardSystem.ASTM ? "btn-primary fw-bold" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary"))"
+                        @onclick="() => SetStandard(StandardSystem.ASTM)">
+                    🇺🇸 美标 ASTM
+                </button>
+            </div>
+        }
+
+        <!-- 右侧属性与向导面板快速开关按钮 -->
+        @if (ShowInspectorToggle)
+        {
+            <button class="btn btn-sm @(Mediator.IsInspectorOpen ? (Theme.IsDarkMode ? "btn-info text-white" : "btn-primary") : "btn-outline-secondary") d-flex align-items-center gap-1"
+                    @onclick="Mediator.ToggleInspector"
+                    title="@(Mediator.IsInspectorOpen ? "收起右侧向导与检视面板" : "展开右侧向导与检视面板")">
+                <span>@(Mediator.IsInspectorOpen ? "📖 向导检视 [开]" : "📖 向导检视 [关]")</span>
+            </button>
+        }
+    </div>
+</header>
+
+@code {
+    [Parameter] public string IconBadge { get; set; } = "⚙️";
+    [Parameter] public string Title { get; set; } = "工程工作台";
+    [Parameter] public string TagBadge { get; set; } = "PRO";
+    [Parameter] public string Subtitle { get; set; } = "";
+    [Parameter] public bool ShowHomeBack { get; set; } = true;
+    [Parameter] public bool ShowStandardSelector { get; set; } = true;
+    [Parameter] public bool ShowInspectorToggle { get; set; } = true;
+    [Parameter] public RenderFragment? ActionButtons { get; set; }
+
+    [Parameter] public EventCallback<StandardSystem> OnStandardChanged { get; set; }
+
+    protected override void OnInitialized()
+    {
+        Theme.OnChange += StateHasChanged;
+        Mediator.OnStandardChanged += HandleStandardChanged;
+        Mediator.OnInspectorToggled += HandleInspectorToggled;
+    }
+
+    private void SetStandard(StandardSystem system)
+    {
+        Mediator.SetStandard(system);
+        OnStandardChanged.InvokeAsync(system);
+    }
+
+    private void HandleStandardChanged(StandardSystem _) => StateHasChanged();
+    private void HandleInspectorToggled(bool _) => StateHasChanged();
+
+    public void Dispose()
+    {
+        Theme.OnChange -= StateHasChanged;
+        Mediator.OnStandardChanged -= HandleStandardChanged;
+        Mediator.OnInspectorToggled -= HandleInspectorToggled;
+    }
+}

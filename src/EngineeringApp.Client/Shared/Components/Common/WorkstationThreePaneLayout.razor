@@ -1,0 +1,112 @@
+@namespace EngineeringApp.Client.Shared.Components.Common
+@using EngineeringApp.Client.Services
+@inject ThemeState Theme
+@inject WorkstationStateMediator Mediator
+@implements IDisposable
+
+<div class="workstation-three-pane-root d-flex flex-column flex-grow-1 min-vh-0 w-100">
+    <!-- 顶部布局预设控制快捷栏 (支持 20:60:20 / 15:70:15 / 25:50:25) -->
+    <div class="d-flex align-items-center justify-content-between mb-2">
+        <div class="d-flex align-items-center gap-2">
+            <span class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">分栏视口:</span>
+            <div class="btn-group btn-group-sm">
+                <button class="btn btn-xs @(Math.Abs(LeftWidth - 20) < 0.5 ? "btn-primary fw-bold" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary"))"
+                        @onclick="() => SetPreset(20, 22)" title="标准三栏: 左 20% - 中 58% - 右 22%">
+                    20:58:22 (标准)
+                </button>
+                <button class="btn btn-xs @(Math.Abs(LeftWidth - 15) < 0.5 ? "btn-primary fw-bold" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary"))"
+                        @onclick="() => SetPreset(15, 18)" title="宽视口: 左 15% - 中 67% - 右 18%">
+                    15:67:18 (专注)
+                </button>
+                <button class="btn btn-xs @(Math.Abs(LeftWidth - 25) < 0.5 ? "btn-primary fw-bold" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary"))"
+                        @onclick="() => SetPreset(25, 25)" title="看板优先: 左 25% - 中 50% - 右 25%">
+                    25:50:25 (看板)
+                </button>
+            </div>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+            <button class="btn btn-xs @(Mediator.IsInspectorOpen ? (Theme.IsDarkMode ? "btn-outline-info" : "btn-info text-white") : "btn-outline-secondary")"
+                    @onclick="Mediator.ToggleInspector">
+                @(Mediator.IsInspectorOpen ? "▶ 折叠右侧向导" : "◀ 展开右侧向导")
+            </button>
+        </div>
+    </div>
+
+    <!-- 三栏主体容器 -->
+    <div class="workstation-flex-body d-flex flex-row flex-grow-1 min-vh-0 w-100 position-relative overflow-hidden border rounded @(Theme.IsDarkMode ? "border-secondary bg-dark bg-opacity-25" : "border-light-subtle bg-white shadow-sm")">
+        <!-- 1. 左栏：工程导航树 / 类别列表 -->
+        <aside class="workstation-column-left d-flex flex-column h-100 overflow-y-auto p-2 border-end @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle")"
+               style="width: @(LeftWidth)%; min-width: 200px;">
+            @LeftPane
+        </aside>
+
+        <!-- 2. 中栏：核心作业舞台 (CAD画布 / 算量网格 / 主操作区) -->
+        <main class="workstation-column-center d-flex flex-column h-100 overflow-y-auto p-2 flex-grow-1"
+              style="min-width: 400px;">
+            @CenterPane
+        </main>
+
+        <!-- 3. 右栏：属性检视器与工程智能向导 (Inspector & Wizard) -->
+        @if (Mediator.IsInspectorOpen)
+        {
+            <aside class="workstation-column-right d-flex flex-column h-100 overflow-y-auto p-2 border-start @(Theme.IsDarkMode ? "border-secondary bg-black bg-opacity-20" : "border-light-subtle bg-light")"
+                   style="width: @(RightWidth)%; min-width: 250px;">
+                @RightPane
+            </aside>
+        }
+    </div>
+</div>
+
+<style>
+    .workstation-three-pane-root {
+        min-height: 520px;
+        height: calc(100vh - 170px);
+    }
+    .workstation-flex-body {
+        min-height: 480px;
+    }
+    @@media (max-width: 1199.98px) {
+        .workstation-flex-body {
+            flex-direction: column !important;
+            height: auto !important;
+            overflow-y: auto !important;
+        }
+        .workstation-column-left,
+        .workstation-column-center,
+        .workstation-column-right {
+            width: 100% !important;
+            height: auto !important;
+            min-height: 280px;
+        }
+    }
+</style>
+
+@code {
+    [Parameter] public RenderFragment? LeftPane { get; set; }
+    [Parameter] public RenderFragment? CenterPane { get; set; }
+    [Parameter] public RenderFragment? RightPane { get; set; }
+
+    private double LeftWidth = 20.0;
+    private double RightWidth = 22.0;
+
+    protected override void OnInitialized()
+    {
+        Theme.OnChange += StateHasChanged;
+        Mediator.OnInspectorToggled += HandleInspectorToggled;
+    }
+
+    private void SetPreset(double left, double right)
+    {
+        LeftWidth = left;
+        RightWidth = right;
+    }
+
+    private void HandleInspectorToggled(bool _) => StateHasChanged();
+
+    public void Dispose()
+    {
+        Theme.OnChange -= StateHasChanged;
+        Mediator.OnInspectorToggled -= HandleInspectorToggled;
+    }
+}
