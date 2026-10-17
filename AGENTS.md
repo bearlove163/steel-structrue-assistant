@@ -37,8 +37,9 @@ You must respect and strictly adhere to the following project layout when genera
 3. **Simplified Databases:** When writing database interactions, stick to standard async Linq-to-Entities (EF Core) queries. Avoid raw SQL queries or complex repository patterns that complicate maintenance.
 4. **Excel Grid Pattern:** Always structure grid data-binding around observable collections or reactive `Sheet` objects compatible with Blazor data-grid components. Keep cell-recalculation functions optimized for performance.
 5. **Plan & Specification File Archival (方案归档规则):**
-   * **强制统一存放于 `doc/` 目录：** 每次通过 `/plan` 或其他交互制定的所有规划方案、架构设计、工程计算规范与实施计划 Markdown 文件（例如 `doc/xxx_plan.md`），**必须直接写入项目根目录下的 `doc/` 文件夹中**，严禁存放至缓存目录、临时目录或项目外的其他路径。
-   * **便于追溯与归档：** 文件命名应具备清晰的工程业务含义（如 `doc/section_calculator_plan.md`、`doc/coating_database_plan.md`），确保团队及用户随时可在版本库中检索、追溯和复核。
+   * **强制统一存放于 `doc/` 目录：** 每次通过 `/plan` 或其他交互制定的所有规划方案、架构设计、工程计算规范与实施计划 Markdown 文件（例如 `doc/01_xxx.md`），**必须直接写入项目根目录下的 `doc/` 文件夹中**，严禁存放至缓存目录、临时目录或项目外的其他路径。
+   * **时间序列顺序数字前缀编号 (`01_文件名.md`)：** 存放在 `doc/` 目录下的所有方案文件，必须严格按照生成的时间先后顺序，在文件名前增加两位数字编号前缀（如 `01_fabrication_quotation_plan.md`、`02_steel_structure_assistant_refactor_plan.md` 等），以便直观按时间轴追溯工程方案的演进与迭代过程。
+   * **清晰的工程业务语义：** 紧随数字前缀之后的文件名应具备明确的工程业务含义（如 `doc/05_section_calculator_plan.md`、`doc/06_gui_layout_and_temporal_architecture_plan.md`），确保团队及用户随时可在版本库中检索、追溯和复核。
 
 ## Git Commit & Collaboration Rules
 1. **Commit Message Structure (提交信息双层结构):** 必须严格遵循工业级 Conventional Commits 标准结构，包含「首行简要标题」与「详细变更要点列表」：

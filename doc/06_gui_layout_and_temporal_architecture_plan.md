@@ -1,6 +1,6 @@
 # 钢结构工程工作站：模块画面统一、三栏 GUI 架构、全业务通用版本回溯与系统级设计模式重构方案
 
-> **文档归档路径：** `doc/gui_layout_and_temporal_architecture_plan.md`  
+> **文档归档路径：** `doc/06_gui_layout_and_temporal_architecture_plan.md`  
 > **适用领域：** 土木工程、空间结构深化设计、材料采办供应链、防腐防火涂装、定额装配 BOM、全过程工程造价与审计  
 > **技术基石：** C# (.NET 9.0) + Blazor WebAssembly (WASM) + 响应式 Flexbox 架构 + 经典软件设计模式体系  
 > **更新要点：** 针对用户批注，全面升级为**全业务通用版本模型**，并深度规划**五大核心设计模式重构**，实现大幅降低代码量、彻底解耦与无限横向扩展。
