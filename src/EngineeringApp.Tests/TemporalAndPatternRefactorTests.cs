@@ -6,6 +6,9 @@ using EngineeringApp.Shared.Material.Pricing;
 using EngineeringApp.Shared.Models;
 using EngineeringApp.Shared.Pricing;
 using EngineeringApp.Shared.Quota;
+using EngineeringApp.Shared.QuotationExport;
+using EngineeringApp.Shared.Reports;
+using EngineeringApp.Shared.Standards;
 using Xunit;
 
 namespace EngineeringApp.Tests;
@@ -158,5 +161,111 @@ public class TemporalAndPatternRefactorTests
         Assert.Equal(0.0, exWorksSheet.SiteErectionCost);
         Assert.Equal(0.0, exWorksSheet.TransportationCost);
         Assert.True(exWorksSheet.FinalBidQuotation < epcSheet.FinalBidQuotation);
+    }
+
+    [Fact]
+    public void EngineeringStandardFactory_ShouldProduceAccuratePricingToleranceAndLimitsForGB_EN_ASTM()
+    {
+        // 1. 验证国标 GB 工厂
+        var gbFactory = EngineeringStandardFactoryProvider.GetFactory(StandardSystem.GB);
+        Assert.Equal(StandardSystem.GB, gbFactory.SystemType);
+        Assert.Equal(350.0, gbFactory.CreateLimitsEngine().GetTensionSlendernessLimit());
+        Assert.Equal(150.0, gbFactory.CreateLimitsEngine().GetCompressionSlendernessLimit(true));
+        Assert.True(gbFactory.CreateToleranceEngine().GetThicknessTolerance(20) > 0);
+        Assert.NotNull(gbFactory.CreatePricingStrategy());
+
+        // 2. 验证欧标 EN 工厂
+        var enFactory = EngineeringStandardFactoryProvider.GetFactory(StandardSystem.EN);
+        Assert.Equal(StandardSystem.EN, enFactory.SystemType);
+        Assert.Equal(300.0, enFactory.CreateLimitsEngine().GetTensionSlendernessLimit());
+        Assert.Equal(1.0, enFactory.CreateLimitsEngine().GetResistanceFactor());
+        Assert.NotNull(enFactory.CreatePricingStrategy());
+
+        // 3. 验证美标 ASTM 工厂
+        var astmFactory = EngineeringStandardFactoryProvider.GetFactory(StandardSystem.ASTM);
+        Assert.Equal(StandardSystem.ASTM, astmFactory.SystemType);
+        Assert.Equal(0.90, astmFactory.CreateLimitsEngine().GetResistanceFactor());
+        Assert.Equal(200.0, astmFactory.CreateLimitsEngine().GetCompressionSlendernessLimit());
+        Assert.NotNull(astmFactory.CreatePricingStrategy());
+
+        // 4. 验证 PricingStrategyFactory 兼容性委托
+        var pricingGb = PricingStrategyFactory.GetStrategy(StandardSystem.GB);
+        var pricingEn = PricingStrategyFactory.GetStrategy(StandardSystem.EN);
+        var pricingAstm = PricingStrategyFactory.GetStrategy(StandardSystem.ASTM);
+        Assert.NotNull(pricingGb);
+        Assert.NotNull(pricingEn);
+        Assert.NotNull(pricingAstm);
+        Assert.NotEqual(pricingGb.GetType(), pricingEn.GetType());
+    }
+
+    [Fact]
+    public void EngineeringReportBuilder_And_Visitors_ShouldGenerateAccurateMarkdownExcelAndHtmlOutputs()
+    {
+        var parameters = new SectionParameters
+        {
+            Type = SectionType.HBeam,
+            StandardProfileName = "HM 350x250x9x14",
+            Height = 350,
+            Width = 250,
+            WebThickness = 9,
+            FlangeThickness = 14,
+            Material = new MaterialProfile { Name = "Q355B", YieldStrength = 355, ElasticModulus = 206000 }
+        };
+
+        var result = new SectionPropertiesResult
+        {
+            Area = 10140,
+            LinearMass = 79.7,
+            OuterPerimeter = 1680,
+            Iy = 228000000,
+            Iz = 36500000,
+            WyTop = 1300000,
+            WyBot = 1300000
+        };
+
+        var bidSummary = new CommercialBidSummary
+        {
+            ProjectName = "中建某工业厂房总包工程",
+            Items =
+            [
+                new QuotationBillItem
+                {
+                    ItemNumber = 1,
+                    BillCode = "010605001001",
+                    BillName = "钢柱",
+                    ItemDescription = "Q355B HM350x250",
+                    Unit = "t",
+                    Quantity = 50.0,
+                    UnitPrice = 6500.0
+                }
+            ]
+        };
+
+        var builder = new EngineeringReportBuilder()
+            .AddProjectOverview("钢结构工程综合成果报告", "中建测试工程局", "GB 50017-2017", "主跨工业厂房")
+            .AddSectionMechanics(parameters, result)
+            .AddQuotationBid(bidSummary)
+            .AddTemporalAudit("SNAP-01", "SNAP-02", DateTime.Now.AddDays(-30), DateTime.Now, 15000, 80, 4000, "双方核对无误，同意定案");
+
+        // 1. 验证 Markdown 访问者成果
+        var mdOutput = builder.Build(new MarkdownReportVisitor());
+        Assert.Contains("# 钢结构工程综合成果报告", mdOutput);
+        Assert.Contains("HM 350x250x9x14", mdOutput);
+        Assert.Contains("010605001001", mdOutput);
+        Assert.Contains("剪刀差利润", mdOutput);
+
+        // 2. 验证 Excel (TSV) 访问者成果
+        var excelOutput = builder.Build(new ExcelSpreadsheetVisitor());
+        Assert.Contains("【截面特性计算表】", excelOutput);
+        Assert.Contains("【商业投标工程量清单表】", excelOutput);
+        Assert.Contains("【双时空版本审计对比表】", excelOutput);
+        Assert.Contains("\t", excelOutput); // 包含制表符
+
+        // 3. 验证 Printable HTML 访问者成果
+        var htmlOutput = builder.Build(new PrintableHtmlVisitor());
+        Assert.Contains("<!DOCTYPE html>", htmlOutput);
+        Assert.Contains("钢结构工程综合成果报告", htmlOutput);
+        Assert.Contains("<table", htmlOutput);
+        Assert.Contains("</body></html>", htmlOutput);
     }
 }

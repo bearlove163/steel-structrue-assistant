@@ -1,4 +1,5 @@
 @using EngineeringApp.Shared.Models
+@using EngineeringApp.Shared.Reports
 @using Microsoft.JSInterop
 @using System.Text
 @inject IJSRuntime JS
@@ -325,60 +326,13 @@
     {
         if (Result == null || Parameters == null) return;
 
-        var sb = new StringBuilder();
-        sb.AppendLine("# 截面几何与力学特性综合计算书");
-        sb.AppendLine();
-        sb.AppendLine($"- **截面类型**：{Parameters.Type}");
-        sb.AppendLine($"- **型号规格**：{Parameters.StandardProfileName ?? "自定义尺寸"}");
-        sb.AppendLine($"- **材料等级**：{Parameters.Material.Name} (fy={Parameters.Material.YieldStrength} MPa, E={Parameters.Material.ElasticModulus} MPa)");
-        sb.AppendLine();
-        sb.AppendLine("## 一、 几何与惯性力学指标");
-        sb.AppendLine("| 物理量名称 | 符号 | 计算数值 | 单位 |");
-        sb.AppendLine("| :--- | :--- | :--- | :--- |");
-        sb.AppendLine($"| 截面面积 | A | {Result.AreaCm2:F2} | cm² |");
-        sb.AppendLine($"| 延米理论米重 | m | {Result.LinearMass:F2} | kg/m |");
-        sb.AppendLine($"| 延米外涂装表面积 | A_paint | {Result.GrossPaintingAreaPerMeter:F3} | m²/m |");
-        if (Result.TopSurfaceWidth > 0)
-        {
-            sb.AppendLine($"| 扣除楼板贴合净涂装面积 | A_net_slab | {Result.PaintingAreaExcludingTop:F3} | m²/m |");
-        }
-        sb.AppendLine($"| 吨钢比表面积 | A_ton | {Result.AreaPerTon:F1} | m²/t |");
-        sb.AppendLine($"| 形心坐标 | (Yc, Zc) | ({Result.Yc:F1}, {Result.Zc:F1}) | mm |");
-        sb.AppendLine($"| 强轴惯性矩 | Iy | {Result.IyCm4:F2} | cm⁴ |");
-        sb.AppendLine($"| 弱轴惯性矩 | Iz | {Result.IzCm4:F2} | cm⁴ |");
-        sb.AppendLine($"| 形心惯性积 | Iyz | {Result.Iyz:F1} | mm⁴ |");
-        sb.AppendLine($"| 第一主惯性矩 | I1 | {Result.I1Cm4:F2} | cm⁴ |");
-        sb.AppendLine($"| 第二主惯性矩 | I2 | {Result.I2Cm4:F2} | cm⁴ |");
-        sb.AppendLine($"| 主轴方位角 | αp | {Result.PrincipalAngleDeg:F2} | ° |");
-        sb.AppendLine($"| 回转半径 | iy, iz | {Result.IyRadius:F2}, {Result.IzRadius:F2} | mm |");
-        sb.AppendLine($"| 弹性截面模量 | Wy,min, Wz,min | {Result.WyMinCm3:F2}, {Result.WzMinCm3:F2} | cm³ |");
-        sb.AppendLine($"| 塑性截面模量 | Wpl_y, Wpl_z | {Result.WplyCm3:F2}, {Result.WplzCm3:F2} | cm³ |");
-        sb.AppendLine($"| 自由扭转常数 | J | {Result.TorsionConstantJCm4:F2} | cm⁴ |");
-        sb.AppendLine($"| 翘曲常数 | Iw | {Result.WarpingConstantIwCm6:F2} | cm⁶ |");
+        var builder = new EngineeringReportBuilder()
+            .AddProjectOverview("工程截面几何与力学特性综合计算书", "Antigravity Structural Computing Workstation", "GB 50017-2017《钢结构设计标准》")
+            .AddSectionMechanics(Parameters, Result, BucklingParameters, LoadCase);
 
-        if (BucklingParameters != null && BucklingParameters.EnableSlendernessCheck && Result.SlendernessResult != null)
-        {
-            sb.AppendLine();
-            sb.AppendLine("## 二、 构件面内与面外计算长度及长细比验算 (GB 50017)");
-            sb.AppendLine($"- 构件长度 L = {BucklingParameters.MemberLength:F0} mm, 面内 L0x = {Result.SlendernessResult.L0x:F0} mm, 面外 L0y = {Result.SlendernessResult.L0y:F0} mm");
-            sb.AppendLine($"- 强轴/面内长细比 λx = {Result.SlendernessResult.LambdaX:F1}, 弱轴/面外长细比 λy = {Result.SlendernessResult.LambdaY:F1}");
-            sb.AppendLine($"- 最大控制长细比 λmax = {Result.SlendernessResult.LambdaMax:F1}, 规范限值 [λ] = {Result.SlendernessResult.AllowableLambda:F0}");
-            sb.AppendLine($"- 验算判定：{(Result.SlendernessResult.IsSatisfied ? "合格 PASSED" : "超限 WARNING")}");
-        }
+        var markdown = builder.Build(new MarkdownReportVisitor());
 
-        if (LoadCase != null && LoadCase.EnableStressCheck && Result.StressResult != null)
-        {
-            sb.AppendLine();
-            sb.AppendLine("## 三、 荷载工况与正应力验算");
-            sb.AppendLine($"- 轴力 N = {LoadCase.AxialForceN:F1} kN, 弯矩 My = {LoadCase.BendingMomentMy:F1} kN·m, Mz = {LoadCase.BendingMomentMz:F1} kN·m");
-            sb.AppendLine($"- 最大拉应力 σ_max = +{Result.StressResult.MaxTensileStress:F1} MPa");
-            sb.AppendLine($"- 最大压应力 σ_min = {Result.StressResult.MinCompressiveStress:F1} MPa");
-            sb.AppendLine($"- 应力利用率比值 η = {Result.StressResult.StressRatio:P1}");
-            bool isSafe = Result.StressResult.MaxAbsoluteStress <= Parameters.Material.YieldStrength;
-            sb.AppendLine($"- 验算判定：{(isSafe ? "合格 PASSED" : "不合格 FAILED")}");
-        }
-
-        await JS.InvokeVoidAsync("navigator.clipboard.writeText", sb.ToString());
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", markdown);
         await JS.InvokeVoidAsync("alert", "计算书 Markdown 已成功复制到剪贴板！");
     }
 }
