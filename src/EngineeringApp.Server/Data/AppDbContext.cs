@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using EngineeringApp.Shared.Models;
 using EngineeringApp.Shared.Data;
 using EngineeringApp.Shared.Material.Pricing;
+using EngineeringApp.Shared.BOQ.Models;
 
 namespace EngineeringApp.Server.Data;
 
@@ -362,6 +363,16 @@ public class AppDbContext : DbContext
     public DbSet<FreightRouteEntity> FreightRoutes => Set<FreightRouteEntity>();
     public DbSet<MaterialProvenanceRecordEntity> MaterialProvenanceRecords => Set<MaterialProvenanceRecordEntity>();
 
+    // ==========================================
+    // 6 大核心 BOQ 工程量清单实体集 (Milestone 1)
+    // ==========================================
+    public DbSet<BoqProject> BoqProjects => Set<BoqProject>();
+    public DbSet<BoqTenderItem> BoqTenderItems => Set<BoqTenderItem>();
+    public DbSet<BoqSubProject> BoqSubProjects => Set<BoqSubProject>();
+    public DbSet<BoqPart> BoqParts => Set<BoqPart>();
+    public DbSet<FabricationQuotaRule> FabricationQuotaRules => Set<FabricationQuotaRule>();
+    public DbSet<InstallationQuotaRule> InstallationQuotaRules => Set<InstallationQuotaRule>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -430,6 +441,112 @@ public class AppDbContext : DbContext
             e.HasIndex(x => x.Category);
             e.HasIndex(x => x.Name);
         });
+
+        // 11. BOQ 项目大盘实体
+        modelBuilder.Entity<BoqProject>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.ProjectCode);
+            e.Property(x => x.ProjectCode).IsRequired().HasMaxLength(50);
+            e.Property(x => x.ProjectName).IsRequired().HasMaxLength(200);
+            e.Property(x => x.ClientName).HasMaxLength(200);
+            e.Property(x => x.ActiveMaterialSnapshotId).HasMaxLength(50);
+            e.Property(x => x.ActivePaintSnapshotId).HasMaxLength(50);
+
+            e.HasMany(x => x.TenderItems)
+             .WithOne(x => x.Project)
+             .HasForeignKey(x => x.ProjectId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // 12. BOQ 对外投标清单项实体 (支持独立费率覆盖)
+        modelBuilder.Entity<BoqTenderItem>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.ProjectId);
+            e.HasIndex(x => x.ItemTag);
+            e.HasIndex(x => x.BillItemCode);
+            e.Property(x => x.ItemTag).IsRequired().HasMaxLength(50);
+            e.Property(x => x.BillItemCode).IsRequired().HasMaxLength(50);
+            e.Property(x => x.BillItemName).IsRequired().HasMaxLength(200);
+            e.Property(x => x.Unit).HasMaxLength(20);
+
+            e.HasMany(x => x.SubProjects)
+             .WithOne(x => x.TenderItem)
+             .HasForeignKey(x => x.TenderItemId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // 13. BOQ 构件/分段成本实体 (双定额关联与防火涂装)
+        modelBuilder.Entity<BoqSubProject>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.TenderItemId);
+            e.HasIndex(x => x.SubProjectCode);
+            e.HasIndex(x => x.FabricationQuotaRuleId);
+            e.HasIndex(x => x.InstallationQuotaRuleId);
+            e.Property(x => x.SubProjectCode).IsRequired().HasMaxLength(100);
+            e.Property(x => x.SubProjectName).IsRequired().HasMaxLength(200);
+            e.Property(x => x.StructuralRole).HasMaxLength(50);
+            e.Property(x => x.InstallationMethod).HasMaxLength(50);
+            e.Property(x => x.FireProofType).HasMaxLength(50);
+            e.Property(x => x.CraneTonnageTier).HasMaxLength(50);
+
+            e.HasMany(x => x.Parts)
+             .WithOne(x => x.SubProject)
+             .HasForeignKey(x => x.SubProjectId)
+             .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne(x => x.FabricationQuotaRule)
+             .WithMany()
+             .HasForeignKey(x => x.FabricationQuotaRuleId)
+             .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasOne(x => x.InstallationQuotaRule)
+             .WithMany()
+             .HasForeignKey(x => x.InstallationQuotaRuleId)
+             .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // 14. BOQ 下料零件实体 (完备映射材料价格与1.15损耗)
+        modelBuilder.Entity<BoqPart>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.SubProjectId);
+            e.HasIndex(x => x.PartMark);
+            e.HasIndex(x => x.SteelGrade);
+            e.HasIndex(x => x.SectionType);
+            e.Property(x => x.PartMark).IsRequired().HasMaxLength(100);
+            e.Property(x => x.SectionSpecification).HasMaxLength(100);
+            e.Property(x => x.SectionType).HasMaxLength(50);
+            e.Property(x => x.SteelGrade).HasMaxLength(50);
+            e.Property(x => x.ZDirectionGrade).HasMaxLength(20);
+            e.Property(x => x.BillCategory).HasMaxLength(50);
+            e.Property(x => x.MaterialPriceSnapshotId).HasMaxLength(50);
+            e.Property(x => x.MaterialPricingKey).HasMaxLength(100);
+        });
+
+        // 15. 车间制作定额规则实体
+        modelBuilder.Entity<FabricationQuotaRule>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.QuotaCode).IsUnique();
+            e.HasIndex(x => x.StructuralSystem);
+            e.Property(x => x.QuotaCode).IsRequired().HasMaxLength(100);
+            e.Property(x => x.QuotaName).HasMaxLength(200);
+            e.Property(x => x.StructuralSystem).HasMaxLength(100);
+        });
+
+        // 16. 现场安装定额规则实体
+        modelBuilder.Entity<InstallationQuotaRule>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.QuotaCode).IsUnique();
+            e.HasIndex(x => x.ApplicableRole);
+            e.Property(x => x.QuotaCode).IsRequired().HasMaxLength(100);
+            e.Property(x => x.QuotaName).HasMaxLength(200);
+            e.Property(x => x.ApplicableRole).HasMaxLength(100);
+        });
     }
 
     /// <summary>
@@ -442,7 +559,21 @@ public class AppDbContext : DbContext
         // 0. 填充供应链基准供应商库 (含钢厂、贸易商、吊机商、紧固件螺栓、特种材料[拉索/支座/楼承板]、油漆涂料)
         if (!db.Suppliers.Any())
         {
-            var seedSuppliers = SupplierDatabase.AllSuppliers.Select(s => SupplierEntity.FromDomain(s)).ToList();
+            var existingIds = new HashSet<int>();
+            int nextFallbackId = 100;
+            var seedSuppliers = new List<SupplierEntity>();
+            foreach (var s in SupplierDatabase.AllSuppliers)
+            {
+                var ent = SupplierEntity.FromDomain(s);
+                if (existingIds.Contains(ent.Id) || ent.Id <= 0)
+                {
+                    while (existingIds.Contains(nextFallbackId)) nextFallbackId++;
+                    ent.Id = nextFallbackId;
+                }
+                existingIds.Add(ent.Id);
+                seedSuppliers.Add(ent);
+            }
+
             db.Suppliers.AddRange(seedSuppliers);
             db.SaveChanges();
         }
@@ -634,5 +765,8 @@ public class AppDbContext : DbContext
             db.MaterialProvenanceRecords.AddRange(seedRecords);
             db.SaveChanges();
         }
+
+        // 9. 填充宁波奥林匹克体育中心 BOQ 基准工程量清单与定额数据 (Milestone 3)
+        NingboOlympicDataSeeder.Seed(db);
     }
 }

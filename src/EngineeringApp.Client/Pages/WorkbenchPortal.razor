@@ -257,7 +257,7 @@
             </div>
         </div>
 
-        <!-- 模块 5：定额与BOM域 -->
+        <!-- 模块 5：奥体 BOQ 商务大盘与报表 -->
         <div class="col-md-6 col-lg-4">
             <div class="card @(Theme.IsDarkMode ? "bg-dark border-secondary" : "bg-white border-light-subtle shadow-sm") h-100 shadow-sm d-flex flex-column hover-card position-relative overflow-hidden">
                 <div class="position-absolute top-0 end-0 bg-danger text-white px-2 py-1 small rounded-bottom-start fw-bold" style="font-size: 11px;">
@@ -266,25 +266,26 @@
                 <div class="card-body d-flex flex-column p-4">
                     <div class="d-flex align-items-center gap-3 mb-3">
                         <div class="p-2 bg-danger bg-opacity-25 rounded-3 text-danger fs-3">
-                            ⚙️
+                            📊
                         </div>
                         <div>
-                            <h5 class="card-title fw-bold @(Theme.IsDarkMode ? "text-white" : "text-dark") mb-0">构件装配BOM与定额</h5>
+                            <h5 class="card-title fw-bold @(Theme.IsDarkMode ? "text-white" : "text-dark") mb-0">奥体 BOQ 商务大盘与报表</h5>
                             <span class="badge bg-success-subtle text-success text-xs">● 已就绪 ACTIVE</span>
                         </div>
                     </div>
                     <p class="card-text @(Theme.IsDarkMode ? "text-white-50" : "text-muted") small flex-grow-1">
-                        “构件角色 (MemberRole)”与“截面特性 (SectionType)”双字段正交解耦。装配构件零件树 BOM，箱型柱牛腿/内隔板工时加成，车间制造直接工费核算。
+                        宁波奥林匹克体育中心主体育场与配套工程商务大盘。贯通清单报价、总经济师全成本透视、构件制造/现场安装双定额与零件材料采购排程，支持5大受众脱敏与Excel多Sheet导出。
                     </p>
                     <div class="mb-3 d-flex flex-wrap gap-1">
-                        <span class="badge @(Theme.IsDarkMode ? "bg-secondary" : "bg-light text-dark border") text-xs">正交双字段</span>
-                        <span class="badge @(Theme.IsDarkMode ? "bg-secondary" : "bg-light text-dark border") text-xs">装配零件BOM</span>
-                        <span class="badge @(Theme.IsDarkMode ? "bg-secondary" : "bg-light text-dark border") text-xs">牛腿隔板加成</span>
-                        <span class="badge @(Theme.IsDarkMode ? "bg-secondary" : "bg-light text-dark border") text-xs">车间直接工费</span>
+                        <span class="badge @(Theme.IsDarkMode ? "bg-secondary" : "bg-light text-dark border") text-xs">清单报价</span>
+                        <span class="badge @(Theme.IsDarkMode ? "bg-secondary" : "bg-light text-dark border") text-xs">双定额树表</span>
+                        <span class="badge @(Theme.IsDarkMode ? "bg-secondary" : "bg-light text-dark border") text-xs">5大受众脱敏</span>
+                        <span class="badge @(Theme.IsDarkMode ? "bg-secondary" : "bg-light text-dark border") text-xs">全成本穿透</span>
+                        <span class="badge @(Theme.IsDarkMode ? "bg-secondary" : "bg-light text-dark border") text-xs">采购剪刀差</span>
                     </div>
                     <button class="btn @(Theme.IsDarkMode ? "btn-outline-light" : "btn-outline-danger") w-100 fw-bold d-flex align-items-center justify-content-center gap-2 py-2"
-                            @onclick='() => Nav.NavigateTo("/sections")'>
-                        <span>进入构件BOM定额</span>
+                            @onclick='() => Nav.NavigateTo("/boq-workbench")'>
+                        <span>进入奥体BOQ大盘工作台</span>
                         <span>→</span>
                     </button>
                 </div>
@@ -311,8 +312,8 @@
                 </p>
             </div>
             <div class="col-lg-4 text-lg-end mt-3 mt-lg-0">
-                <button class="btn btn-primary btn-lg fw-bold px-4" @onclick='() => Nav.NavigateTo("/material-pricing")'>
-                    🚀 从【材料价格工作台】开始试算
+                <button class="btn btn-primary btn-lg fw-bold px-4" @onclick='() => Nav.NavigateTo("/boq-workbench")'>
+                    🚀 启动【奥体 BOQ 商务大盘与报表】工作台
                 </button>
             </div>
         </div>

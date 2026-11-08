@@ -21,3 +21,4 @@ publish/
 *.db
 *.db-shm
 *.db-wal
+.agents/teamwork/

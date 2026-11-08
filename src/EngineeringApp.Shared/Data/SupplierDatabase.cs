@@ -162,7 +162,7 @@ public static class SupplierDatabase
         // ================= 2. 钢材现货贸易商 (SteelTrader) =================
         new SupplierItem
         {
-            Id = 7,
+            Id = 29,
             Code = "SUP-TRD-001",
             Name = "欧冶云商股份有限公司",
             ShortName = "欧冶云商",
@@ -177,7 +177,7 @@ public static class SupplierDatabase
         },
         new SupplierItem
         {
-            Id = 8,
+            Id = 30,
             Code = "SUP-TRD-002",
             Name = "五矿发展股份有限公司 (上海五矿)",
             ShortName = "五矿发展",
@@ -192,7 +192,7 @@ public static class SupplierDatabase
         },
         new SupplierItem
         {
-            Id = 9,
+            Id = 31,
             Code = "SUP-TRD-003",
             Name = "浙商中拓集团股份有限公司",
             ShortName = "浙商中拓",
@@ -207,7 +207,7 @@ public static class SupplierDatabase
         },
         new SupplierItem
         {
-            Id = 10,
+            Id = 32,
             Code = "SUP-TRD-004",
             Name = "物产中大物流投资有限公司",
             ShortName = "物产中大",
