@@ -11,66 +11,39 @@
 <div class="container-fluid py-2 px-3 workstation-root d-flex flex-column h-100 min-vh-100 @(IsDarkMode ? "bg-dark text-white" : "bg-light text-dark")"
      data-theme="@(IsDarkMode ? "dark" : "light")">
 
-    <!-- ======================= 顶部工程工作站标题栏 ======================= -->
-    <header class="d-flex flex-wrap align-items-center justify-content-between pb-2 mb-2 border-bottom @(IsDarkMode ? "border-secondary" : "border-light-subtle bg-white rounded p-2 shadow-sm")">
-        <div class="d-flex align-items-center gap-3">
-            <button class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1" @onclick='() => Nav.NavigateTo("/portal")' title="返回统一门户中心">
-                <span>←</span>
-                <span>门户中心</span>
-            </button>
-            <div class="p-2 bg-primary rounded-3 text-white fw-bold d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
-                ⬡
-            </div>
-            <div>
-                <h5 class="mb-0 fw-bold tracking-tight d-flex align-items-center gap-2">
-                    <span>截面特性计算与力学分析工作站</span>
-                    <span class="badge @(IsDarkMode ? "bg-secondary" : "bg-primary-subtle text-primary") text-xs">v2.1 PRO</span>
-                </h5>
-                <div class="@(IsDarkMode ? "text-white-50" : "text-muted") text-xs">
-                    空间结构与钢结构截面几何 · 惯性主轴 · 塑性模量 · 扭转翘曲 · <b>面外长细比 (λx, λy)</b> · 应力验算
-                </div>
-            </div>
-        </div>
+@using EngineeringApp.Client.Shared.Components.Common
 
-        <div class="d-flex align-items-center gap-2 mt-2 mt-md-0">
-            <!-- 模块 1：材料价格快捷跳转 -->
+    <!-- ======================= 顶部统一工程工作站标题栏 ======================= -->
+    <WorkstationHeader IconBadge="⬡"
+                       Title="截面特性计算与力学分析工作站"
+                       TagBadge="v2.1 PRO"
+                       Subtitle="空间结构与钢结构截面几何 · 惯性主轴 · 塑性模量 · 扭转翘曲 · 面外长细比 (λx, λy) · 应力验算"
+                       ShowStandardSelector="true"
+                       ShowInspectorToggle="false">
+        <ActionButtons>
             <button class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1" @onclick='() => Nav.NavigateTo("/material-pricing")'>
-                <span>🧱 材料价格与供应链</span>
+                <span>🧱 材料价格</span>
             </button>
-
-            <!-- 暗黑/亮色主题切换按钮 -->
-            <button class="btn btn-sm d-flex align-items-center gap-1 @(IsDarkMode ? "btn-outline-warning" : "btn-outline-dark")"
-                    @onclick="ToggleTheme" title="切换暗黑/亮色主题界面类型">
-                <span>@(IsDarkMode ? "☀️ 亮色" : "🌙 暗黑")</span>
+            <button class="btn btn-sm btn-outline-warning d-flex align-items-center gap-1" @onclick='() => Nav.NavigateTo("/coating-fire-calculation")' title="进入独立全屏：防腐涂装、防火算量与热浸镀锌工作台">
+                <span>🎨 防腐防火</span>
             </button>
-
-            <!-- 视口分栏比例快捷预设 -->
+            <button class="btn btn-outline-info btn-sm d-flex align-items-center gap-1" @onclick="OpenDatabaseModal" title="查看欧标、美标、国标型钢库及油漆单价数据库">
+                <span>🗄️ 基础数据库</span>
+            </button>
             <div class="btn-group btn-group-sm">
                 <button class="btn btn-xs @(Math.Abs(LeftWidthPercent - 20) < 0.5 ? "btn-primary fw-bold" : (IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary"))"
-                        @onclick="() => SetLayoutPreset(20, 20)" title="默认比例: 左 20% - 中 60% - 右 20%">
+                        @onclick="() => SetLayoutPreset(20, 20)" title="默认比例: 20:60:20">
                     20:60:20
                 </button>
                 <button class="btn btn-xs @(Math.Abs(LeftWidthPercent - 15) < 0.5 ? "btn-primary fw-bold" : (IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary"))"
-                        @onclick="() => SetLayoutPreset(15, 15)" title="宽视口: 左 15% - 中 70% - 右 15%">
+                        @onclick="() => SetLayoutPreset(15, 15)" title="宽视口: 15:70:15">
                     15:70:15
                 </button>
                 <button class="btn btn-xs @(Math.Abs(LeftWidthPercent - 25) < 0.5 ? "btn-primary fw-bold" : (IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary"))"
-                        @onclick="() => SetLayoutPreset(25, 25)" title="看板优先: 左 25% - 中 50% - 右 25%">
+                        @onclick="() => SetLayoutPreset(25, 25)" title="看板优先: 25:50:25">
                     25:50:25
                 </button>
             </div>
-
-            <!-- 后台数据库工作站按钮 -->
-            <button class="btn btn-outline-info btn-sm d-flex align-items-center gap-1" @onclick="OpenDatabaseModal" title="查看欧标、美标、国标型钢库及油漆单价数据库">
-                <span>🗄️ 基础数据库</span>
-                <span class="badge bg-info text-dark">欧/美/国/涂料</span>
-            </button>
-
-            <!-- 模块 3：防腐与防火工作台独立网页直达 -->
-            <button class="btn btn-outline-warning btn-sm d-flex align-items-center gap-1" @onclick='() => Nav.NavigateTo("/coating-fire-calculation")' title="进入独立全屏：防腐涂装、防火算量与热浸镀锌工作台">
-                <span>🎨 模块3：防腐与防火</span>
-            </button>
-
             <button class="btn btn-outline-secondary btn-sm" @onclick="OpenStandardDatabase" title="打开常用型钢检索库">
                 <span>📖 快速型钢</span>
             </button>
@@ -80,8 +53,8 @@
             <button class="btn btn-outline-secondary btn-sm" @onclick="ResetToDefault">
                 🔄 重置
             </button>
-        </div>
-    </header>
+        </ActionButtons>
+    </WorkstationHeader>
 
     <!-- ======================= 工作站三栏式主体架构 (可拖拽可调分栏 20% - 60% - 20%) ======================= -->
     <style>

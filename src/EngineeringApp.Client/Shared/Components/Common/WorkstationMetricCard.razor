@@ -1,0 +1,36 @@
+@namespace EngineeringApp.Client.Shared.Components.Common
+@using EngineeringApp.Client.Services
+@inject ThemeState Theme
+
+<div class="card @(Theme.IsDarkMode ? "bg-dark border-secondary text-white" : "bg-white border-light-subtle shadow-sm text-dark") p-2 h-100 position-relative overflow-hidden">
+    <div class="d-flex justify-content-between align-items-center @(Theme.IsDarkMode ? "text-white-50" : "text-muted") text-xs mb-1">
+        <span>@Label</span>
+        @if (!string.IsNullOrWhiteSpace(BadgeText))
+        {
+            <span class="badge @BadgeClass text-xs">@BadgeText</span>
+        }
+    </div>
+    <div class="d-flex align-items-baseline gap-1">
+        <span class="fw-bold fs-5 @ValueColorClass">@Value</span>
+        @if (!string.IsNullOrWhiteSpace(Unit))
+        {
+            <span class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">@Unit</span>
+        }
+    </div>
+    @if (!string.IsNullOrWhiteSpace(Description))
+    {
+        <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mt-1 text-truncate" title="@Description">
+            @Description
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public string Value { get; set; } = "-";
+    [Parameter] public string Unit { get; set; } = "";
+    [Parameter] public string BadgeText { get; set; } = "";
+    [Parameter] public string BadgeClass { get; set; } = "bg-primary";
+    [Parameter] public string ValueColorClass { get; set; } = "text-primary";
+    [Parameter] public string Description { get; set; } = "";
+}

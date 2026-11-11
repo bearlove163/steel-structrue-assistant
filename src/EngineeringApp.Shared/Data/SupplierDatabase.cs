@@ -500,99 +500,126 @@ public static class SupplierDatabase
         }
     ];
 
+    private static readonly object _lock = new();
     private static readonly List<SupplierItem> _dynamicSuppliers = [.. _seedSuppliers];
 
-    public static IReadOnlyList<SupplierItem> AllSuppliers => _dynamicSuppliers;
+    public static IReadOnlyList<SupplierItem> AllSuppliers
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _dynamicSuppliers.Where(s => s != null).ToList();
+            }
+        }
+    }
 
-    public static SupplierItem? GetById(int id) =>
-        _dynamicSuppliers.FirstOrDefault(s => s.Id == id);
+    public static SupplierItem? GetById(int id)
+    {
+        lock (_lock)
+        {
+            return _dynamicSuppliers.FirstOrDefault(s => s != null && s.Id == id);
+        }
+    }
 
     public static IEnumerable<SupplierItem> Filter(SupplierCategory? category, string? subCategory = null, string? keyword = null)
     {
-        var query = _dynamicSuppliers.AsEnumerable();
-
-        if (category.HasValue && (int)category.Value > 0)
+        lock (_lock)
         {
-            query = query.Where(s => s.Category == category.Value);
-        }
+            var query = _dynamicSuppliers.Where(s => s != null).AsEnumerable();
 
-        if (!string.IsNullOrWhiteSpace(subCategory) && subCategory != "全部")
-        {
-            query = query.Where(s => s.SubCategory.Contains(subCategory, StringComparison.OrdinalIgnoreCase));
-        }
+            if (category.HasValue && (int)category.Value > 0)
+            {
+                query = query.Where(s => s.Category == category.Value);
+            }
 
-        if (!string.IsNullOrWhiteSpace(keyword))
-        {
-            var kw = keyword.Trim().ToLowerInvariant();
-            query = query.Where(s =>
-                s.Name.ToLowerInvariant().Contains(kw) ||
-                s.ShortName.ToLowerInvariant().Contains(kw) ||
-                s.Code.ToLowerInvariant().Contains(kw) ||
-                s.SubCategory.ToLowerInvariant().Contains(kw) ||
-                s.ContactPerson.ToLowerInvariant().Contains(kw) ||
-                s.CityRegion.ToLowerInvariant().Contains(kw));
-        }
+            if (!string.IsNullOrWhiteSpace(subCategory) && subCategory != "全部")
+            {
+                query = query.Where(s => s.SubCategory.Contains(subCategory, StringComparison.OrdinalIgnoreCase));
+            }
 
-        return query.OrderBy(s => s.Category).ThenBy(s => s.Id);
+            if (!string.IsNullOrWhiteSpace(keyword))
+            {
+                var kw = keyword.Trim().ToLowerInvariant();
+                query = query.Where(s =>
+                    s.Name.ToLowerInvariant().Contains(kw) ||
+                    s.ShortName.ToLowerInvariant().Contains(kw) ||
+                    s.Code.ToLowerInvariant().Contains(kw) ||
+                    s.SubCategory.ToLowerInvariant().Contains(kw) ||
+                    s.ContactPerson.ToLowerInvariant().Contains(kw) ||
+                    s.CityRegion.ToLowerInvariant().Contains(kw));
+            }
+
+            return query.OrderBy(s => s.Category).ThenBy(s => s.Id).ToList();
+        }
     }
 
     public static List<string> GetAllSubCategories(SupplierCategory? category = null)
     {
-        var query = _dynamicSuppliers.AsEnumerable();
-        if (category.HasValue && (int)category.Value > 0)
+        lock (_lock)
         {
-            query = query.Where(s => s.Category == category.Value);
-        }
+            var query = _dynamicSuppliers.Where(s => s != null).AsEnumerable();
+            if (category.HasValue && (int)category.Value > 0)
+            {
+                query = query.Where(s => s.Category == category.Value);
+            }
 
-        return query
-            .SelectMany(s => s.SubCategory.Split(new[] { '/', '、', ',', '，' }, StringSplitOptions.RemoveEmptyEntries))
-            .Select(s => s.Trim())
-            .Where(s => !string.IsNullOrEmpty(s))
-            .Distinct()
-            .OrderBy(s => s)
-            .ToList();
+            return query
+                .SelectMany(s => s.SubCategory.Split(new[] { '/', '、', ',', '，' }, StringSplitOptions.RemoveEmptyEntries))
+                .Select(s => s.Trim())
+                .Where(s => !string.IsNullOrEmpty(s))
+                .Distinct()
+                .OrderBy(s => s)
+                .ToList();
+        }
     }
 
     public static void AddSupplier(SupplierItem item)
     {
-        item.Id = _dynamicSuppliers.Count > 0 ? _dynamicSuppliers.Max(s => s.Id) + 1 : 1;
-        if (string.IsNullOrWhiteSpace(item.Code))
+        lock (_lock)
         {
-            var prefix = item.Category switch
+            item.Id = _dynamicSuppliers.Count > 0 ? _dynamicSuppliers.Max(s => s.Id) + 1 : 1;
+            if (string.IsNullOrWhiteSpace(item.Code))
             {
-                SupplierCategory.SteelMill => "SUP-MILL",
-                SupplierCategory.SteelTrader => "SUP-TRD",
-                SupplierCategory.CraneRental => "SUP-CRN",
-                SupplierCategory.FastenerBolt => "SUP-BLT",
-                SupplierCategory.SpecialtyMaterial => "SUP-MAT",
-                SupplierCategory.PaintCoating => "SUP-PNT",
-                _ => "SUP-CUS"
-            };
-            item.Code = $"{prefix}-{item.Id:D3}";
+                var prefix = item.Category switch
+                {
+                    SupplierCategory.SteelMill => "SUP-MILL",
+                    SupplierCategory.SteelTrader => "SUP-TRD",
+                    SupplierCategory.CraneRental => "SUP-CRN",
+                    SupplierCategory.FastenerBolt => "SUP-BLT",
+                    SupplierCategory.SpecialtyMaterial => "SUP-MAT",
+                    SupplierCategory.PaintCoating => "SUP-PNT",
+                    _ => "SUP-CUS"
+                };
+                item.Code = $"{prefix}-{item.Id:D3}";
+            }
+            item.CreatedAt = DateTime.Now;
+            item.UpdatedAt = DateTime.Now;
+            _dynamicSuppliers.Add(item);
         }
-        item.CreatedAt = DateTime.Now;
-        item.UpdatedAt = DateTime.Now;
-        _dynamicSuppliers.Add(item);
     }
 
     public static bool UpdateSupplier(SupplierItem item)
     {
-        var target = _dynamicSuppliers.FirstOrDefault(s => s.Id == item.Id);
-        if (target == null) return false;
+        lock (_lock)
+        {
+            var target = _dynamicSuppliers.FirstOrDefault(s => s != null && s.Id == item.Id);
+            if (target == null) return false;
 
-        target.Name = item.Name;
-        target.ShortName = item.ShortName;
-        target.Category = item.Category;
-        target.SubCategory = item.SubCategory;
-        target.ContactPerson = item.ContactPerson;
-        target.ContactPhone = item.ContactPhone;
-        target.Email = item.Email;
-        target.CityRegion = item.CityRegion;
-        target.CooperationStatus = item.CooperationStatus;
-        target.Remarks = item.Remarks;
-        target.BenchmarkPremiumPerTon = item.BenchmarkPremiumPerTon;
-        target.UpdatedAt = DateTime.Now;
-        return true;
+            target.Name = item.Name;
+            target.ShortName = item.ShortName;
+            target.Category = item.Category;
+            target.SubCategory = item.SubCategory;
+            target.ContactPerson = item.ContactPerson;
+            target.ContactPhone = item.ContactPhone;
+            target.Email = item.Email;
+            target.CityRegion = item.CityRegion;
+            target.CooperationStatus = item.CooperationStatus;
+            target.Remarks = item.Remarks;
+            target.BenchmarkPremiumPerTon = item.BenchmarkPremiumPerTon;
+            target.UpdatedAt = DateTime.Now;
+            return true;
+        }
     }
 
     /// <summary>
@@ -601,56 +628,65 @@ public static class SupplierDatabase
     /// </summary>
     public static List<SteelMillBrand> GetSteelMillsAsBrands()
     {
-        var mills = _dynamicSuppliers
-            .Where(s => s.Category == SupplierCategory.SteelMill)
-            .Select(s =>
-            {
-                // 将标准前缀映射到历史标识，实现历史表单选择的 100% 丝滑兼容
-                string mappedId = s.Code switch
+        lock (_lock)
+        {
+            var mills = _dynamicSuppliers
+                .Where(s => s != null && s.Category == SupplierCategory.SteelMill)
+                .Select(s =>
                 {
-                    "SUP-MILL-001" => "Baosteel",
-                    "SUP-MILL-002" => "NISCO",
-                    "SUP-MILL-003" => "Jinxi",
-                    "SUP-MILL-004" => "MaSteel",
-                    "SUP-MILL-005" => "Shagang",
-                    "SUP-MILL-006" => "Ansteel",
-                    "SUP-MILL-007" => "Xiangsteel",
-                    "SUP-MILL-008" => "WISCO",
-                    "SUP-MILL-009" => "GeneralMill",
-                    _ => s.Code
-                };
+                    // 将标准前缀映射到历史标识，实现历史表单选择的 100% 丝滑兼容
+                    string mappedId = s.Code switch
+                    {
+                        "SUP-MILL-001" => "Baosteel",
+                        "SUP-MILL-002" => "NISCO",
+                        "SUP-MILL-003" => "Jinxi",
+                        "SUP-MILL-004" => "MaSteel",
+                        "SUP-MILL-005" => "Shagang",
+                        "SUP-MILL-006" => "Ansteel",
+                        "SUP-MILL-007" => "Xiangsteel",
+                        "SUP-MILL-008" => "WISCO",
+                        "SUP-MILL-009" => "GeneralMill",
+                        _ => s.Code
+                    };
 
-                return new SteelMillBrand
-                {
-                    Id = mappedId,
-                    Name = s.Name,
-                    ShortName = s.ShortName,
-                    ProductionBase = s.CityRegion,
-                    Tier = s.BenchmarkPremiumPerTon > 100 ? 1 : (s.BenchmarkPremiumPerTon >= 0 ? 2 : 3),
-                    BrandPremiumPerTon = s.BenchmarkPremiumPerTon,
-                    SpecialtyDescription = $"{s.SubCategory} - {s.Remarks}",
-                    SupportsThirdPartyCertification = true,
-                    IsRecommended = s.CooperationStatus == "战略合作" || s.CooperationStatus == "优先推荐"
-                };
-            })
-            .ToList();
+                    return new SteelMillBrand
+                    {
+                        Id = mappedId,
+                        Name = s.Name,
+                        ShortName = s.ShortName,
+                        ProductionBase = s.CityRegion,
+                        Tier = s.BenchmarkPremiumPerTon > 100 ? 1 : (s.BenchmarkPremiumPerTon >= 0 ? 2 : 3),
+                        BrandPremiumPerTon = s.BenchmarkPremiumPerTon,
+                        SpecialtyDescription = $"{s.SubCategory} - {s.Remarks}",
+                        SupportsThirdPartyCertification = true,
+                        IsRecommended = s.CooperationStatus == "战略合作" || s.CooperationStatus == "优先推荐"
+                    };
+                })
+                .ToList();
 
-        return mills;
+            return mills;
+        }
     }
 
     public static bool RemoveSupplier(int id)
     {
-        var target = _dynamicSuppliers.FirstOrDefault(s => s.Id == id);
-        return target != null && _dynamicSuppliers.Remove(target);
+        lock (_lock)
+        {
+            var target = _dynamicSuppliers.FirstOrDefault(s => s != null && s.Id == id);
+            return target != null && _dynamicSuppliers.Remove(target);
+        }
     }
 
     public static string ExportToJson()
     {
-        return System.Text.Json.JsonSerializer.Serialize(_dynamicSuppliers, new System.Text.Json.JsonSerializerOptions
+        lock (_lock)
         {
-            WriteIndented = true,
-            Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
-        });
+            return System.Text.Json.JsonSerializer.Serialize(_dynamicSuppliers.Where(s => s != null), new System.Text.Json.JsonSerializerOptions
+            {
+                WriteIndented = true,
+                Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+            });
+        }
     }
 
     public static bool ImportFromJson(string json, bool overwrite = false)
@@ -660,16 +696,19 @@ public static class SupplierDatabase
             var list = System.Text.Json.JsonSerializer.Deserialize<List<SupplierItem>>(json);
             if (list == null || list.Count == 0) return false;
 
-            if (overwrite)
+            lock (_lock)
             {
-                _dynamicSuppliers.Clear();
-            }
-
-            foreach (var item in list)
-            {
-                if (!_dynamicSuppliers.Any(s => s.Id == item.Id || s.Code.Equals(item.Code, StringComparison.OrdinalIgnoreCase)))
+                if (overwrite)
                 {
-                    _dynamicSuppliers.Add(item);
+                    _dynamicSuppliers.Clear();
+                }
+
+                foreach (var item in list)
+                {
+                    if (item != null && !_dynamicSuppliers.Any(s => s != null && (s.Id == item.Id || s.Code.Equals(item.Code, StringComparison.OrdinalIgnoreCase))))
+                    {
+                        _dynamicSuppliers.Add(item);
+                    }
                 }
             }
             return true;
@@ -682,7 +721,10 @@ public static class SupplierDatabase
 
     public static void ResetToDefaults()
     {
-        _dynamicSuppliers.Clear();
-        _dynamicSuppliers.AddRange(_seedSuppliers);
+        lock (_lock)
+        {
+            _dynamicSuppliers.Clear();
+            _dynamicSuppliers.AddRange(_seedSuppliers);
+        }
     }
 }

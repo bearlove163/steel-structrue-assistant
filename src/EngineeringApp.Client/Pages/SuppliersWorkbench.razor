@@ -12,31 +12,16 @@
 <div class="container-fluid py-2 px-3 workstation-root d-flex flex-column min-vh-100 @(Theme.IsDarkMode ? "bg-dark text-white" : "bg-light text-dark")"
      data-theme="@(Theme.IsDarkMode ? "dark" : "light")">
 
-    <!-- ======================= 顶部导航与控制器 ======================= -->
-    <header class="d-flex flex-wrap align-items-center justify-content-between pb-2 mb-3 border-bottom @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle bg-white rounded p-2 shadow-sm")">
-        <div class="d-flex align-items-center gap-3">
-            <button class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1" @onclick='() => Nav.NavigateTo("/portal")' title="返回统一门户">
-                <span>←</span>
-                <span>门户中心</span>
-            </button>
-            <div class="d-flex align-items-center gap-2">
-                <span class="fs-4">🏢</span>
-                <div>
-                    <div class="d-flex align-items-center gap-2">
-                        <h5 class="mb-0 fw-bold @(Theme.IsDarkMode ? "text-white" : "text-dark")">工程供应链与供应商库管理中心</h5>
-                        <span class="badge @(Theme.IsDarkMode ? "bg-primary-subtle text-primary border border-primary" : "bg-primary text-white") text-xs">
-                            模块4 · 供方资质中心
-                        </span>
-                        <span class="badge bg-success text-xs">动态品类扩展</span>
-                    </div>
-                    <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">
-                        贯通制造钢厂 · 现货贸易 · 吊装机械 · 紧固件螺栓 · 特种构件 (拉索/支座/楼承板) · 防腐防火涂料
-                    </div>
-                </div>
-            </div>
-        </div>
+@using EngineeringApp.Client.Shared.Components.Common
 
-        <div class="d-flex align-items-center gap-2 mt-2 mt-md-0">
+    <!-- ======================= 顶部统一工程工作站标题栏 ======================= -->
+    <WorkstationHeader IconBadge="🏢"
+                       Title="工程供应链与供应商库管理中心"
+                       TagBadge="模块4 · 供方资质中心"
+                       Subtitle="贯通制造钢厂 · 现货贸易 · 吊装机械 · 紧固件螺栓 · 特种构件 (拉索/支座/楼承板) · 防腐防火涂料"
+                       ShowStandardSelector="false"
+                       ShowInspectorToggle="false">
+        <ActionButtons>
             <!-- 视图模式切换 -->
             <div class="btn-group btn-group-sm">
                 <button class="btn @(CurrentView == ViewMode.Grid ? "btn-primary" : "btn-outline-secondary")" @onclick="() => CurrentView = ViewMode.Grid" title="切换紧凑表格清单视图">
@@ -64,86 +49,64 @@
                 <span>🔄</span>
                 <span>重置基准</span>
             </button>
-
-            <!-- 主题切换 -->
-            <button class="btn btn-sm @(Theme.IsDarkMode ? "btn-outline-warning" : "btn-outline-dark")" @onclick="Theme.ToggleTheme" title="切换暗黑/亮色主题">
-                @(Theme.IsDarkMode ? "☀️" : "🌙")
-            </button>
-        </div>
-    </header>
+        </ActionButtons>
+    </WorkstationHeader>
 
     <!-- ======================= 顶部统计看板 (6 张核心指标卡片) ======================= -->
     <div class="row g-2 mb-3">
-        <!-- 卡片 1: 供应商总库 -->
         <div class="col-6 col-md-2">
-            <div class="card p-2 h-100 @(Theme.IsDarkMode ? "bg-secondary bg-opacity-25 border-secondary" : "bg-white border-light-subtle shadow-sm")">
-                <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1 d-flex justify-content-between">
-                    <span>🏢 在册总供方</span>
-                    <span class="badge bg-primary">合格率 100%</span>
-                </div>
-                <div class="h5 fw-bold mb-0 text-primary">@TotalSuppliersCount <span class="fs-6 fw-normal @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">家</span></div>
-                <div class="text-xs text-secondary mt-1">涵盖全国全产业链</div>
-            </div>
+            <WorkstationMetricCard Label="🏢 在册总供方"
+                                   BadgeText="合格率 100%"
+                                   BadgeClass="bg-primary"
+                                   Value="@TotalSuppliersCount.ToString()"
+                                   Unit="家"
+                                   ValueColorClass="text-primary"
+                                   Description="涵盖全国全产业链" />
         </div>
-
-        <!-- 卡片 2: 钢厂与贸易商 -->
         <div class="col-6 col-md-2">
-            <div class="card p-2 h-100 @(Theme.IsDarkMode ? "bg-secondary bg-opacity-25 border-secondary" : "bg-white border-light-subtle shadow-sm")">
-                <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1 d-flex justify-content-between">
-                    <span>🏭 钢厂与贸易</span>
-                    <span class="badge bg-info text-dark">主材源头</span>
-                </div>
-                <div class="h5 fw-bold mb-0 text-info">@(GetCountByCategory(SupplierCategory.SteelMill) + GetCountByCategory(SupplierCategory.SteelTrader)) <span class="fs-6 fw-normal @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">家</span></div>
-                <div class="text-xs text-secondary mt-1">钢厂 @GetCountByCategory(SupplierCategory.SteelMill) · 贸易 @GetCountByCategory(SupplierCategory.SteelTrader)</div>
-            </div>
+            <WorkstationMetricCard Label="🏭 钢厂与贸易"
+                                   BadgeText="主材源头"
+                                   BadgeClass="bg-info text-dark"
+                                   Value="@((GetCountByCategory(SupplierCategory.SteelMill) + GetCountByCategory(SupplierCategory.SteelTrader)).ToString())"
+                                   Unit="家"
+                                   ValueColorClass="text-info"
+                                   Description="@($"钢厂 {GetCountByCategory(SupplierCategory.SteelMill)} · 贸易 {GetCountByCategory(SupplierCategory.SteelTrader)}")" />
         </div>
-
-        <!-- 卡片 3: 吊机租赁与施工机械 -->
         <div class="col-6 col-md-2">
-            <div class="card p-2 h-100 @(Theme.IsDarkMode ? "bg-secondary bg-opacity-25 border-secondary" : "bg-white border-light-subtle shadow-sm")">
-                <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1 d-flex justify-content-between">
-                    <span>🏗️ 吊装设备机械</span>
-                    <span class="badge bg-warning text-dark">台班定额</span>
-                </div>
-                <div class="h5 fw-bold mb-0 text-warning">@GetCountByCategory(SupplierCategory.CraneRental) <span class="fs-6 fw-normal @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">家</span></div>
-                <div class="text-xs text-secondary mt-1">平头塔/动臂塔/履带吊</div>
-            </div>
+            <WorkstationMetricCard Label="🏗️ 吊装设备机械"
+                                   BadgeText="台班定额"
+                                   BadgeClass="bg-warning text-dark"
+                                   Value="@GetCountByCategory(SupplierCategory.CraneRental).ToString()"
+                                   Unit="家"
+                                   ValueColorClass="text-warning"
+                                   Description="平头塔/动臂塔/履带吊" />
         </div>
-
-        <!-- 卡片 4: 紧固件与螺栓 -->
         <div class="col-6 col-md-2">
-            <div class="card p-2 h-100 @(Theme.IsDarkMode ? "bg-secondary bg-opacity-25 border-secondary" : "bg-white border-light-subtle shadow-sm")">
-                <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1 d-flex justify-content-between">
-                    <span>🔩 连接紧固件</span>
-                    <span class="badge bg-success">高强抗剪</span>
-                </div>
-                <div class="h5 fw-bold mb-0 text-success">@GetCountByCategory(SupplierCategory.FastenerBolt) <span class="fs-6 fw-normal @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">家</span></div>
-                <div class="text-xs text-secondary mt-1">10.9S螺栓/地脚锚栓</div>
-            </div>
+            <WorkstationMetricCard Label="🔩 连接紧固件"
+                                   BadgeText="高强抗剪"
+                                   BadgeClass="bg-success"
+                                   Value="@GetCountByCategory(SupplierCategory.FastenerBolt).ToString()"
+                                   Unit="家"
+                                   ValueColorClass="text-success"
+                                   Description="10.9S螺栓/地脚锚栓" />
         </div>
-
-        <!-- 卡片 5: 特种构件与材料 (拉索/支座/楼承板) -->
         <div class="col-6 col-md-2">
-            <div class="card p-2 h-100 @(Theme.IsDarkMode ? "bg-secondary bg-opacity-25 border-secondary" : "bg-white border-light-subtle shadow-sm")">
-                <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1 d-flex justify-content-between">
-                    <span>🔗 特种构件材料</span>
-                    <span class="badge bg-danger">空间大跨</span>
-                </div>
-                <div class="h5 fw-bold mb-0 text-danger">@GetCountByCategory(SupplierCategory.SpecialtyMaterial) <span class="fs-6 fw-normal @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">家</span></div>
-                <div class="text-xs text-secondary mt-1">拉索/减隔震/楼承板</div>
-            </div>
+            <WorkstationMetricCard Label="🔗 特种构件材料"
+                                   BadgeText="空间大跨"
+                                   BadgeClass="bg-danger"
+                                   Value="@GetCountByCategory(SupplierCategory.SpecialtyMaterial).ToString()"
+                                   Unit="家"
+                                   ValueColorClass="text-danger"
+                                   Description="拉索/减隔震/楼承板" />
         </div>
-
-        <!-- 卡片 6: 防腐与防火涂料 -->
         <div class="col-6 col-md-2">
-            <div class="card p-2 h-100 @(Theme.IsDarkMode ? "bg-secondary bg-opacity-25 border-secondary" : "bg-white border-light-subtle shadow-sm")">
-                <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-1 d-flex justify-content-between">
-                    <span>🎨 防腐防火涂装</span>
-                    <span class="badge bg-primary">重防腐认证</span>
-                </div>
-                <div class="h5 fw-bold mb-0 text-primary">@GetCountByCategory(SupplierCategory.PaintCoating) <span class="fs-6 fw-normal @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">家</span></div>
-                <div class="text-xs text-secondary mt-1">环氧/氟碳/防火涂料</div>
-            </div>
+            <WorkstationMetricCard Label="🎨 防腐防火涂装"
+                                   BadgeText="重防腐认证"
+                                   BadgeClass="bg-primary"
+                                   Value="@GetCountByCategory(SupplierCategory.PaintCoating).ToString()"
+                                   Unit="家"
+                                   ValueColorClass="text-primary"
+                                   Description="环氧/氟碳/防火涂料" />
         </div>
     </div>
 

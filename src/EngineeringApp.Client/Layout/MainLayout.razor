@@ -1,21 +1,413 @@
 @inherits LayoutComponentBase
-@inject EngineeringApp.Client.Services.ThemeState Theme
+@using EngineeringApp.Shared.Material.Pricing
+@using EngineeringApp.Client.Services
+@using EngineeringApp.Shared.Reports
+@using Microsoft.JSInterop
+@inject NavigationManager Nav
+@inject ThemeState Theme
+@inject WorkstationStateMediator Mediator
+@inject IJSRuntime JS
 @implements IDisposable
 
-<div class="workstation-wrapper @(Theme.IsDarkMode ? "bg-dark text-white" : "bg-light text-dark") min-vh-100" data-theme="@(Theme.IsDarkMode ? "dark" : "light")">
-    <main>
-        @Body
-    </main>
+<div class="workstation-app-container @(Theme.IsDarkMode ? "dark-theme bg-dark text-white" : "light-theme bg-light text-dark")"
+     data-theme="@(Theme.IsDarkMode ? "dark" : "light")">
+
+    <!-- ======================= 1. 全局顶部大盘控制栏 (Top Bar) ======================= -->
+    <header class="app-topbar d-flex align-items-center justify-content-between px-3 border-bottom @(Theme.IsDarkMode ? "bg-black border-secondary text-white" : "bg-white border-light-subtle text-dark shadow-sm")">
+        <!-- 品牌徽标与当前工程上下文 -->
+        <div class="d-flex align-items-center gap-3">
+            <div class="d-flex align-items-center gap-2 cursor-pointer" @onclick='() => Nav.NavigateTo("/portal")' title="点击返回门户大盘">
+                <div class="p-1 bg-gradient bg-primary rounded-3 text-white fw-bold d-flex align-items-center justify-content-center shadow-sm"
+                     style="width: 32px; height: 32px; font-size: 16px;">
+                    ⬡
+                </div>
+                <div class="d-flex flex-column">
+                    <span class="fw-bold tracking-tight text-sm leading-tight text-primary">Antigravity · 结构计算工作站</span>
+                    <span class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">Civil Engineering Quotation & Mechanics IDE</span>
+                </div>
+            </div>
+
+            <div class="vr mx-1 d-none d-md-block opacity-25"></div>
+
+            <!-- 当前模块标签 -->
+            <span class="badge @(Theme.IsDarkMode ? "bg-secondary text-white" : "bg-primary-subtle text-primary") text-xs d-none d-sm-inline-block">
+                @GetCurrentModuleTitle()
+            </span>
+        </div>
+
+        <!-- 顶部快捷操作群：项目、规范选择器、主题、向导抽屉 -->
+        <div class="d-flex align-items-center gap-2">
+            <!-- 当前工程标签 -->
+            <div class="d-none d-lg-flex align-items-center gap-1 text-xs px-2 py-1 rounded border @(Theme.IsDarkMode ? "border-secondary bg-dark" : "border-light-subtle bg-light")">
+                <span>📍 项目:</span>
+                <span class="fw-bold text-primary">华东超高层钢结构中心</span>
+            </div>
+
+            <!-- 国际标准体系切换 (GB / EN / ASTM) -->
+            <div class="btn-group btn-group-sm">
+                <button class="btn btn-xs @(Mediator.CurrentStandard == StandardSystem.GB ? "btn-primary fw-bold" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary"))"
+                        @onclick="() => Mediator.SetStandard(StandardSystem.GB)">
+                    🇨🇳 国标 GB
+                </button>
+                <button class="btn btn-xs @(Mediator.CurrentStandard == StandardSystem.EN ? "btn-primary fw-bold" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary"))"
+                        @onclick="() => Mediator.SetStandard(StandardSystem.EN)">
+                    🇪🇺 欧标 EN
+                </button>
+                <button class="btn btn-xs @(Mediator.CurrentStandard == StandardSystem.ASTM ? "btn-primary fw-bold" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary"))"
+                        @onclick="() => Mediator.SetStandard(StandardSystem.ASTM)">
+                    🇺🇸 美标 ASTM
+                </button>
+            </div>
+
+            <!-- 主题切换 (暗黑 / 亮色) -->
+            <button class="btn btn-xs px-2 py-1 d-flex align-items-center gap-1 @(Theme.IsDarkMode ? "btn-outline-warning" : "btn-outline-dark")"
+                    @onclick="Theme.ToggleTheme" title="切换暗黑/亮色主题界面类型">
+                <span>@(Theme.IsDarkMode ? "☀️" : "🌙")</span>
+            </button>
+
+            <!-- 右侧向导与审计折叠开关 -->
+            <button class="btn btn-xs px-2 py-1 d-flex align-items-center gap-1 @(Mediator.IsInspectorOpen ? (Theme.IsDarkMode ? "btn-info text-white" : "btn-primary") : "btn-outline-secondary")"
+                    @onclick="Mediator.ToggleInspector" title="展开/收起右侧智能向导与检视栏">
+                <span>📖</span>
+                <span class="d-none d-md-inline">@(Mediator.IsInspectorOpen ? "向导检视 [开]" : "向导检视 [关]")</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- ======================= 2. 三栏式工作台主体 (Left + Center + Right) ======================= -->
+    <div class="app-workspace d-flex flex-row flex-grow-1 overflow-hidden">
+        
+        <!-- ================= [左栏] 大菜单栏 (Antigravity / Codex Sidebar) ================= -->
+        <aside class="sidebar-left d-flex flex-column @(Theme.IsDarkMode ? "bg-black border-secondary text-white" : "bg-white border-light-subtle text-dark shadow-sm") border-end @(isSidebarCollapsed ? "collapsed" : "")">
+            <!-- 栏目头与折叠钮 -->
+            <div class="p-2 border-bottom @(Theme.IsDarkMode ? "border-secondary text-white-50" : "border-light-subtle text-muted") text-xs fw-bold text-uppercase d-flex justify-content-between align-items-center">
+                <span>@(isSidebarCollapsed ? "菜单" : "大菜单导航 (Navigation)")</span>
+                <button class="btn btn-xs btn-link p-0 text-decoration-none text-muted"
+                        @onclick="() => isSidebarCollapsed = !isSidebarCollapsed"
+                        title="@(isSidebarCollapsed ? "展开左侧大菜单" : "折叠左侧大菜单")">
+                    @(isSidebarCollapsed ? "▶" : "◀")
+                </button>
+            </div>
+
+            <!-- 核心大菜单项列表 -->
+            <nav class="nav flex-column p-2 gap-1 flex-grow-1 overflow-y-auto">
+                <NavLink class="nav-item-card d-flex align-items-center gap-2 p-2 rounded text-decoration-none" href="portal" Match="NavLinkMatch.All">
+                    <span class="nav-icon fs-5">🏠</span>
+                    @if (!isSidebarCollapsed)
+                    {
+                        <div class="d-flex flex-column">
+                            <span class="fw-bold text-sm">统一门户中心</span>
+                            <span class="text-xs text-muted">Hub · 全局大盘与指引</span>
+                        </div>
+                    }
+                </NavLink>
+
+                <NavLink class="nav-item-card d-flex align-items-center gap-2 p-2 rounded text-decoration-none" href="material-pricing">
+                    <span class="nav-icon fs-5">🧱</span>
+                    @if (!isSidebarCollapsed)
+                    {
+                        <div class="d-flex flex-column">
+                            <span class="fw-bold text-sm">材料价格与供应链</span>
+                            <span class="text-xs text-muted">钢板加价 · 品牌溢价 · 调差</span>
+                        </div>
+                    }
+                </NavLink>
+
+                <NavLink class="nav-item-card d-flex align-items-center gap-2 p-2 rounded text-decoration-none" href="sections">
+                    <span class="nav-icon fs-5">📐</span>
+                    @if (!isSidebarCollapsed)
+                    {
+                        <div class="d-flex flex-column">
+                            <span class="fw-bold text-sm">截面几何与力学</span>
+                            <span class="text-xs text-muted">11类截面 · 塑性模量 · 验算</span>
+                        </div>
+                    }
+                </NavLink>
+
+                <NavLink class="nav-item-card d-flex align-items-center gap-2 p-2 rounded text-decoration-none" href="coating-fire-calculation">
+                    <span class="nav-icon fs-5">🎨</span>
+                    @if (!isSidebarCollapsed)
+                    {
+                        <div class="d-flex flex-column">
+                            <span class="fw-bold text-sm">涂装防腐与防火</span>
+                            <span class="text-xs text-muted">防腐防火 · 热浸镀锌算量</span>
+                        </div>
+                    }
+                </NavLink>
+
+                <NavLink class="nav-item-card d-flex align-items-center gap-2 p-2 rounded text-decoration-none" href="suppliers">
+                    <span class="nav-icon fs-5">🏢</span>
+                    @if (!isSidebarCollapsed)
+                    {
+                        <div class="d-flex flex-column">
+                            <span class="fw-bold text-sm">供应商资质库</span>
+                            <span class="text-xs text-muted">钢厂 · 现货 · 机械 · 紧固件</span>
+                        </div>
+                    }
+                </NavLink>
+            </nav>
+
+            <!-- 底部版本与架构说明 -->
+            @if (!isSidebarCollapsed)
+            {
+                <div class="p-2 border-top @(Theme.IsDarkMode ? "border-secondary bg-dark bg-opacity-50" : "border-light-subtle bg-light") text-xs">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="text-muted">架构基座:</span>
+                        <span class="badge bg-success">.NET 9 WASM</span>
+                    </div>
+                    <div class="text-muted mt-1" style="font-size: 11px;">
+                        三栏工程工作站 (Antigravity GUI)
+                    </div>
+                </div>
+            }
+        </aside>
+
+        <!-- ================= [中栏] 主操作区 (Operation Workspace) ================= -->
+        <main class="operation-workspace flex-grow-1 overflow-y-auto">
+            @Body
+        </main>
+
+        <!-- ================= [右栏] 向导与历史回溯抽屉 (Codex / Antigravity Inspector) ================= -->
+        @if (Mediator.IsInspectorOpen)
+        {
+            <aside class="sidebar-right d-flex flex-column @(Theme.IsDarkMode ? "bg-black border-secondary text-white" : "bg-white border-light-subtle text-dark shadow-sm") border-start">
+                <!-- 右侧功能选项卡 -->
+                <div class="p-2 border-bottom @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle") d-flex justify-content-between align-items-center">
+                    <div class="btn-group btn-group-sm w-100">
+                        <button class="btn btn-xs @(activeRightTab == 1 ? "btn-primary fw-bold" : "btn-outline-secondary")" @onclick="() => activeRightTab = 1">
+                            💡 智能向导
+                        </button>
+                        <button class="btn btn-xs @(activeRightTab == 2 ? "btn-primary fw-bold" : "btn-outline-secondary")" @onclick="() => activeRightTab = 2">
+                            ⏱️ 历史回溯
+                        </button>
+                        <button class="btn btn-xs @(activeRightTab == 3 ? "btn-primary fw-bold" : "btn-outline-secondary")" @onclick="() => activeRightTab = 3">
+                            📑 导出成果
+                        </button>
+                    </div>
+                    <button class="btn btn-xs btn-link text-muted ms-2 p-0" @onclick="Mediator.ToggleInspector" title="收起此面板">
+                        ✕
+                    </button>
+                </div>
+
+                <!-- 选项卡正文内容 -->
+                <div class="p-3 overflow-y-auto flex-grow-1 text-xs">
+                    @if (activeRightTab == 1)
+                    {
+                        @RenderContextualWizard()
+                    }
+                    else if (activeRightTab == 2)
+                    {
+                        @RenderTemporalAuditWidget()
+                    }
+                    else
+                    {
+                        @RenderExportQuickActions()
+                    }
+                </div>
+            </aside>
+        }
+    </div>
 </div>
 
 @code {
+    private bool isSidebarCollapsed = false;
+    private int activeRightTab = 1;
+
     protected override void OnInitialized()
     {
         Theme.OnChange += StateHasChanged;
+        Mediator.OnStandardChanged += _ => StateHasChanged();
+        Mediator.OnInspectorToggled += _ => StateHasChanged();
+        Nav.LocationChanged += (_, _) => StateHasChanged();
+    }
+
+    private string GetCurrentModuleTitle()
+    {
+        var path = new Uri(Nav.Uri).AbsolutePath.ToLowerInvariant();
+        if (path.Contains("material")) return "🧱 模块1：材料价格与供应链";
+        if (path.Contains("section")) return "📐 模块2：截面几何与力学分析";
+        if (path.Contains("coating") || path.Contains("painting")) return "🎨 模块3：防腐涂装与防火算量";
+        if (path.Contains("supplier")) return "🏢 模块4：供应商资质与供应链库";
+        return "🏠 工程工作台统一门户";
+    }
+
+    private RenderFragment RenderContextualWizard() => __builder =>
+    {
+        var path = new Uri(Nav.Uri).AbsolutePath.ToLowerInvariant();
+
+        <div class="d-flex flex-column gap-3">
+            @if (path.Contains("material"))
+            {
+                <div class="alert alert-info py-2 px-3 mb-0">
+                    <div class="fw-bold mb-1">📘 钢板五维组价向导 (GB/T 709)</div>
+                    <div class="text-muted">
+                        • 厚度阶梯：14~20mm 为基准厚度 (0加价)，超厚板 (≥40mm) 阶梯递增加价。<br />
+                        • 材质加价：Q355B 相对 Q235B 基准加价 +¥150~200/t。<br />
+                        • 钢厂品牌溢价：一线央企 (宝武/鞍钢/首钢) 享受品质品牌基准溢价。
+                    </div>
+                </div>
+                <div class="card p-2 border-light-subtle @(Theme.IsDarkMode ? "bg-dark" : "bg-light")">
+                    <div class="fw-bold mb-1 text-primary">★ 采办经营创效公式</div>
+                    <div class="text-muted font-monospace">
+                        创效(剪刀差) = 追溯索赔单价 - 实际执行单价<br />
+                        示例: +130 索赔 - +50 超支 = +80元/吨 净创效
+                    </div>
+                </div>
+            }
+            else if (path.Contains("section"))
+            {
+                <div class="alert alert-info py-2 px-3 mb-0">
+                    <div class="fw-bold mb-1">📐 截面力学校核向导 (GB 50017-2017)</div>
+                    <div class="text-muted">
+                        • 惯性矩：强轴 Iy 与弱轴 Iz 表征截面抵抗弯曲变形的能力。<br />
+                        • 塑性截面模量：Wpl 用于弹塑性极限承载力设计。<br />
+                        • 长细比限值 [λ]：受拉构件限值 350，受压主构件限值 150。
+                    </div>
+                </div>
+                <div class="card p-2 border-light-subtle @(Theme.IsDarkMode ? "bg-dark" : "bg-light")">
+                    <div class="fw-bold mb-1 text-primary">★ 正应力计算法则</div>
+                    <div class="text-muted font-monospace">
+                        σ = N/A ± My/Wy ± Mz/Wz ≤ [f]<br />
+                        应力比 η = |σ_max| / [f] ≤ 1.0 合格
+                    </div>
+                </div>
+            }
+            else if (path.Contains("coating") || path.Contains("painting"))
+            {
+                <div class="alert alert-info py-2 px-3 mb-0">
+                    <div class="fw-bold mb-1">🎨 防腐涂装防火向导 (ISO 12944)</div>
+                    <div class="text-muted">
+                        • 典型三度体系：环氧富锌底漆 (80μm) + 云铁中间漆 (100μm) + 氟碳面漆 (60μm)。<br />
+                        • 喷涂损耗系数：大平板构件取 30%~40%，桁架与空间网壳取 50%~60%。
+                    </div>
+                </div>
+            }
+            else if (path.Contains("supplier"))
+            {
+                <div class="alert alert-info py-2 px-3 mb-0">
+                    <div class="fw-bold mb-1">🏢 供应商评价准则</div>
+                    <div class="text-muted">
+                        • 梯队等级：战略合作 (Tier 1)、优先推荐 (Tier 2)、合格准入 (Tier 3)。<br />
+                        • 质保要求：钢厂直供须具备完整质保书 (MTR) 与第三方力学拉伸测试报告。
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="alert alert-primary py-2 px-3 mb-0">
+                    <div class="fw-bold mb-1">💡 Antigravity 三栏操作指南</div>
+                    <div class="text-muted">
+                        • <b>左侧大菜单</b>：随时一键切换 5 大核心计算域，无需退回主页。<br />
+                        • <b>中间 Operation</b>：全功能工程交互表格、CAD矢量视窗与计算核心。<br />
+                        • <b>右侧向导检视</b>：提供实时工程规范条款、公式提示与跨时序审计。
+                    </div>
+                </div>
+            }
+        </div>
+    };
+
+    private RenderFragment RenderTemporalAuditWidget() => __builder =>
+    {
+        <div class="d-flex flex-column gap-2">
+            <div class="fw-bold text-primary">⏱️ 历史时序与基准回溯看板</div>
+            <div class="p-2 rounded border @(Theme.IsDarkMode ? "border-secondary bg-dark" : "border-light-subtle bg-light")">
+                <div class="text-muted mb-1">当前对比版本：</div>
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span>基准快照:</span>
+                    <span class="badge bg-secondary font-monospace">SNAP-2026-03</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span>现行结算:</span>
+                    <span class="badge bg-success font-monospace">SNAP-2026-10</span>
+                </div>
+                <hr class="my-1 @(Theme.IsDarkMode ? "border-secondary" : "")" />
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="fw-bold">大盘调差变动:</span>
+                    <span class="text-danger fw-bold">+¥300.00 /吨</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="fw-bold">采办套利剪刀差:</span>
+                    <span class="text-success fw-bold">+¥80.00 /吨</span>
+                </div>
+            </div>
+
+            <div class="fw-bold mt-2 text-muted">📜 最近审计履历链条 (Audit Trail)</div>
+            <div class="list-group list-group-flush">
+                <div class="list-group-item px-2 py-1.5 @(Theme.IsDarkMode ? "bg-transparent text-white border-secondary" : "bg-transparent text-dark border-light-subtle")">
+                    <div class="d-flex justify-content-between">
+                        <span class="fw-bold">Q355B 普板现货调差</span>
+                        <span class="text-muted" style="font-size: 10px;">10-08 09:30</span>
+                    </div>
+                    <div class="text-muted" style="font-size: 11px;">调整基准 +30 元/吨 · 经办: 商业总造价师</div>
+                </div>
+                <div class="list-group-item px-2 py-1.5 @(Theme.IsDarkMode ? "bg-transparent text-white border-secondary" : "bg-transparent text-dark border-light-subtle")">
+                    <div class="d-flex justify-content-between">
+                        <span class="fw-bold">宝武首单战略签约溢价</span>
+                        <span class="text-muted" style="font-size: 10px;">10-01 14:00</span>
+                    </div>
+                    <div class="text-muted" style="font-size: 11px;">锁定溢价 +200 元/吨 · 经办: 采办经营部长</div>
+                </div>
+            </div>
+        </div>
+    };
+
+    private RenderFragment RenderExportQuickActions() => __builder =>
+    {
+        <div class="d-flex flex-column gap-2">
+            <div class="fw-bold text-primary">📑 报表与计算书快速导出 (Visitor Engine)</div>
+            <p class="text-muted mb-2">
+                系统采用访问者模式 (Visitor)，支持将当前工程数据一键渲染为多格式成果：
+            </p>
+            <button class="btn btn-outline-primary btn-sm d-flex align-items-center justify-content-between"
+                    @onclick="CopyQuickMarkdown">
+                <span>📋 复制标准 Markdown 计算书</span>
+                <span class="badge bg-primary">MD</span>
+            </button>
+            <button class="btn btn-outline-success btn-sm d-flex align-items-center justify-content-between"
+                    @onclick="ExportQuickExcel">
+                <span>📊 导出 Excel 网格表格 (TSV)</span>
+                <span class="badge bg-success">Excel</span>
+            </button>
+            <button class="btn btn-outline-info btn-sm d-flex align-items-center justify-content-between"
+                    @onclick="PrintQuickHtml">
+                <span>🖨️ 打印 / 导出 PDF 标准公文</span>
+                <span class="badge bg-info text-dark">PDF</span>
+            </button>
+        </div>
+    };
+
+    private async Task CopyQuickMarkdown()
+    {
+        var builder = new EngineeringReportBuilder()
+            .AddProjectOverview("华东超高层钢结构中心综合成果报告", "Antigravity Structural Workstation", "GB 50017-2017《钢结构设计标准》")
+            .AddTemporalAudit("SNAP-2026-03", "SNAP-2026-10", new DateTime(2026, 3, 1), new DateTime(2026, 10, 8), 150000, 80, 40000, "双方核对无误，同意定案");
+
+        var md = builder.Build(new MarkdownReportVisitor());
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", md);
+        await JS.InvokeVoidAsync("alert", "工程成果 Markdown 已复制到剪贴板！");
+    }
+
+    private async Task ExportQuickExcel()
+    {
+        var builder = new EngineeringReportBuilder()
+            .AddProjectOverview("华东超高层钢结构中心综合成果报告", "Antigravity Structural Workstation", "GB 50017-2017")
+            .AddTemporalAudit("SNAP-2026-03", "SNAP-2026-10", new DateTime(2026, 3, 1), new DateTime(2026, 10, 8), 150000, 80, 40000, "双方核对无误，同意定案");
+
+        var tsv = builder.Build(new ExcelSpreadsheetVisitor());
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", tsv);
+        await JS.InvokeVoidAsync("alert", "Excel/TSV 矩阵表格已复制到剪贴板，可直接粘贴进 Excel 或 RadzenSpreadsheet！");
+    }
+
+    private async Task PrintQuickHtml()
+    {
+        await JS.InvokeVoidAsync("window.print");
     }
 
     public void Dispose()
     {
         Theme.OnChange -= StateHasChanged;
+        Mediator.OnStandardChanged -= _ => StateHasChanged();
+        Mediator.OnInspectorToggled -= _ => StateHasChanged();
+        Nav.LocationChanged -= (_, _) => StateHasChanged();
     }
 }

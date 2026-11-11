@@ -41,18 +41,23 @@ public static class MaterialProvenanceTagBuilder
 /// 物料价格与加价原则变更履历 (Material Price & Principle Revision Audit Log)
 /// 记录由于“加价原则变更”、“询价时间差异”或“二次议价”引发的修改过程与痕迹
 /// </summary>
-public class MaterialPriceRevisionLog
+public class MaterialPriceRevisionLog : EngineeringApp.Shared.Common.Temporal.IAuditEvent
 {
     public int Id { get; set; }
     public int RecordId { get; set; }
     public int RevisionNumber { get; set; }
+    public int RevisionId { get => RevisionNumber; set => RevisionNumber = value; }
+    public string EntityFingerprint { get; set; } = "";
     public DateTime RevisedAt { get; set; } = DateTime.Now;
     public string RevisedBy { get; set; } = "造价工程师";
     public string Reason { get; set; } = ""; // 变更原因，如“加价原则调整”、“不同询价日重核”、“现货加价政策变更”
     public double PreviousPricePerTon { get; set; }
+    public double OldCostMetric { get => PreviousPricePerTon; set => PreviousPricePerTon = value; }
     public double NewPricePerTon { get; set; }
+    public double NewCostMetric { get => NewPricePerTon; set => NewPricePerTon = value; }
     public double PriceDelta => NewPricePerTon - PreviousPricePerTon;
     public string ChangeDetails { get; set; } = ""; // 明细对比文本
+    public string DetailComparisonJson { get => ChangeDetails; set => ChangeDetails = value; }
     public string AppliedPrinciple { get; set; } = ""; // 本次适用的加价原则版本
 }
 

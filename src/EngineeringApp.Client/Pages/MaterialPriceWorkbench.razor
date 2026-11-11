@@ -5,177 +5,283 @@
 @using EngineeringApp.Shared.Models
 @using EngineeringApp.Client.Services
 @using EngineeringApp.Client.Shared.Pricing
+@using EngineeringApp.Client.Shared.Components.Common
 @using System.Net.Http.Json
 @inject NavigationManager Nav
 @inject ThemeState Theme
+@inject WorkstationStateMediator Mediator
 @inject HttpClient Http
 @implements IDisposable
 
-<PageTitle>材料价格与供应链智能查询工作台</PageTitle>
+<PageTitle>材料价格与供应链智能查询工作台 - 三栏现代工作站</PageTitle>
 
 <div class="container-fluid py-2 px-3 workstation-root d-flex flex-column min-vh-100 @(Theme.IsDarkMode ? "bg-dark text-white" : "bg-light text-dark")"
      data-theme="@(Theme.IsDarkMode ? "dark" : "light")">
 
-    <!-- ======================= 顶部导航与大盘控制器 ======================= -->
-    <header class="d-flex flex-wrap align-items-center justify-content-between pb-2 mb-2 border-bottom @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle bg-white rounded p-2 shadow-sm")">
-        <div class="d-flex align-items-center gap-3">
-            <button class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1" @onclick='() => Nav.NavigateTo("/portal")' title="返回统一门户">
-                <span>←</span>
-                <span>门户中心</span>
+    <!-- ======================= 1. 统一全局工作台顶栏 ======================= -->
+    <WorkstationHeader IconBadge="🧱"
+                       Title="材料价格与供应链智能查询工作台"
+                       TagBadge="PRICING 3-PANE"
+                       Subtitle="钢板五维加价规则 · 型材圆转方冷成型工艺 · 钢厂品牌溢价 · 干线调运 · 跨时序回溯审计"
+                       OnStandardChanged="HandleStandardChanged">
+        <ActionButtons>
+            <!-- 价格基准快照选择器 -->
+            <div class="d-flex align-items-center gap-1 me-1">
+                <span class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">基准日:</span>
+                <select class="form-select form-select-sm @(Theme.IsDarkMode ? "bg-black text-warning border-secondary" : "bg-white text-dark border-secondary-subtle") w-auto"
+                        @bind="SelectedSnapshotId" @bind:after="OnSnapshotChanged">
+                    @foreach (var snap in AllSnapshots)
+                    {
+                        <option value="@snap.SnapshotId">
+                            📅 @snap.EffectiveDate.ToString("yyyy-MM-dd") | @snap.SnapshotName @(snap.IsLocked ? "🔒[基准锁定]" : "")
+                        </option>
+                    }
+                </select>
+            </div>
+
+            <button class="btn @(Theme.IsDarkMode ? "btn-outline-warning" : "btn-warning text-dark") btn-sm"
+                    @onclick='() => Nav.NavigateTo("/coating-fire-calculation")'
+                    title="打开防腐与防火算量工作台">
+                🎨 防腐防火
             </button>
-            <div class="p-2 bg-primary rounded-3 text-white fw-bold d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
-                🧱
-            </div>
-            <div>
-                <h5 class="mb-0 fw-bold tracking-tight d-flex align-items-center gap-2 @(Theme.IsDarkMode ? "text-white" : "text-dark")">
-                    <span>模块 1：材料价格与供应链智能查询工作台</span>
-                    <span class="badge bg-primary text-xs">PRICING WORKBENCH</span>
-                </h5>
-                <div class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted") text-xs">
-                    钢板五维加价规则 · 截面型材圆转方冷成型工艺 · 钢厂品牌溢价 · 跨省干线调运费 · 工业级标准 Describe 规范
-                </div>
-            </div>
+            <button class="btn @(Theme.IsDarkMode ? "btn-outline-info" : "btn-info text-white") btn-sm"
+                    @onclick='() => Nav.NavigateTo("/sections")'
+                    title="打开截面力学视窗">
+                📐 截面力学
+            </button>
+        </ActionButtons>
+    </WorkstationHeader>
+
+    <!-- ======================= 2. 核心大盘行情指标横幅 ======================= -->
+    <div class="row g-2 mb-2">
+        <div class="col-6 col-md-4 col-xl-2">
+            <WorkstationMetricCard Label="普板 Q235B 基价"
+                                   Value="@($"¥{CurrentSnapshot.PlateBaseQ235B}")"
+                                   Unit="元/吨"
+                                   BadgeText="大盘基础"
+                                   BadgeClass="bg-secondary"
+                                   ValueColorClass="@(Theme.IsDarkMode ? "text-warning" : "text-danger")"
+                                   Description="14~20mm 常用规格普碳板" />
         </div>
-
-        <!-- 顶部工具栏：暗黑/亮色切换、多国标准切换、快照选择与快捷链接 -->
-        <div class="d-flex align-items-center gap-2 mt-2 mt-md-0">
-            <!-- 暗黑/亮色主题切换按钮 -->
-            <button class="btn btn-sm d-flex align-items-center gap-1 @(Theme.IsDarkMode ? "btn-outline-warning" : "btn-outline-dark")"
-                    @onclick="Theme.ToggleTheme" title="切换暗黑/亮色主题界面类型">
-                <span>@(Theme.IsDarkMode ? "☀️ 亮色" : "🌙 暗黑")</span>
-            </button>
-
-            <!-- 标准体系切换器 -->
-            <div class="btn-group btn-group-sm">
-                <button class="btn @(CurrentStandard == StandardSystem.GB ? "btn-primary fw-bold" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary"))"
-                        @onclick="() => ChangeStandard(StandardSystem.GB)">
-                    🇨🇳 国标 GB
-                </button>
-                <button class="btn @(CurrentStandard == StandardSystem.EN ? "btn-primary fw-bold" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary"))"
-                        @onclick="() => ChangeStandard(StandardSystem.EN)">
-                    🇪🇺 欧标 EN
-                </button>
-                <button class="btn @(CurrentStandard == StandardSystem.ASTM ? "btn-primary fw-bold" : (Theme.IsDarkMode ? "btn-outline-secondary text-white-50" : "btn-outline-secondary"))"
-                        @onclick="() => ChangeStandard(StandardSystem.ASTM)">
-                    🇺🇸 美标 ASTM
-                </button>
-            </div>
-
-            <!-- 价格快照选择 -->
-            <select class="form-select form-select-sm @(Theme.IsDarkMode ? "bg-black text-warning border-secondary" : "bg-white text-dark border-secondary-subtle") w-auto"
-                    @bind="SelectedSnapshotId" @bind:after="OnSnapshotChanged">
-                @foreach (var snap in AllSnapshots)
-                {
-                    <option value="@snap.SnapshotId">
-                        📅 @snap.EffectiveDate.ToString("yyyy-MM-dd") | @snap.SnapshotName @(snap.IsLocked ? "🔒[基准锁定]" : "")
-                    </option>
-                }
-            </select>
-
-            <button class="btn @(Theme.IsDarkMode ? "btn-outline-warning" : "btn-warning text-dark") btn-sm" @onclick='() => Nav.NavigateTo("/coating-fire-calculation")' title="打开防腐与防火算量工作台">
-                🎨 防腐防火工作台
-            </button>
-            <button class="btn @(Theme.IsDarkMode ? "btn-outline-info" : "btn-info text-white") btn-sm" @onclick='() => Nav.NavigateTo("/sections")' title="打开截面力学视窗">
-                📐 截面力学视窗
-            </button>
+        <div class="col-6 col-md-4 col-xl-2">
+            <WorkstationMetricCard Label="低合金 Q355B 基价"
+                                   Value="@($"¥{CurrentSnapshot.PlateBaseQ355B}")"
+                                   Unit="元/吨"
+                                   BadgeText="高强主流"
+                                   BadgeClass="bg-success"
+                                   ValueColorClass="text-success"
+                                   Description="主要受力构件基准板材" />
         </div>
-    </header>
-
-    <!-- ======================= 大盘行情指标横幅 ======================= -->
-    <div class="@(Theme.IsDarkMode ? "bg-black bg-opacity-40 border-secondary" : "bg-white border-light-subtle shadow-sm") p-2 rounded border mb-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
-        <div class="d-flex align-items-center gap-3 flex-wrap">
-            <span class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted") small">当前基准网价:</span>
-            <div class="badge @(Theme.IsDarkMode ? "bg-secondary text-white" : "bg-light text-dark border")">
-                普板 Q235B: <b class="@(Theme.IsDarkMode ? "text-warning" : "text-danger")">¥@CurrentSnapshot.PlateBaseQ235B</b>/t
-            </div>
-            <div class="badge @(Theme.IsDarkMode ? "bg-secondary text-white" : "bg-light text-dark border")">
-                高强板 Q355B: <b class="text-success">¥@CurrentSnapshot.PlateBaseQ355B</b>/t
-            </div>
-            <div class="badge @(Theme.IsDarkMode ? "bg-secondary text-white" : "bg-light text-dark border")">
-                热轧H型钢: <b class="text-primary">¥@CurrentSnapshot.HBeamBaseQ355B</b>/t
-            </div>
-            <div class="badge @(Theme.IsDarkMode ? "bg-secondary text-white" : "bg-light text-dark border")">
-                热卷基料: <b class="@(Theme.IsDarkMode ? "text-white" : "text-dark")">¥@CurrentSnapshot.HotRolledCoilBase</b>/t
-            </div>
-            <div class="badge @(Theme.IsDarkMode ? "bg-secondary text-white" : "bg-light text-dark border")">
-                无缝钢管: <b class="@(Theme.IsDarkMode ? "text-warning" : "text-primary")">¥@CurrentSnapshot.SeamlessTubeBase</b>/t
-            </div>
+        <div class="col-6 col-md-4 col-xl-2">
+            <WorkstationMetricCard Label="热轧 H型钢 Q355B"
+                                   Value="@($"¥{CurrentSnapshot.HBeamBaseQ355B}")"
+                                   Unit="元/吨"
+                                   BadgeText="型钢主材"
+                                   BadgeClass="bg-primary"
+                                   ValueColorClass="text-primary"
+                                   Description="国标与欧标热轧型钢基价" />
         </div>
-        <div class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted") small">
-            数据来源: <span class="text-primary fw-bold">@CurrentSnapshot.SourceSupplier</span> | 含13%税
+        <div class="col-6 col-md-4 col-xl-2">
+            <WorkstationMetricCard Label="热卷基料 (冷弯基材)"
+                                   Value="@($"¥{CurrentSnapshot.HotRolledCoilBase}")"
+                                   Unit="元/吨"
+                                   BadgeText="工艺母料"
+                                   BadgeClass="bg-info text-dark"
+                                   ValueColorClass="text-info"
+                                   Description="方矩管与圆转方成型基料" />
+        </div>
+        <div class="col-6 col-md-4 col-xl-2">
+            <WorkstationMetricCard Label="无缝钢管管坯"
+                                   Value="@($"¥{CurrentSnapshot.SeamlessTubeBase}")"
+                                   Unit="元/吨"
+                                   BadgeText="特种管件"
+                                   BadgeClass="bg-secondary"
+                                   ValueColorClass="@(Theme.IsDarkMode ? "text-warning" : "text-primary")"
+                                   Description="无缝圆管与热扩管基材" />
+        </div>
+        <div class="col-6 col-md-4 col-xl-2">
+            <WorkstationMetricCard Label="物料出处记录库"
+                                   Value="@($"{ProvenanceRecords.Count}")"
+                                   Unit="批次"
+                                   BadgeText="★ 审计存证"
+                                   BadgeClass="bg-warning text-dark"
+                                   ValueColorClass="text-warning"
+                                   Description="跨时序指纹与修改痕迹" />
         </div>
     </div>
 
-    <!-- ======================= 选项卡导航 ======================= -->
-    <ul class="nav nav-tabs @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle") mb-2 flex-nowrap overflow-x-auto">
-        <li class="nav-item">
-            <button class="nav-link py-1.5 px-3 text-nowrap @(ActiveTab == 1 ? (Theme.IsDarkMode ? "active bg-dark text-primary border-primary border-bottom-0 fw-bold" : "active bg-white text-primary border-primary border-bottom-0 fw-bold shadow-sm") : (Theme.IsDarkMode ? "text-white-50" : "text-secondary"))"
-                    @onclick="() => ActiveTab = 1">
-                📑 钢板五维加价
-            </button>
-        </li>
-        <li class="nav-item">
-            <button class="nav-link py-1.5 px-3 text-nowrap @(ActiveTab == 2 ? (Theme.IsDarkMode ? "active bg-dark text-info border-info border-bottom-0 fw-bold" : "active bg-white text-primary border-info border-bottom-0 fw-bold shadow-sm") : (Theme.IsDarkMode ? "text-white-50" : "text-secondary"))"
-                    @onclick="() => ActiveTab = 2">
-                ⚙️ 型材与圆转方
-            </button>
-        </li>
-        <li class="nav-item">
-            <button class="nav-link py-1.5 px-3 text-nowrap @(ActiveTab == 3 ? (Theme.IsDarkMode ? "active bg-dark text-warning border-warning border-bottom-0 fw-bold" : "active bg-white text-warning border-warning border-bottom-0 fw-bold shadow-sm") : (Theme.IsDarkMode ? "text-white-50" : "text-secondary"))"
-                    @onclick="() => ActiveTab = 3">
-                📈 大盘调差模拟
-            </button>
-        </li>
-        <li class="nav-item">
-            <button class="nav-link py-1.5 px-3 text-nowrap @(ActiveTab == 4 ? (Theme.IsDarkMode ? "active bg-dark text-success border-success border-bottom-0 fw-bold" : "active bg-white text-success border-success border-bottom-0 fw-bold shadow-sm") : (Theme.IsDarkMode ? "text-white-50" : "text-secondary"))"
-                    @onclick="() => ActiveTab = 4">
-                📚 出处库与审计履历
-                <span class="badge bg-success ms-1">@ProvenanceRecords.Count 批次</span>
-                <span class="badge bg-warning text-dark text-xs ms-1">★ Rev审计</span>
-            </button>
-        </li>
-    </ul>
+    <!-- ======================= 3. 现代化三栏工程工作台架构 ======================= -->
+    <WorkstationThreePaneLayout>
+        <!-- 左栏：专业品类与导航工程树 -->
+        <LeftPane>
+            <div class="d-flex flex-column gap-2 h-100">
+                <div class="fw-bold text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted") text-uppercase pb-1 border-bottom">
+                    📂 专业计价与工序树
+                </div>
 
-    <!-- ======================= 选项卡 1：钢板五维加价矩阵 ======================= -->
-    @if (ActiveTab == 1)
-    {
-        <PlatePricingCalculator CurrentStandard="CurrentStandard"
-                                CurrentSnapshot="CurrentSnapshot"
-                                AllMills="AllMills"
-                                ThicknessLadders="ThicknessLadders"
-                                DimensionRules="DimensionRules"
-                                OnArchiveRecord="HandleArchiveRecord"
-                                OnGoToProvenance="() => ActiveTab = 4" />
-    }
+                <div class="list-group list-group-flush small">
+                    <button class="list-group-item list-group-item-action d-flex align-items-center justify-content-between p-2 rounded mb-1 @(ActiveTab == 1 ? "active fw-bold" : (Theme.IsDarkMode ? "bg-dark text-white border-0" : "bg-transparent text-dark border-0"))"
+                            @onclick="() => ActiveTab = 1">
+                        <div class="d-flex align-items-center gap-2">
+                            <span>📑</span>
+                            <span>钢板五维加价矩阵</span>
+                        </div>
+                        <span class="badge @(ActiveTab == 1 ? "bg-white text-primary" : "bg-secondary") text-xs">厚/宽/长</span>
+                    </button>
 
-    <!-- ======================= 选项卡 2：型材与圆转方工艺定价 ======================= -->
-    @if (ActiveTab == 2)
-    {
-        <ProfilePricingCalculator CurrentSnapshot="CurrentSnapshot"
-                                  CurrentStandard="CurrentStandard"
-                                  AllMills="AllMills" />
-    }
+                    <button class="list-group-item list-group-item-action d-flex align-items-center justify-content-between p-2 rounded mb-1 @(ActiveTab == 2 ? "active fw-bold" : (Theme.IsDarkMode ? "bg-dark text-white border-0" : "bg-transparent text-dark border-0"))"
+                            @onclick="() => ActiveTab = 2">
+                        <div class="d-flex align-items-center gap-2">
+                            <span>⚙️</span>
+                            <span>型材与圆转方工艺</span>
+                        </div>
+                        <span class="badge @(ActiveTab == 2 ? "bg-white text-primary" : "bg-secondary") text-xs">冷弯/成型</span>
+                    </button>
 
-    <!-- ======================= 选项卡 3：时间序列调差模拟器 ======================= -->
-    @if (ActiveTab == 3)
-    {
-        <MarketSpreadSimulationView AllSnapshots="AllSnapshots"
-                                    OnNavigateToProvenance="() => ActiveTab = 4" />
-    }
+                    <button class="list-group-item list-group-item-action d-flex align-items-center justify-content-between p-2 rounded mb-1 @(ActiveTab == 3 ? "active fw-bold" : (Theme.IsDarkMode ? "bg-dark text-white border-0" : "bg-transparent text-dark border-0"))"
+                            @onclick="() => ActiveTab = 3">
+                        <div class="d-flex align-items-center gap-2">
+                            <span>📈</span>
+                            <span>大盘时序调差模拟器</span>
+                        </div>
+                        <span class="badge @(ActiveTab == 3 ? "bg-white text-primary" : "bg-secondary") text-xs">双时期</span>
+                    </button>
 
-    <!-- ======================= 选项卡 4：工程物料出处库与跨时序价格回溯 ======================= -->
-    @if (ActiveTab == 4)
-    {
-        <ProvenanceRetrospectionGrid Records="ProvenanceRecords"
-                                     AllSnapshots="AllSnapshots"
-                                     ThicknessLadders="ThicknessLadders"
-                                     DimensionRules="DimensionRules"
-                                     OnOpenRevision="OpenRevisionModal"
-                                     OnOpenAudit="OpenAuditModal"
-                                     OnRemoveRecord="RemoveProvenanceRecord"
-                                     OnRecordUpdated="HandleRecordUpdated"
-                                     OnNavigateToPlateConfig="() => ActiveTab = 1" />
-    }
+                    <button class="list-group-item list-group-item-action d-flex align-items-center justify-content-between p-2 rounded mb-1 @(ActiveTab == 4 ? "active fw-bold" : (Theme.IsDarkMode ? "bg-dark text-white border-0" : "bg-transparent text-dark border-0"))"
+                            @onclick="() => ActiveTab = 4">
+                        <div class="d-flex align-items-center gap-2">
+                            <span>📚</span>
+                            <span>出处库与审计履历</span>
+                        </div>
+                        <span class="badge @(ActiveTab == 4 ? "bg-white text-primary" : "bg-warning text-dark") text-xs">@ProvenanceRecords.Count 批</span>
+                    </button>
+                </div>
+
+                <!-- 钢厂品牌直发快捷筛选 -->
+                <div class="mt-3 pt-2 border-top @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle")">
+                    <div class="fw-bold text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-2">
+                        🏭 主流钢厂品牌溢价基准
+                    </div>
+                    <div class="d-flex flex-column gap-1">
+                        @foreach (var mill in AllMills.Take(5))
+                        {
+                            <div class="d-flex justify-content-between align-items-center text-xs p-1.5 rounded @(Theme.IsDarkMode ? "bg-secondary bg-opacity-25" : "bg-light")">
+                                <span class="fw-bold">@mill.Name</span>
+                                <span class="@(mill.BrandPremiumPerTon > 0 ? "text-warning" : "text-success")">
+                                    @(mill.BrandPremiumPerTon > 0 ? $"+¥{mill.BrandPremiumPerTon}" : "基准免加")
+                                </span>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <!-- 快捷规范指引 -->
+                <div class="mt-auto p-2 rounded border @(Theme.IsDarkMode ? "border-secondary bg-black bg-opacity-30" : "border-light-subtle bg-light") text-xs">
+                    <div class="fw-bold text-info mb-1">📘 执行规范</div>
+                    <div class="@(Theme.IsDarkMode ? "text-white-50" : "text-muted")">
+                        GB/T 709-2019 热轧钢板尺寸外形<br/>
+                        GB 50017-2017 钢结构设计标准
+                    </div>
+                </div>
+            </div>
+        </LeftPane>
+
+        <!-- 中栏：核心作业舞台 (计算网格 / 调差模拟 / 出处清单) -->
+        <CenterPane>
+            @if (ActiveTab == 1)
+            {
+                <PlatePricingCalculator CurrentStandard="CurrentStandard"
+                                        CurrentSnapshot="CurrentSnapshot"
+                                        AllMills="AllMills"
+                                        ThicknessLadders="ThicknessLadders"
+                                        DimensionRules="DimensionRules"
+                                        OnArchiveRecord="HandleArchiveRecord"
+                                        OnGoToProvenance="() => ActiveTab = 4" />
+            }
+            else if (ActiveTab == 2)
+            {
+                <ProfilePricingCalculator CurrentSnapshot="CurrentSnapshot"
+                                          CurrentStandard="CurrentStandard"
+                                          AllMills="AllMills" />
+            }
+            else if (ActiveTab == 3)
+            {
+                <MarketSpreadSimulationView AllSnapshots="AllSnapshots"
+                                            OnNavigateToProvenance="() => ActiveTab = 4" />
+            }
+            else if (ActiveTab == 4)
+            {
+                <ProvenanceRetrospectionGrid Records="ProvenanceRecords"
+                                             AllSnapshots="AllSnapshots"
+                                             ThicknessLadders="ThicknessLadders"
+                                             DimensionRules="DimensionRules"
+                                             OnOpenRevision="OpenRevisionModal"
+                                             OnOpenAudit="OpenAuditModal"
+                                             OnRemoveRecord="RemoveProvenanceRecord"
+                                             OnRecordUpdated="HandleRecordUpdated"
+                                             OnNavigateToPlateConfig="() => ActiveTab = 1" />
+            }
+        </CenterPane>
+
+        <!-- 右栏：属性检视器与工程智能向导 (Inspector & Wizard) -->
+        <RightPane>
+            <div class="d-flex flex-column gap-3 h-100">
+                <div class="d-flex align-items-center justify-content-between pb-1 border-bottom @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle")">
+                    <div class="fw-bold text-xs @(Theme.IsDarkMode ? "text-warning" : "text-primary")">
+                        💡 智能向导与规范审查
+                    </div>
+                    <span class="badge bg-primary text-xs">AI 助手</span>
+                </div>
+
+                <!-- 动态向导卡片 1：公差与工艺推荐 -->
+                <div class="card @(Theme.IsDarkMode ? "bg-dark border-secondary" : "bg-white border-light-subtle shadow-sm") p-2">
+                    <div class="fw-bold text-xs text-primary mb-1">
+                        🎯 厚板工艺优化建议 (GB/T 709)
+                    </div>
+                    <p class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-2">
+                        对于厚度 ≥ 50mm 的重型桁架节点板，建议优先选用 <b>TMCP 控轧控冷工艺</b> 并执行 <b>Class C 保全厚度公差</b>，避免气割下料分层与角焊缝层状撕裂。
+                    </p>
+                    <div class="badge bg-warning text-dark text-xs text-start">
+                        Z25向抗层状撕裂加价约 +¥450/吨
+                    </div>
+                </div>
+
+                <!-- 动态向导卡片 2：调差索赔备忘录 -->
+                <div class="card @(Theme.IsDarkMode ? "bg-dark border-secondary" : "bg-white border-light-subtle shadow-sm") p-2">
+                    <div class="fw-bold text-xs text-success mb-1">
+                        ⚖️ 双时态调差索赔备忘
+                    </div>
+                    <p class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mb-2">
+                        依据《建设工程施工合同(示范文本)》GF-2017-0201 价格调整条款，合同基期价与进场网价波动超过 ±5% 时，应即时归档出处标签并生成调差签证。
+                    </p>
+                    <button class="btn btn-outline-success btn-xs w-100" @onclick="() => ActiveTab = 3">
+                        进入时序调差模拟器 →
+                    </button>
+                </div>
+
+                <!-- 动态向导卡片 3：修改审计履历快速入口 -->
+                @if (ProvenanceRecords.Count > 0)
+                {
+                    var latestRecord = ProvenanceRecords.First();
+                    <div class="card @(Theme.IsDarkMode ? "bg-dark border-secondary" : "bg-white border-light-subtle shadow-sm") p-2 mt-auto">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="fw-bold text-xs text-warning">最新出处物料</span>
+                            <span class="badge bg-secondary text-xs">Rev @(latestRecord.RevisionLogs.Count)</span>
+                        </div>
+                        <div class="text-xs fw-bold text-truncate" title="@latestRecord.DisplayTitle">
+                            @latestRecord.DisplayTitle
+                        </div>
+                        <div class="text-xs text-muted mb-2 font-monospace">
+                            @latestRecord.MaterialTag
+                        </div>
+                        <button class="btn btn-primary btn-xs w-100" @onclick="() => OpenAuditModal(latestRecord)">
+                            查看该物料完整审计时间轴
+                        </button>
+                    </div>
+                }
+            </div>
+        </RightPane>
+    </WorkstationThreePaneLayout>
 
     <!-- ======================= 模态框：价格修改与加价原则修订 ======================= -->
     <PriceRevisionModal IsVisible="ShowRevisionModal"
@@ -183,10 +289,12 @@
                         OnClose="CloseRevisionModal"
                         OnRecordUpdated="HandleRecordUpdated" />
 
-    <!-- ======================= 模态框：价格修改全过程审计履历 ======================= -->
-    <PriceAuditTimelineDrawer IsVisible="ShowAuditModal"
-                              Record="SelectedRecordForAudit"
-                              OnClose="CloseAuditModal" />
+    <!-- ======================= 模态框：通用全过程不可篡改审计履历抽屉 ======================= -->
+    <UnifiedAuditTimelineDrawer IsVisible="ShowAuditModal"
+                                Title="材料价格与加价原则变更"
+                                TargetFingerprint="@(SelectedRecordForAudit?.MaterialTag ?? "")"
+                                AuditEvents="@(SelectedRecordForAudit?.RevisionLogs ?? [])"
+                                OnClose="CloseAuditModal" />
 
 </div>
 
@@ -217,6 +325,7 @@
     protected override void OnInitialized()
     {
         Theme.OnChange += StateHasChanged;
+        Mediator.OnStandardChanged += HandleStandardChanged;
 
         AllSnapshots = SeedPriceSnapshots.AllSnapshots;
         AllMills = SeedSteelMills.AllMills;
@@ -231,16 +340,19 @@
     public void Dispose()
     {
         Theme.OnChange -= StateHasChanged;
+        Mediator.OnStandardChanged -= HandleStandardChanged;
     }
 
-    private void ChangeStandard(StandardSystem std)
+    private void HandleStandardChanged(StandardSystem std)
     {
         CurrentStandard = std;
+        StateHasChanged();
     }
 
     private void OnSnapshotChanged()
     {
         CurrentSnapshot = SeedPriceSnapshots.GetById(SelectedSnapshotId);
+        Mediator.SetSnapshotId(SelectedSnapshotId);
     }
 
     private async Task HandleArchiveRecord(MaterialProvenanceRecord newRecord)
@@ -250,6 +362,7 @@
         if (newRecord.RevisionLogs.Count > 0)
         {
             newRecord.RevisionLogs[0].RecordId = nextId;
+            newRecord.RevisionLogs[0].EntityFingerprint = newRecord.MaterialTag;
         }
 
         ProvenanceRecords.Insert(0, newRecord);
@@ -284,6 +397,11 @@
     private void OpenAuditModal(MaterialProvenanceRecord rec)
     {
         SelectedRecordForAudit = rec;
+        // 同步设置指纹
+        foreach (var log in rec.RevisionLogs)
+        {
+            log.EntityFingerprint = rec.MaterialTag;
+        }
         ShowAuditModal = true;
     }
 

@@ -3,10 +3,15 @@ namespace EngineeringApp.Shared.Pricing.Coating;
 /// <summary>
 /// 涂装防腐与防火价格历史基准快照 (含时间标签、通用品类寄存基价与品牌实体询价库)
 /// </summary>
-public class PaintPriceSnapshot
+public class PaintPriceSnapshot : EngineeringApp.Shared.Common.Temporal.IVersionSnapshot<PaintPriceSnapshot>
 {
     public string SnapshotId { get; set; } = Guid.NewGuid().ToString("N")[..8];
     public string SnapshotName { get; set; } = "2026年10月上旬-大盘涂装信息价";
+    public string EntityCategory { get; set; } = "PaintCoating";
+    public DateTime RecordedAt { get; set; } = DateTime.Now;
+    public string Operator { get; set; } = "防腐造价工程师";
+    public EngineeringApp.Shared.Material.Pricing.StandardSystem Standard { get; set; } = EngineeringApp.Shared.Material.Pricing.StandardSystem.GB;
+    public PaintPriceSnapshot StateData { get => this; set { } }
 
     /// <summary>价格基准生效日期 (时间标签)</summary>
     public DateTime EffectiveDate { get; set; } = DateTime.Today;

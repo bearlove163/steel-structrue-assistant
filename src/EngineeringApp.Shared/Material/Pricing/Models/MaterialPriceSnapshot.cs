@@ -37,10 +37,15 @@ public static class PriceSourceTypeExtensions
 /// <summary>
 /// 材料价格基准快照 (含时间标签与大盘行情)
 /// </summary>
-public class MaterialPriceSnapshot
+public class MaterialPriceSnapshot : EngineeringApp.Shared.Common.Temporal.IVersionSnapshot<MaterialPriceSnapshot>
 {
     public string SnapshotId { get; set; } = Guid.NewGuid().ToString("N")[..8];
     public string SnapshotName { get; set; } = "2026年10月上旬-华东区市场基准价";
+    public string EntityCategory { get; set; } = "MaterialPrice";
+    public DateTime RecordedAt { get; set; } = DateTime.Now;
+    public string Operator { get; set; } = "造价工程师";
+    public StandardSystem Standard { get; set; } = StandardSystem.GB;
+    public MaterialPriceSnapshot StateData { get => this; set { } }
     
     /// <summary>价格基准生效日期 (时间标签)</summary>
     public DateTime EffectiveDate { get; set; } = DateTime.Today;

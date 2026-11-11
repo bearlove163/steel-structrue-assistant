@@ -1,0 +1,117 @@
+@namespace EngineeringApp.Client.Shared.Components.Common
+@using EngineeringApp.Shared.Common.Temporal
+@using EngineeringApp.Client.Services
+@inject ThemeState Theme
+
+@if (IsVisible)
+{
+    <!-- 模态背景遮罩 -->
+    <div class="modal-backdrop fade show" style="z-index: 1050;" @onclick="CloseDrawer"></div>
+
+    <!-- 侧滑抽屉面板 -->
+    <div class="offcanvas offcanvas-end show shadow-lg @(Theme.IsDarkMode ? "bg-dark text-white border-secondary" : "bg-white text-dark")"
+         tabindex="-1"
+         style="visibility: visible; z-index: 1055; width: 520px; max-width: 95vw;">
+        
+        <div class="offcanvas-header border-bottom @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle") p-3">
+            <div>
+                <h5 class="offcanvas-title fw-bold d-flex align-items-center gap-2">
+                    <span>📜 @Title</span>
+                    <span class="badge bg-warning text-dark text-xs">审计溯源链条</span>
+                </h5>
+                <div class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted") mt-1">
+                    物料指纹/构件编码: <code class="@(Theme.IsDarkMode ? "text-warning" : "text-primary")">@TargetFingerprint</code>
+                </div>
+            </div>
+            <button type="button" class="btn-close @(Theme.IsDarkMode ? "btn-close-white" : "")" @onclick="CloseDrawer" aria-label="Close"></button>
+        </div>
+
+        <div class="offcanvas-body p-3 overflow-y-auto">
+            @if (AuditEvents == null || !AuditEvents.Any())
+            {
+                <div class="alert @(Theme.IsDarkMode ? "alert-secondary bg-opacity-25" : "alert-light border") text-center p-4">
+                    <div class="fs-4 mb-2">🔍</div>
+                    <div class="fw-bold">暂无修改审计记录</div>
+                    <div class="text-xs text-muted mt-1">当前物料/构件自建档后尚未发生加价原则或价格手工修订</div>
+                </div>
+            }
+            else
+            {
+                <!-- 时间轴流 -->
+                <div class="timeline-stream position-relative ps-3">
+                    @foreach (var ev in AuditEvents.OrderByDescending(e => e.RevisedAt))
+                    {
+                        <div class="timeline-node mb-4 position-relative border-start ps-3 @(Theme.IsDarkMode ? "border-secondary" : "border-primary")">
+                            <!-- 节点徽章 -->
+                            <div class="position-absolute" style="left: -12px; top: 0;">
+                                <span class="badge rounded-circle p-1 @(ev.CostDelta > 0 ? "bg-danger" : ev.CostDelta < 0 ? "bg-success" : "bg-primary")"
+                                      style="width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; font-size: 11px;">
+                                    @(ev.CostDelta > 0 ? "↑" : ev.CostDelta < 0 ? "↓" : "•")
+                                </span>
+                            </div>
+
+                            <div class="card @(Theme.IsDarkMode ? "bg-secondary bg-opacity-25 border-secondary text-white" : "bg-light border-light-subtle") p-2 shadow-sm">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="badge bg-dark border text-xs">Rev @ev.RevisionId</span>
+                                    <span class="text-xs @(Theme.IsDarkMode ? "text-white-50" : "text-muted")">
+                                        📅 @ev.RevisedAt.ToString("yyyy-MM-dd HH:mm")
+                                    </span>
+                                </div>
+
+                                <div class="d-flex align-items-baseline gap-2 mb-2">
+                                    <span class="text-xs text-muted">指标变动:</span>
+                                    <span class="small text-decoration-line-through text-muted">¥@ev.OldCostMetric.ToString("F1")</span>
+                                    <span>→</span>
+                                    <span class="fw-bold text-primary">¥@ev.NewCostMetric.ToString("F1")</span>
+                                    <span class="badge text-xs @(ev.CostDelta > 0 ? "bg-danger" : ev.CostDelta < 0 ? "bg-success" : "bg-secondary")">
+                                        @(ev.CostDelta >= 0 ? "+" : "")@ev.CostDelta.ToString("F1")
+                                    </span>
+                                </div>
+
+                                <div class="small fw-bold mb-1 @(Theme.IsDarkMode ? "text-warning" : "text-dark")">
+                                    📌 修改事由：@ev.Reason
+                                </div>
+
+                                @if (!string.IsNullOrWhiteSpace(ev.AppliedPrinciple))
+                                {
+                                    <div class="text-xs text-muted mb-1">
+                                        ⚖️ 适用原则/规范：<span class="text-info">@ev.AppliedPrinciple</span>
+                                    </div>
+                                }
+
+                                @if (!string.IsNullOrWhiteSpace(ev.DetailComparisonJson))
+                                {
+                                    <div class="p-2 rounded bg-black bg-opacity-30 text-xs font-monospace mt-1 overflow-x-auto text-white-50">
+                                        @ev.DetailComparisonJson
+                                    </div>
+                                }
+
+                                <div class="text-xs text-end text-muted mt-2">
+                                    经办人：<b class="@(Theme.IsDarkMode ? "text-white" : "text-dark")">@ev.RevisedBy</b>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        <div class="offcanvas-footer border-top @(Theme.IsDarkMode ? "border-secondary" : "border-light-subtle") p-3 d-flex justify-content-between align-items-center">
+            <span class="text-xs text-muted">符合工程审计追溯与不可篡改存证规范</span>
+            <button class="btn btn-secondary btn-sm" @onclick="CloseDrawer">关闭抽屉</button>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsVisible { get; set; }
+    [Parameter] public string Title { get; set; } = "全过程版本与修改审计履历";
+    [Parameter] public string TargetFingerprint { get; set; } = "";
+    [Parameter] public IEnumerable<IAuditEvent> AuditEvents { get; set; } = [];
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private async Task CloseDrawer()
+    {
+        await OnClose.InvokeAsync();
+    }
+}
